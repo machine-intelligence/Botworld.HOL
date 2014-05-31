@@ -1,0 +1,14 @@
+ifndef VMLDIR
+VMLDIR = $(HOME)/vml
+endif
+
+INCLUDES = $(VMLDIR)/bytecode
+
+ifdef POLY
+HOLHEAP = heap
+EXTRA_CLEANS = $(HOLHEAP) $(HOLHEAP).o
+BARE_THYS = $(VMLDIR)/bytecode/bytecodeExtraTheory
+DEPS = $(patsubst %,%.uo,$(BARE_THYS))
+$(HOLHEAP): $(DEPS)
+	$(protect $(HOLDIR)/bin/buildheap) -o $(HOLHEAP) $(BARE_THYS)
+endif
