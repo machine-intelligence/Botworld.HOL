@@ -28,6 +28,9 @@ val _ = Datatype`
             ; machineState : bc_state
             |>`
 
+val resetMemory_def = Define`
+  resetMemory m = m with machineState := empty_bc_state`
+
 val _ = Datatype`
   cargo = <| cargoType : num; cargoWeight : num |>`
 
@@ -36,14 +39,13 @@ val _ = Datatype`
        | ProcessorPart processor
        | MemoryPart memory
        | FramePart frame
-       | Shield`
+       | InspectShield
+       | DestroyShield`
 
 val weight_def = Define`
   weight (Cargo c) = c.cargoWeight ∧
-  weight Shield = 1 ∧
-  weight (MemoryPart _) = 1 ∧
-  weight (ProcessorPart _) = 1 ∧
-  weight (FramePart _) = 100`
+  weight (FramePart _) = 100 ∧
+  weight _ = 1`
 
 val _ = Datatype`
   robot = <| frame : frame
@@ -67,13 +69,18 @@ val isMemory_def = Define`
   (isMemory _ ⇔ F)`
 val _ = export_rewrites["isMemory_def"]
 
+val _ = type_abbrev("robotItems",``:num#num#num``)
+
 val construct_def = Define`
-  construct f p m =
+  construct (f,p,m) =
             <| frame := f
              ; inventory := []
              ; processor := p
              ; memory := m
              |>`
+
+val shatter_def = Define`
+  shatter r = (r.frame, r.processor, resetMemory r.memory)`
 
 val canLift_def = Define`
   canLift r item ⇔ r.frame.strength ≥ SUM (MAP weight (item::r.inventory))`
@@ -104,7 +111,7 @@ val _ = Datatype`
           | Drop num
           | Inspect num
           | Destroy num
-          | Build num num num memory
+          | Build robotItems memory
           | Pass`
 
 val _ = Datatype`
@@ -123,9 +130,21 @@ val _ = Datatype`
          | DestroyTargetFled num
          | DestroyBlocked num
          | Destroyed num
-         | BuildInterrupted (num list)
-         | Built (num list) robot
+         | BuildInterrupted robotItems
+         | Built robotItems robot
          | Invalid`
+
+val _ = Datatype`
+  itemCache = <| components : item list
+               ; possessions : item list
+               |>`
+
+val _ = Datatype`
+  event = <| robotActions : (robot#action) list
+           ; untouchedItems : item list
+           ; droppedItems : item list
+           ; fallenItems : itemCache list
+           |>`
 
 val isValidLift_def = Define`
   isValidLift items r i ⇔
@@ -142,7 +161,7 @@ val allLifts_def = Define`
               (ZIP(robots,intents)))`
 
 val isValidBuild_def = Define`
-  isValidBuild items fi pi mi ⇔
+  isValidBuild items (fi,pi,mi) ⇔
     fi < LENGTH items ∧
     pi < LENGTH items ∧
     mi < LENGTH items ∧
@@ -154,8 +173,8 @@ val allBuilds_def = Define`
   allBuilds items intents =
     FLAT (MAP (λc.
       case c of
-      | SOME (Build fi pi mi _) =>
-          if isValidBuild items fi pi mi
+      | SOME (Build (fi,pi,mi) _) =>
+          if isValidBuild items (fi,pi,mi)
           then [fi;pi;mi]
           else []
       | _ => [])
