@@ -1,13 +1,17 @@
-ifndef VMLDIR
-VMLDIR = $(HOME)/vml
+ifndef CAKEMLDIR
+CAKEMLDIR = $(HOME)/cakeml
 endif
 
-INCLUDES = $(VMLDIR)/bytecode $(VMLDIR)/initial
+INCLUDES = $(CAKEMLDIR)/semantics
+THYFILES = $(patsubst %Script.sml,%Theory.uo,$(wildcard *.sml))
+TARGETS = $(patsubst %.sml,%.uo,$(THYFILES))
+all: $(TARGETS)
+.PHONY: all
 
 ifdef POLY
 HOLHEAP = heap
 EXTRA_CLEANS = $(HOLHEAP) $(HOLHEAP).o
-BARE_THYS = $(VMLDIR)/bytecode/bytecodeExtraTheory $(VMLDIR)/initial/initialProgramTheory
+BARE_THYS = $(CAKEMLDIR)/semantics/terminationTheory
 DEPS = $(patsubst %,%.uo,$(BARE_THYS))
 $(HOLHEAP): $(DEPS)
 	$(protect $(HOLDIR)/bin/buildheap) -o $(HOLHEAP) $(BARE_THYS)
