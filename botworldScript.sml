@@ -1,5 +1,8 @@
 open HolKernel Parse boolLib bossLib lcsymtacs
-open bytecodeTerminationTheory
+open terminationTheory
+
+val _ = temp_tight_equality()
+
 val _ = new_theory"botworld"
 
 val _ = Datatype`
@@ -24,13 +27,10 @@ val _ = Datatype`
   processor = <| speed : num |>`
 
 val _ = Datatype`
-  memory = <| heapSize : num
-            ; codeSize : num
-            ; machineState : bc_state
-            |>`
+  memory = <| program : prog |>`
 
 val resetMemory_def = Define`
-  resetMemory m = m with machineState := empty_bc_state`
+  resetMemory m = m with program := []`
 
 val _ = Datatype`
   cargo = <| cargoType : num; cargoWeight : num |>`
@@ -58,8 +58,7 @@ val _ = Datatype`
 val setState_def = Define`
   setState code r =
     r with memory :=
-      (r.memory with machineState :=
-        (empty_bc_state with code := (TAKE r.memory.codeSize code)))`
+      (r.memory with program := code)`
 
 val isFrame_def = Define`
   (isFrame (FramePart _) ⇔ T) ∧
@@ -129,7 +128,7 @@ val _ = Datatype`
           | Drop num
           | Inspect num
           | Destroy num
-          | Build robotItems (bc_inst list)
+          | Build robotItems prog
           | Pass`
 
 val _ = Datatype`
