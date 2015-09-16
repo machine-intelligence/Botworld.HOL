@@ -289,4 +289,28 @@ val act_def = Define`
        Invalid) ∧
   (act _ _ _ Pass = Passed)`
 
+(*
+val untouched_def = Define`
+  untouched localActions sq =
+    removeIndices
+      (FLAT (MAP (λa. case a of Lifted i => [i]
+                              | Built (i,j,k) _ => [i;j;k]
+                              | _ => [])
+                 localActions))
+      sq.itemsIn`;
+
+val dropped_def = Define`
+  dropped robots localActions =
+    FLAT (MAP (λ(r,a). case a of Dropped i => [EL i r.inventory]a | _ => [])
+              (ZIP(robots,localActions)))`;
+
+val updateInventory_def = Define`
+  updateInventory i a r =
+  case a of
+  | MovedOut _ => r
+  | Lifted n =>
+  | Dropped n =>
+  | _ => r with inventory := defend i r.inventory
+*)
+
 val _ = export_theory()
