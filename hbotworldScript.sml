@@ -126,6 +126,11 @@ val _ = Datatype`
   | Built (num list) robot
   | Invalid`;
 
+val isMovedOut_def = Define`
+  (isMovedOut (MovedOut _) ⇔ T) ∧
+  (isMovedOut _ ⇔ F)`;
+val _ = export_rewrites["isMovedOut_def"];
+
 val _ = Datatype`
   square = <| robots: robot list; items: item list |>`;
 val _ = type_abbrev("cell",``:square option``);
@@ -287,5 +292,34 @@ val event_def = Define`
      |>`;
 
 (* computation phase *)
+
+val _ = Datatype`
+  privateData = pInvalid | pNothing | pInspected processor prog`;
+
+val private_def = Define`
+  (private (Inspected _ r) = pInspected r.processor r.memory) ∧
+  (private Invalid = pInvalid) ∧
+  (private _ = pNothing)`;
+
+val _ = type_abbrev("observation",``:num # event # privateData``);
+
+(*
+val setInput_def = Define`
+  setInput r obs =
+
+val prepare_def = Define`
+  prepare ev (i,r,a) =
+    setInput r (i, ev, private a)`;
+
+val computeSquare_def = Define`
+  computeSquare ev =
+    <| items = ev.untouchedItems ++ ev.droppedItems ++
+               FLAT (MAP (λc. c.components ++ c.possessions) ev.fallenItems)
+     ; robots =
+       let ls = GENLIST (λi. (i,EL i ev.robotActions)) (LENGTH robotActions) in
+       let ls = FILTER (λ(i,r,a). ¬isMovedOut a ∧ ¬MEM (Destroyed i) (MAP SND robotActions)) ls in
+       MAP (runMachine o prepare ev) ls
+     |>`;
+*)
 
 val _ = export_theory()
