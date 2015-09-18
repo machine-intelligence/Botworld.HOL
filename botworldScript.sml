@@ -1,316 +1,177 @@
 open HolKernel Parse boolLib bossLib lcsymtacs
-open terminationTheory
+open botworld_dataTheory terminationTheory
 
-val _ = temp_tight_equality()
+val _ = temp_tight_equality();
 
 val _ = new_theory"botworld"
 
-val _ = Datatype`
-  color = Red | Orange | Yellow | Green | Blue
-        | Violet | Black | White`
-val color_to_num_def = Define`
-  color_to_num Red = 0 ∧
-  color_to_num Orange = 1 ∧
-  color_to_num Yellow = 2 ∧
-  color_to_num Green = 3 ∧
-  color_to_num Blue = 4 ∧
-  color_to_num Violet = 5 ∧
-  color_to_num Black = 6 ∧
-  color_to_num White = 7`
+(* Port of Botworld to more idiomatic HOL *)
 
 val _ = Datatype`
-  frame = <| color : color
-           ; strength : num
-           |>`
+  square = <| robots: robot list; items: item list |>`;
+val _ = type_abbrev("cell",``:square option``);
 
-val _ = Datatype`
-  processor = <| speed : num |>`
-
-val _ = Datatype`
-  memory = <| program : prog |>`
-
-val resetMemory_def = Define`
-  resetMemory m = m with program := []`
-
-val _ = Datatype`
-  cargo = <| cargoType : num; cargoWeight : num |>`
-
-val _ = Datatype`
-  item = Cargo cargo
-       | ProcessorPart processor
-       | MemoryPart memory
-       | FramePart frame
-       | InspectShield
-       | DestroyShield`
-
-val weight_def = Define`
-  weight (Cargo c) = c.cargoWeight ∧
-  weight (FramePart _) = 100 ∧
-  weight _ = 1`
-
-val _ = Datatype`
-  robot = <| frame : frame
-           ; inventory : item list
-           ; processor : processor
-           ; memory : memory
-           |>`
-
-val setState_def = Define`
-  setState code r =
-    r with memory :=
-      (r.memory with program := code)`
-
-val isFrame_def = Define`
-  (isFrame (FramePart _) ⇔ T) ∧
-  (isFrame _ ⇔ F)`
-val _ = export_rewrites["isFrame_def"]
-
-val isProcessor_def = Define`
-  (isProcessor (ProcessorPart _) ⇔ T) ∧
-  (isProcessor _ ⇔ F)`
-val _ = export_rewrites["isProcessor_def"]
-
-val isMemory_def = Define`
-  (isMemory (MemoryPart _) ⇔ T) ∧
-  (isMemory _ ⇔ F)`
-val _ = export_rewrites["isMemory_def"]
-
-val isInspectShield_def = Define`
-  (isInspectShield InspectShield ⇔ T) ∧
-  (isInspectShield _ ⇔ F)`
-val _ = export_rewrites["isInspectShield_def"]
-
-val isDestroyShield_def = Define`
-  (isDestroyShield DestroyShield ⇔ T) ∧
-  (isDestroyShield _ ⇔ F)`
-val _ = export_rewrites["isDestroyShield_def"]
-
-val _ = type_abbrev("robotItems",``:num#num#num``)
-
-val construct_def = Define`
-  construct (FramePart f,ProcessorPart p,MemoryPart m) =
-       SOME <| frame := f
-             ; inventory := []
-             ; processor := p
-             ; memory := m
-             |> ∧
-  construct _ = NONE`
-
-val shatter_def = Define`
-  shatter r = (r.frame, r.processor, resetMemory r.memory)`
-
-val canLift_def = Define`
-  canLift r item ⇔ r.frame.strength ≥ SUM (MAP weight (item::r.inventory))`
-
-val _ = Datatype`
-  square = <| robotsIn : robot list ; itemsIn : item list |>`
-
-val _ = type_abbrev("cell",``:square option``)
-
-val _ = Datatype`
-  direction = North | NorthEast | East | SouthEast |
-              South | SouthWest | West | NorthWest`
-val direction_to_num_def = Define`
-  direction_to_num North     = 0 ∧
-  direction_to_num NorthEast = 1 ∧
-  direction_to_num East      = 2 ∧
-  direction_to_num SouthEast = 3 ∧
-  direction_to_num South     = 4 ∧
-  direction_to_num SouthWest = 5 ∧
-  direction_to_num West      = 6 ∧
-  direction_to_num NorthWest = 7`
 val opposite_def = Define`
-  opposite d = d + 4 MOD 8`
+  opposite d = d + 4 MOD 8`;
 
-val _ = Datatype`
-  command = Move direction
-          | Lift num
-          | Drop num
-          | Inspect num
-          | Destroy num
-          | Build robotItems prog
-          | Pass`
-
-val _ = Datatype`
-  action = Created
-         | Passed
-         | MoveBlocked direction
-         | MovedOut direction
-         | MovedIn direction
-         | CannotLift num
-         | GrappledOver num
-         | Lifted num
-         | Dropped num
-         | InspectTargetFled num
-         | InspectBlocked num
-         | Inspected num robot
-         | DestroyTargetFled num
-         | DestroyBlocked num
-         | Destroyed num
-         | BuildInterrupted robotItems
-         | Built robotItems robot
-         | Invalid`
-
-val _ = Datatype`
-  itemCache = <| components : item list
-               ; possessions : item list
-               |>`
-
-val _ = Datatype`
-  event = <| robotActions : (robot#action) list
-           ; untouchedItems : item list
-           ; droppedItems : item list
-           ; fallenItems : itemCache list
-           |>`
-
-val isValidLift_def = Define`
-  isValidLift items r i ⇔
-    i < LENGTH items ∧
-    canLift r (EL i items)`
-
-val allLifts_def = Define`
-  allLifts items robots intents =
-    FLAT (MAP (λ(r,c).
-      case c of
-      | SOME (Lift i) =>
-        if isValidLift items r i then [i] else []
-      | _ => [])
-              (ZIP(robots,intents)))`
-
-val isValidBuild_def = Define`
-  isValidBuild items (fi,pi,mi) ⇔
-    fi < LENGTH items ∧
-    pi < LENGTH items ∧
-    mi < LENGTH items ∧
-    isFrame (EL fi items) ∧
-    isProcessor (EL pi items) ∧
-    isMemory (EL mi items)`
-
-val allBuilds_def = Define`
-  allBuilds items intents =
-    FLAT (MAP (λc.
-      case c of
-      | SOME (Build (fi,pi,mi) _) =>
-          if isValidBuild items (fi,pi,mi)
-          then [fi;pi;mi]
-          else []
-      | _ => [])
-              intents)`
-
-val isContested_def = Define`
-  isContested uses i ⇔ LENGTH (FILTER ($= i) uses) > 1`
+(* environment phase *)
 
 val contested_def = Define`
-  contested sq robots intents =
-  let uses = (allLifts sq.itemsIn robots intents ++
-              allBuilds sq.itemsIn intents) in
-    GENLIST (isContested uses) (LENGTH (sq.itemsIn))`
-
-val destroyAttempts_def = Define`
-  destroyAttempts robots intents =
-    GENLIST
-    (λi. LENGTH (FILTER (λc. case c of SOME (Destroy n) => n = i | _ => F)
-                 intents))
-    (LENGTH robots)`
-
-val inspectAttempts_def = Define`
-  inspectAttempts robots intents =
-    GENLIST
-    (λi. LENGTH (FILTER (λc. case c of SOME (Inspect n) => n = i | _ => F)
-                 intents))
-    (LENGTH robots)`
-
-val destroyShielded_def = Define`
-  destroyShielded robots intents =
-    GENLIST
-    (λi. EL i (destroyAttempts robots intents) ≤
-         LENGTH (FILTER isDestroyShield (EL i robots).inventory))
-    (LENGTH robots)`
-
-val inspectShielded_def = Define`
-  inspectShielded robots intents =
-    GENLIST
-    (λi. EL i (inspectAttempts robots intents) ≤
-         LENGTH (FILTER isInspectShield (EL i robots).inventory))
-    (LENGTH robots)`
+  contested sq i ⇔
+    i < LENGTH sq.items ∧
+    1 < LENGTH
+        (FILTER (λr. case r.command of
+                     | Lift li => li = i ∧ canLift r (EL i sq.items)
+                     | Build is _ => MEM i is ∧
+                                     EVERY (λi. i < LENGTH sq.items) is ∧
+                                     IS_SOME (construct (MAP (λi. EL i sq.items) is))
+                     | _ => F)
+         sq.robots)`;
 
 val fled_def = Define`
-  (fled neighbors (SOME (Move dir)) ⇔
-     IS_SOME (OPTION_JOIN (FLOOKUP neighbors dir))) ∧
-  (fled neighbors _ ⇔ F)`
+  (fled nb (Move dir) ⇔ dir < LENGTH nb ∧ IS_SOME (EL dir nb)) ∧
+  (fled nb _ = F)`;
+
+val inspectAttempts_def = Define`
+  inspectAttempts intents i =
+    LENGTH (FILTER (λc. c = Inspect i) intents)`;
+
+val inspectShielded_def = Define`
+  inspectShielded robots i ⇔
+    inspectAttempts (MAP robot_command robots) i ≤
+    LENGTH (FILTER isInspectShield (EL i robots).inventory)`;
+
+val destroyAttempts_def = Define`
+  destroyAttempts intents i =
+    LENGTH (FILTER (λc. c = Destroy i) intents)`;
+
+val destroyShielded_def = Define`
+  destroyShielded robots i ⇔
+    destroyAttempts (MAP robot_command robots) i ≤
+    LENGTH (FILTER isDestroyShield (EL i robots).inventory)`;
 
 val act_def = Define`
-  (act _ _ (sq,neighbors) (Move dir) =
-     (if IS_SOME (OPTION_JOIN (FLOOKUP neighbors dir))
-      then MovedOut else MoveBlocked) dir) ∧
-  (act r (robots,intents) (sq,neighbors) (Lift i) =
-     if i < LENGTH sq.itemsIn then
-       if canLift r (EL i sq.itemsIn) then
-         if EL i (contested sq robots intents) then
-           Lifted i
-         else GrappledOver i
-       else CannotLift i
-     else Invalid) ∧
-  (act r _ _ (Drop i) =
-     if i < LENGTH r.inventory then
-       Dropped i
-     else Invalid) ∧
-  (act _ (robots,intents) (_,neighbors) (Inspect i) =
-     if i < LENGTH robots then
-       if fled neighbors (EL i intents) then
-         InspectTargetFled i
-       else if EL i (inspectShielded robots intents) then
-         InspectBlocked i
-       else
-         Inspected i (EL i robots)
-     else Invalid) ∧
-  (act _ (robots,intents) (_,neighbors) (Destroy i) =
-     if i < LENGTH robots then
-       if fled neighbors (EL i intents) then
-         DestroyTargetFled i
-       else if EL i (destroyShielded robots intents) then
-         DestroyBlocked i
-       else Destroyed i
-     else Invalid) ∧
-  (act _ (robots,intents) (sq,_) (Build (fi,pi,mi) code) =
-     if fi < LENGTH sq.itemsIn ∧
-        pi < LENGTH sq.itemsIn ∧
-        mi < LENGTH sq.itemsIn
-     then
-       if EXISTS (λi. EL i (contested sq robots intents)) [fi;pi;mi]
-       then BuildInterrupted (fi,pi,mi)
-       else
-         case construct (EL fi sq.itemsIn,
-                         EL pi sq.itemsIn,
-                         EL mi sq.itemsIn) of
-         | SOME r => Built (fi,pi,mi) (setState code r)
-         | NONE => Invalid
-     else
-       Invalid) ∧
-  (act _ _ _ Pass = Passed)`
+  act sq nb ri = if ri < LENGTH sq.robots then
+    let r = EL ri sq.robots in
+    case r.command of
+    | Move dir =>
+      if dir < LENGTH nb then
+        (if IS_SOME (EL dir nb) then MovedOut else MoveBlocked) dir
+      else MoveBlocked dir
+    | Lift i =>
+      if i < LENGTH sq.items then
+        if canLift r (EL i sq.items) then
+          if contested sq i then GrappledOver i else Lifted i
+        else CannotLift i
+      else Invalid
+    | Drop i =>
+      if i < LENGTH r.inventory then
+        Dropped i
+      else Invalid
+    | Inspect i =>
+      if i < LENGTH sq.robots then
+        if ¬fled nb (EL i sq.robots).command then
+          if ¬inspectShielded sq.robots i then
+            Inspected i (EL i sq.robots)
+          else InspectBlocked i
+        else InspectTargetFled i
+      else Invalid
+    | Destroy i =>
+      if i < LENGTH sq.robots then
+        if ¬fled nb (EL i sq.robots).command then
+          if ¬destroyShielded sq.robots i then
+            Destroyed i
+          else DestroyBlocked i
+        else DestroyTargetFled i
+      else Invalid
+    | Build is m =>
+      if EVERY (λi. i < LENGTH sq.items) is then
+        if ¬EXISTS (contested sq) is then
+          case construct (MAP (λi. EL i sq.items) is) of
+          | NONE => Invalid
+          | SOME r => Built is r
+        else BuildInterrupted is
+      else Invalid
+    | Pass => Passed
+  else Invalid`;
 
-(*
-val untouched_def = Define`
-  untouched localActions sq =
-    removeIndices
-      (FLAT (MAP (λa. case a of Lifted i => [i]
-                              | Built (i,j,k) _ => [i;j;k]
-                              | _ => [])
-                 localActions))
-      sq.itemsIn`;
+val localActions_def = Define`
+  localActions sq nb =
+    GENLIST (act sq nb) (LENGTH sq.robots)`;
 
-val dropped_def = Define`
-  dropped robots localActions =
-    FLAT (MAP (λ(r,a). case a of Dropped i => [EL i r.inventory]a | _ => [])
-              (ZIP(robots,localActions)))`;
+val defend_def = Define`
+  defend intents i =
+    dropN (destroyAttempts intents i) isDestroyShield o
+    dropN (inspectAttempts intents i) isInspectShield`;
 
 val updateInventory_def = Define`
-  updateInventory i a r =
-  case a of
-  | MovedOut _ => r
-  | Lifted n =>
-  | Dropped n =>
-  | _ => r with inventory := defend i r.inventory
+  updateInventory sq i a =
+    let r = EL i sq.robots in
+    let intents = MAP robot_command sq.robots in
+    case a of
+    | MovedOut _ => r
+    | Lifted n => r with inventory := (EL n sq.items)::(defend intents i r.inventory)
+    | Dropped n => r with inventory := (defend intents i (remove_indices ($= n) 0 r.inventory))
+    | _ => r with inventory := defend intents i r.inventory`;
+
+val incomingFrom_def = Define`
+  (incomingFrom dir NONE = []) ∧
+  (incomingFrom dir (SOME sq) =
+   FLAT (MAP (λr. if r.command = Move (opposite dir) then [(r,MovedIn dir)] else []) sq.robots))`;
+
+val event_def = Define`
+  event sq nb =
+    let actions = localActions sq nb in
+    let veterans = GENLIST (λi. updateInventory sq i (EL i actions)) (LENGTH sq.robots) in
+    let fallen = FLAT (GENLIST (λi. if MEM (Destroyed i) actions then
+                                      [<|components := shatter (EL i veterans)
+                                        ;possessions := (EL i veterans).inventory|>]
+                                    else [])
+                       (LENGTH veterans)) in
+    <| robotActions :=
+       let immigrations = FLAT (GENLIST (λi. incomingFrom i (EL i nb)) (LENGTH nb)) in
+       let children = FLAT (MAP (λa. case a of Built _ r => [r] | _ => []) actions) in
+       ZIP (veterans,actions) ++ immigrations ++
+       ZIP (children, REPLICATE (LENGTH children) Created)
+     ; untouchedItems :=
+       remove_indices
+         (λi. EXISTS (λa. case a of Lifted l => i = l
+                                  | Built is _ => MEM i is
+                                  | _ => F)
+              actions)
+         0 sq.items
+     ; droppedItems :=
+       FLAT
+         (MAP (λ(r,a). case a of Dropped i => [EL i r.inventory]
+                               | _ => [])
+              (ZIP(sq.robots,actions)))
+     ; fallenItems := fallen
+     |>`;
+
+(* computation phase *)
+
+val private_def = Define`
+  (private (Inspected _ r) = pInspected r.processor r.memory) ∧
+  (private Invalid = pInvalid) ∧
+  (private _ = pNothing)`;
+
+(*
+val setInput_def = Define`
+  setInput r obs =
+
+val prepare_def = Define`
+  prepare ev (i,r,a) =
+    setInput r (i, ev, private a)`;
+
+val computeSquare_def = Define`
+  computeSquare ev =
+    <| items = ev.untouchedItems ++ ev.droppedItems ++
+               FLAT (MAP (λc. c.components ++ c.possessions) ev.fallenItems)
+     ; robots =
+       let ls = GENLIST (λi. (i,EL i ev.robotActions)) (LENGTH robotActions) in
+       let ls = FILTER (λ(i,r,a). ¬isMovedOut a ∧ ¬MEM (Destroyed i) (MAP SND robotActions)) ls in
+       MAP (runMachine o prepare ev) ls
+     |>`;
 *)
 
 val _ = export_theory()
