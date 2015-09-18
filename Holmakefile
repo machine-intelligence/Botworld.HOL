@@ -2,7 +2,7 @@ ifndef CAKEMLDIR
 CAKEMLDIR = $(HOME)/cakeml
 endif
 
-INCLUDES = $(CAKEMLDIR)/semantics
+INCLUDES = $(CAKEMLDIR)/semantics $(CAKEMLDIR)/parsing $(HOLDIR)/examples/parsing
 THYFILES = $(patsubst %Script.sml,%Theory.uo,$(wildcard *.sml))
 TARGETS = $(patsubst %.sml,%.uo,$(THYFILES))
 all: $(TARGETS)
@@ -11,7 +11,7 @@ all: $(TARGETS)
 ifdef POLY
 HOLHEAP = heap
 EXTRA_CLEANS = $(HOLHEAP) $(HOLHEAP).o
-BARE_THYS = $(CAKEMLDIR)/semantics/terminationTheory
+BARE_THYS = $(CAKEMLDIR)/semantics/terminationTheory $(CAKEMLDIR)/parsing/fromSexpTheory
 DEPS = $(patsubst %,%.uo,$(BARE_THYS))
 $(HOLHEAP): $(DEPS)
 	$(protect $(HOLDIR)/bin/buildheap) -o $(HOLHEAP) $(BARE_THYS)
