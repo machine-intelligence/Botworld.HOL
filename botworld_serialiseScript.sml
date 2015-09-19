@@ -1,16 +1,26 @@
 open HolKernel Parse boolLib bossLib lcsymtacs
 open simpleSexpTheory fromSexpTheory monadsyntax
+open simpleSexpPEGTheory
 open botworld_dataTheory
 
 val _ = new_theory"botworld_serialise"
-
-(* decoding from sexp to action and policy *)
 
 val _ = temp_overload_on ("return", ``SOME``)
 val _ = temp_overload_on ("fail", ``NONE``)
 val _ = temp_overload_on ("lift", ``OPTION_MAP``)
 val _ = temp_overload_on ("guard", ``λb m. monad_unitbind (assert b) m``)
 val _ = temp_overload_on ("sexpnum", ``odestSXNUM``)
+
+(* decoding from string to sexp *)
+
+val parse_sexp_def = Define`
+  parse_sexp s =
+    do
+      (rest,sx) <- destResult (peg_exec sexpPEG (pnt sxnt_sexp) s [] done failed);
+      guard (rest="") (return sx)
+    od`;
+
+(* decoding from sexp to action and policy *)
 
 val sexpframe_def = Define`
   sexpframe s =
@@ -129,5 +139,14 @@ val sexpaction_def = Define`
       guard (nm = "Invalid" ∧ args = [])
             (return Invalid)
     od`;
+
+val sexpoutput_def = Define`
+  sexpoutput = sexppair sexpaction (sexplist sexptop)`;
+
+val decode_def = Define`
+  decode (bytes:word8 list) = do
+    s <- parse_sexp (MAP (CHR o w2n) bytes);
+    sexpoutput s
+  od`;
 
 val _ = export_theory()
