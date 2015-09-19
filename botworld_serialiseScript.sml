@@ -6,9 +6,6 @@ val _ = new_theory"botworld_serialise"
 
 (* decoding from sexp to action and policy *)
 
-val sexptop_def = Define`
-  (sexptop:sexp -> top option) = ARB`; (* TODO in fromSexpTheory *)
-
 val _ = temp_overload_on ("return", ``SOME``)
 val _ = temp_overload_on ("fail", ``NONE``)
 val _ = temp_overload_on ("lift", ``OPTION_MAP``)
