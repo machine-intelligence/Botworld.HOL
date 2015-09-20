@@ -1,5 +1,6 @@
 open HolKernel Parse boolLib bossLib lcsymtacs
-open botworld_dataTheory terminationTheory
+open botworld_dataTheory botworld_serialiseTheory
+open terminationTheory
 
 val _ = temp_tight_equality();
 

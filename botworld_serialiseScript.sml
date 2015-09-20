@@ -149,4 +149,93 @@ val decode_def = Define`
     sexpoutput s
   od`;
 
+(* encoding from observation to sexp *)
+
+val listsexp_def = Define`
+  listsexp = FOLDR SX_CONS nil`;
+
+val topsexp_def = Define`
+  topsexp : top -> sexp = ARB`; (* TODO *)
+
+val framesexp_def = Define`
+  framesexp f =
+    SX_CONS (SX_NUM f.color) (SX_NUM f.strength)`;
+
+val processorsexp_def = Define`
+  processorsexp p = SX_NUM (p.speed)`;
+
+val cargosexp_def = Define`
+  cargosexp c =
+    SX_CONS (SX_NUM c.cargoType) (SX_NUM c.cargoWeight)`;
+
+val itemsexp_def = Define`
+  (itemsexp (Cargo c) = listsexp [SX_SYM "Cargo"; cargosexp c]) ∧
+  (itemsexp (ProcessorPart p) = listsexp [SX_SYM "ProcessorPart"; processorsexp p]) ∧
+  (itemsexp (RegisterPart t) = listsexp [SX_SYM "RegisterPart"; topsexp t]) ∧
+  (itemsexp (FramePart f) = listsexp [SX_SYM "FramePart"; framesexp f]) ∧
+  (itemsexp (InspectShield) = listsexp [SX_SYM "InspectShield"]) ∧
+  (itemsexp (DestroyShield) = listsexp [SX_SYM "DestroyShield"])`;
+
+val commandsexp_def = Define`
+  (commandsexp (Move num) = listsexp [SX_SYM "Move"; SX_NUM num]) ∧
+  (commandsexp (Lift num) = listsexp [SX_SYM "Lift"; SX_NUM num]) ∧
+  (commandsexp (Drop num) = listsexp [SX_SYM "Drop"; SX_NUM num]) ∧
+  (commandsexp (Inspect num) = listsexp [SX_SYM "Inspect"; SX_NUM num]) ∧
+  (commandsexp (Destroy num) = listsexp [SX_SYM "Destroy"; SX_NUM num]) ∧
+  (commandsexp (Build ns prog) = listsexp [SX_SYM "Build"; listsexp (MAP SX_NUM ns); listsexp (MAP topsexp prog)]) ∧
+  (commandsexp (Pass) = listsexp [SX_SYM "Pass"])`;
+
+val robotsexp_def = Define`
+  robotsexp r =
+    SX_CONS (framesexp r.frame)
+      (SX_CONS (processorsexp r.processor)
+        (SX_CONS (listsexp (MAP topsexp r.memory))
+          (SX_CONS (listsexp (MAP itemsexp r.inventory))
+            (commandsexp r.command))))`;
+
+val actionsexp_def = Define`
+  (actionsexp (Created) = listsexp [SX_SYM "Created"]) ∧
+  (actionsexp (Passed) = listsexp [SX_SYM "Passed"]) ∧
+  (actionsexp (MoveBlocked num) = listsexp [SX_SYM "MoveBlocked"; SX_NUM num]) ∧
+  (actionsexp (MovedOut num) = listsexp [SX_SYM "MovedOut"; SX_NUM num]) ∧
+  (actionsexp (MovedIn num) = listsexp [SX_SYM "MovedIn"; SX_NUM num]) ∧
+  (actionsexp (CannotLift num) = listsexp [SX_SYM "CannotLift"; SX_NUM num]) ∧
+  (actionsexp (GrappledOver num) = listsexp [SX_SYM "GrappledOver"; SX_NUM num]) ∧
+  (actionsexp (Lifted num) = listsexp [SX_SYM "Lifted"; SX_NUM num]) ∧
+  (actionsexp (Dropped num) = listsexp [SX_SYM "Dropped"; SX_NUM num]) ∧
+  (actionsexp (InspectTargetFled num) = listsexp [SX_SYM "InspectTargetFled"; SX_NUM num]) ∧
+  (actionsexp (InspectBlocked num) = listsexp [SX_SYM "InspectBlocked"; SX_NUM num]) ∧
+  (actionsexp (Inspected num r) = listsexp [SX_SYM "Inspected"; SX_NUM num; robotsexp r]) ∧
+  (actionsexp (DestroyTargetFled num) = listsexp [SX_SYM "DestroyTargetFled"; SX_NUM num]) ∧
+  (actionsexp (DestroyBlocked num) = listsexp [SX_SYM "DestroyBlocked"; SX_NUM num]) ∧
+  (actionsexp (Destroyed num) = listsexp [SX_SYM "Destroyed"; SX_NUM num]) ∧
+  (actionsexp (BuildInterrupted ns) = listsexp [SX_SYM "BuildInterrupted"; listsexp (MAP SX_NUM ns)]) ∧
+  (actionsexp (Built ns r) = listsexp [SX_SYM "Built"; listsexp (MAP SX_NUM ns); robotsexp r]) ∧
+  (actionsexp (Invalid) = listsexp [SX_SYM "Invalid"])`;
+
+val itemCachesexp_def = Define`
+  itemCachesexp c =
+    SX_CONS (listsexp (MAP itemsexp c.components))
+      (listsexp (MAP itemsexp c.possessions))`;
+
+val eventsexp_def = Define`
+  eventsexp e =
+    SX_CONS (listsexp (MAP (UNCURRY SX_CONS o (robotsexp ## actionsexp)) e.robotActions))
+      (SX_CONS (listsexp (MAP itemsexp e.untouchedItems))
+        (SX_CONS (listsexp (MAP itemsexp e.droppedItems))
+          (listsexp (MAP itemCachesexp e.fallenItems))))`;
+
+val privateDatasexp_def = Define`
+  (privateDatasexp pInvalid = listsexp [SX_SYM "pInvalid"]) ∧
+  (privateDatasexp pNothing = listsexp [SX_SYM "pNothing"]) ∧
+  (privateDatasexp (pInspected proc prog) =
+   listsexp [SX_SYM "pInspected";
+             processorsexp proc;
+             listsexp (MAP topsexp prog)])`;
+
+val observationsexp_def = Define`
+  observationsexp ((i,e,p):observation) =
+    SX_CONS (SX_NUM i)
+      (SX_CONS (eventsexp e) (privateDatasexp p))`;
+
 val _ = export_theory()
