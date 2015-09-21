@@ -151,12 +151,6 @@ val decode_def = Define`
 
 (* encoding from observation to sexp *)
 
-val listsexp_def = Define`
-  listsexp = FOLDR SX_CONS nil`;
-
-val topsexp_def = Define`
-  topsexp : top -> sexp = ARB`; (* TODO *)
-
 val framesexp_def = Define`
   framesexp f =
     SX_CONS (SX_NUM f.color) (SX_NUM f.strength)`;
