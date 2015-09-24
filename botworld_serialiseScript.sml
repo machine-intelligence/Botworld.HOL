@@ -1,6 +1,6 @@
 open HolKernel Parse boolLib bossLib lcsymtacs
 open simpleSexpTheory fromSexpTheory monadsyntax
-open simpleSexpPEGTheory
+open simpleSexpParseTheory
 open botworld_dataTheory
 
 val _ = new_theory"botworld_serialise"
@@ -10,15 +10,6 @@ val _ = temp_overload_on ("fail", ``NONE``)
 val _ = temp_overload_on ("lift", ``OPTION_MAP``)
 val _ = temp_overload_on ("guard", ``λb m. monad_unitbind (assert b) m``)
 val _ = temp_overload_on ("sexpnum", ``odestSXNUM``)
-
-(* decoding from string to sexp *)
-
-val parse_sexp_def = Define`
-  parse_sexp s =
-    do
-      (rest,sx) <- destResult (peg_exec sexpPEG (pnt sxnt_sexp) s [] done failed);
-      guard (rest="") (return sx)
-    od`;
 
 (* decoding from sexp to action and policy *)
 
@@ -231,5 +222,8 @@ val observationsexp_def = Define`
   observationsexp ((i,e,p):observation) =
     SX_CONS (SX_NUM i)
       (SX_CONS (eventsexp e) (privateDatasexp p))`;
+
+val encode_def = Define`
+  encode = print_sexp o observationsexp`;
 
 val _ = export_theory()
