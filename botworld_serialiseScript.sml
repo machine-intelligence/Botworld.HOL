@@ -253,6 +253,47 @@ val observationsexp_def = Define`
       (SX_CONS (eventsexp e) (privateDatasexp p))`;
 
 val encode_def = Define`
-  encode = print_sexp o observationsexp`;
+  (encode:observation -> word8 list) =
+    MAP (n2w o ORD) o print_sexp o observationsexp`;
+
+(* botworld ffi *)
+
+val _ = Datatype`
+  botworld_ffi_state = <|
+    bot_input : observation
+  ; bot_output : command # prog |>`;
+
+val botworld_get_input_length_def = Define`
+  botworld_get_input_length st bytes =
+    let n = LENGTH (encode st.bot_input) in
+    let s = print_sexp (SX_NUM n) in
+    if LENGTH bytes ≤ LENGTH s then
+      SOME (st, MAP (K (0w:word8)) bytes)
+    else
+      SOME (st, MAP (n2w o ORD) s ++ GENLIST (K 0w) (LENGTH bytes - LENGTH s))`;
+
+val botworld_read_def = Define`
+  botworld_read st bytes =
+    let bytes' = encode st.bot_input in
+    if LENGTH bytes < LENGTH bytes' then NONE else
+      SOME (st, bytes' ++ (GENLIST (K 0w) (LENGTH bytes - LENGTH bytes')))`;
+
+val botworld_write_def = Define`
+  botworld_write st bytes =
+    case decode bytes of
+    | SOME output => SOME (st with bot_output := output, bytes)
+    | NONE => SOME (st, bytes)`;
+
+val botworld_oracle_def = Define`
+  botworld_oracle n =
+    if n = 0n then botworld_get_input_length
+    else if n = 1 then botworld_read
+    else botworld_write`;
+
+val botworld_initial_state_def = Define`
+  botworld_initial_state obs =
+    <| oracle := botworld_oracle
+     ; ffi_state := SOME <| bot_input := obs ; bot_output := (Pass, []) |>
+     |>`;
 
 val _ = export_theory()
