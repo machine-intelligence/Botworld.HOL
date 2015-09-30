@@ -1,6 +1,6 @@
 open HolKernel Parse boolLib bossLib lcsymtacs
 open botworld_dataTheory botworld_serialiseTheory
-open terminationTheory
+open terminationTheory initialProgramTheory (* TODO: should be imported by terminationTheory *)
 
 val _ = temp_tight_equality();
 
@@ -156,23 +156,26 @@ val private_def = Define`
   (private Invalid = pInvalid) ∧
   (private _ = pNothing)`;
 
-(*
-val setInput_def = Define`
-  setInput r obs =
-
 val prepare_def = Define`
   prepare ev (i,r,a) =
-    setInput r (i, ev, private a)`;
+    (botworld_initial_state (i, ev, private a), r)`;
+
+val runMachine_def = Define`
+  runMachine (ffi,r) =
+    let (st,env) = THE (basis_sem_env ffi) in
+    let (st',c,res) = evaluate_prog (st with clock := r.processor.speed) env r.memory in
+    let (command,prog) = (THE st'.ffi.ffi_state).bot_output in
+    r with <| command := command; memory := prog |>`;
 
 val computeSquare_def = Define`
   computeSquare ev =
-    <| items = ev.untouchedItems ++ ev.droppedItems ++
-               FLAT (MAP (λc. c.components ++ c.possessions) ev.fallenItems)
-     ; robots =
-       let ls = GENLIST (λi. (i,EL i ev.robotActions)) (LENGTH robotActions) in
-       let ls = FILTER (λ(i,r,a). ¬isMovedOut a ∧ ¬MEM (Destroyed i) (MAP SND robotActions)) ls in
-       MAP (runMachine o prepare ev) ls
+    <| items :=
+         ev.untouchedItems ++ ev.droppedItems ++
+         FLAT (MAP (λc. c.components ++ c.possessions) ev.fallenItems)
+     ; robots :=
+         let ls = GENLIST (λi. (i,EL i ev.robotActions)) (LENGTH ev.robotActions) in
+         let ls = FILTER (λ(i,r,a). ¬isMovedOut a ∧ ¬MEM (Destroyed i) (MAP SND ev.robotActions)) ls in
+           MAP (runMachine o prepare ev) ls
      |>`;
-*)
 
 val _ = export_theory()
