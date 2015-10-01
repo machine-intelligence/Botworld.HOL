@@ -158,13 +158,15 @@ val private_def = Define`
 
 val prepare_def = Define`
   prepare ev (i,r,a) =
-    (botworld_initial_state (i, ev, private a), r)`;
+    (initial_ffi_state botworld_oracle
+      (botworld_initial_state (i, ev, private a)),
+     r)`;
 
 val runMachine_def = Define`
   runMachine (ffi,r) =
     let (st,env) = THE (basis_sem_env ffi) in
     let (st',c,res) = evaluate_prog (st with clock := r.processor.speed) env r.memory in
-    let (command,prog) = (THE st'.ffi.ffi_state).bot_output in
+    let (command,prog) = st'.ffi.ffi_state.bot_output in
     r with <| command := command; memory := prog |>`;
 
 val computeSquare_def = Define`

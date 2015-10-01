@@ -292,8 +292,6 @@ val botworld_oracle_def = Define`
 
 val botworld_initial_state_def = Define`
   botworld_initial_state obs =
-    <| oracle := botworld_oracle
-     ; ffi_state := SOME <| bot_input := obs ; bot_output := (Pass, []) |>
-     |>`;
+    <| bot_input := obs ; bot_output := (Pass, []) |>`;
 
 val _ = export_theory()
