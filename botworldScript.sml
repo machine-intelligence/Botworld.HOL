@@ -10,10 +10,23 @@ val _ = new_theory"botworld"
 
 val _ = Datatype`
   square = <| robots: robot list; items: item list |>`;
-val _ = type_abbrev("cell",``:square option``);
 
 val opposite_def = Define`
   opposite d = d + 4 MOD 8`;
+
+val _ = type_abbrev("coordinate",``:int # int``);
+val _ = type_abbrev("grid",``:coordinate |-> square``)
+
+val neighbours_def = Define`
+  neighbours g (x,y) = MAP (FLOOKUP g)
+    [(x  ,y+1)
+    ;(x+1,y+1)
+    ;(x+1,y  )
+    ;(x+1,y-1)
+    ;(x  ,y-1)
+    ;(x-1,y-1)
+    ;(x-1,y  )
+    ;(x-1,y+1)]`;
 
 (* environment phase *)
 
@@ -179,5 +192,45 @@ val computeSquare_def = Define`
          let ls = FILTER (λ(i,r,a). ¬isMovedOut a ∧ ¬MEM (Destroyed i) (MAP SND ev.robotActions)) ls in
            MAP (runMachine o prepare ev) ls
      |>`;
+
+(* state *)
+
+val step_def = Define`
+  step g = FMAP_MAP2 (λ(c,sq). computeSquare (event sq (neighbours g c))) g`;
+
+val _ = Datatype`
+  state_with_hole = <| state : grid
+                     ; focal_coordinate : coordinate
+                     ; focal_index : num
+                     |>`;
+
+val wf_state_with_hole_def = Define`
+  wf_state_with_hole s =
+    ∃sq. FLOOKUP s.state s.focal_coordinate = SOME sq ∧
+         s.focal_index < LENGTH sq.robots`;
+
+val fill_square_def = Define`
+  fill_square (command,policy) sq index =
+    sq with robots updated_by
+      LUPDATE (EL index sq.robots with
+                 <| memory := policy; command := command |>)
+                 index`;
+
+val fill_def = Define`
+  fill cp s =
+    s.state |+
+    (s.focal_coordinate,
+     fill_square cp (s.state ' s.focal_coordinate) s.focal_index)`;
+
+(*
+val steph_def = Define`
+  steph command s =
+    let focal_action =
+      act (fill_square (command,[]) (s.state ' s.focal_coordinate) s.focal_index)
+          (neighbours s.state s.focal_index)
+          s.focal_index
+    in if focal_action = Inspected ∨ focal_action = Destroyed then NONE else
+    let focal_observation =
+*)
 
 val _ = export_theory()
