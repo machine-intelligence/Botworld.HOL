@@ -11,7 +11,7 @@ all: $(TARGETS)
 ifdef POLY
 HOLHEAP = heap
 EXTRA_CLEANS = $(HOLHEAP) $(HOLHEAP).o
-BARE_THYS = $(CAKEMLDIR)/semantics/terminationTheory $(CAKEMLDIR)/compiler/parsing/fromSexpTheory
+BARE_THYS = $(CAKEMLDIR)/preamble $(CAKEMLDIR)/semantics/terminationTheory $(CAKEMLDIR)/compiler/parsing/fromSexpTheory
 DEPS = $(patsubst %,%.uo,$(BARE_THYS))
 $(HOLHEAP): $(DEPS)
 	$(protect $(HOLDIR)/bin/buildheap) -o $(HOLHEAP) $(BARE_THYS)
