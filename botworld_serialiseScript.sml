@@ -268,21 +268,21 @@ val botworld_get_input_length_def = Define`
     let n = LENGTH (encode st.bot_input) in
     let s = print_sexp (SX_NUM n) in
     if LENGTH bytes ≤ LENGTH s then
-      SOME (st, MAP (K (0w:word8)) bytes)
+      Oracle_return st (MAP (K (0w:word8)) bytes)
     else
-      SOME (st, MAP (n2w o ORD) s ++ GENLIST (K 0w) (LENGTH bytes - LENGTH s))`;
+      Oracle_return st (MAP (n2w o ORD) s ++ GENLIST (K 0w) (LENGTH bytes - LENGTH s))`;
 
 val botworld_read_def = Define`
   botworld_read st bytes =
     let bytes' = encode st.bot_input in
-    if LENGTH bytes < LENGTH bytes' then NONE else
-      SOME (st, bytes' ++ (GENLIST (K 0w) (LENGTH bytes - LENGTH bytes')))`;
+    if LENGTH bytes < LENGTH bytes' then Oracle_fail else
+      Oracle_return st (bytes' ++ (GENLIST (K 0w) (LENGTH bytes - LENGTH bytes')))`;
 
 val botworld_write_def = Define`
   botworld_write st bytes =
     case decode bytes of
-    | SOME output => SOME (st with bot_output := output, bytes)
-    | NONE => SOME (st, bytes)`;
+    | SOME output => Oracle_return (st with bot_output := output) bytes
+    | NONE => Oracle_return st bytes`;
 
 val botworld_oracle_def = Define`
   botworld_oracle n =
