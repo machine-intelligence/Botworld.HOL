@@ -11,6 +11,14 @@ val _ = temp_overload_on ("lift", ``OPTION_MAP``)
 val _ = temp_overload_on ("guard", ``λb m. monad_unitbind (assert b) m``)
 val _ = temp_overload_on ("sexpnum", ``odestSXNUM``)
 
+val sexpbool_def = Define`
+  sexpbool s = if s = SX_SYM "#t" then SOME T else
+               if s = SX_SYM "#f" then SOME F else
+               NONE`;
+
+val boolsexp_def = Define`
+  boolsexp b = SX_SYM (if b then "#t" else "#f")`;
+
 (* decoding from sexp to command and policy *)
 
 val sexpframe_def = Define`
@@ -77,12 +85,13 @@ val sexpitem_def = Define`
 val sexprobot_def = Define`
   sexprobot s =
     do
-      (frame,processor,memory,inventory,command) <-
+      (frame,processor,inventory,memory,command,focal) <-
         sexppair sexpframe
         (sexppair sexpprocessor
-         (sexppair (sexplist sexptop)
-          (sexppair (sexplist sexpitem) sexpcommand))) s;
-      return <| frame:=frame; processor:=processor; memory:=memory; inventory:=inventory; command:=command |>
+         (sexppair (sexplist sexpitem)
+          (sexppair (sexplist sexptop)
+           (sexppair sexpcommand sexpbool)))) s;
+      return <| frame:=frame; processor:=processor; inventory:=inventory; memory:=memory; command:=command; focal:=focal |>
     od`;
 
 val sexpaction_def = Define`
@@ -194,9 +203,10 @@ val robotsexp_def = Define`
   robotsexp r =
     SX_CONS (framesexp r.frame)
       (SX_CONS (processorsexp r.processor)
-        (SX_CONS (listsexp (MAP topsexp r.memory))
-          (SX_CONS (listsexp (MAP itemsexp r.inventory))
-            (commandsexp r.command))))`;
+         (SX_CONS (listsexp (MAP itemsexp r.inventory))
+            (SX_CONS (listsexp (MAP topsexp r.memory))
+               (SX_CONS (commandsexp r.command)
+                  (boolsexp r.focal)))))`;
 
 val actionsexp_def = Define`
   (actionsexp (Created) = listsexp [SX_SYM "Created"]) ∧

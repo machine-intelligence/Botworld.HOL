@@ -50,9 +50,10 @@ val _ = Datatype`
   robot =
   <| frame : frame
    ; processor : processor
-   ; memory : prog
    ; inventory : item list
+   ; memory : prog
    ; command : command
+   ; focal : bool
    |>`;
 
 val construct_def = Define`

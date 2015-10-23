@@ -1,6 +1,8 @@
 open HolKernel Parse boolLib bossLib lcsymtacs
 open botworld_dataTheory botworld_serialiseTheory
-open terminationTheory initialProgramTheory (* TODO: should be imported by terminationTheory *)
+open terminationTheory initialProgramTheory
+
+(* TODO: initialProgram should be imported by termination *)
 
 val _ = temp_tight_equality();
 
@@ -27,6 +29,17 @@ val neighbours_def = Define`
     ;(x-1,y-1)
     ;(x-1,y  )
     ;(x-1,y+1)]`;
+
+val move_coordinate_def = Define`
+  move_coordinate (x,y) (dir:num) =
+    if dir = 0 then (x  ,y+1) else
+    if dir = 1 then (x+1,y+1) else
+    if dir = 2 then (x+1,y  ) else
+    if dir = 3 then (x+1,y-1) else
+    if dir = 4 then (x  ,y-1) else
+    if dir = 5 then (x-1,y-1) else
+    if dir = 6 then (x-1,y  ) else
+    if dir = 7 then (x-1,y+1) else (x,y)`;
 
 (* environment phase *)
 
@@ -195,8 +208,12 @@ val computeSquare_def = Define`
 
 (* state *)
 
+val computeEvents_def = Define`
+  computeEvents g =
+    FMAP_MAP2 (λ(c,sq). event sq (neighbours g c)) g`;
+
 val step_def = Define`
-  step g = FMAP_MAP2 (λ(c,sq). computeSquare (event sq (neighbours g c))) g`;
+  step g = computeSquare o_f (computeEvents g)`;
 
 val _ = Datatype`
   state_with_hole = <| state : grid
@@ -205,9 +222,16 @@ val _ = Datatype`
                      |>`;
 
 val wf_state_with_hole_def = Define`
-  wf_state_with_hole s =
-    ∃sq. FLOOKUP s.state s.focal_coordinate = SOME sq ∧
-         s.focal_index < LENGTH sq.robots`;
+  wf_state_with_hole s ⇔
+    (∃sq.
+      FLOOKUP s.state s.focal_coordinate = SOME sq ∧
+      s.focal_index < LENGTH sq.robots ∧
+      (EL (s.focal_index) sq.robots).focal) ∧
+    (∀sq c i.
+       FLOOKUP s.state c = SOME sq ∧
+       i < LENGTH sq.robots ∧
+       (c,i) ≠ (s.focal_coordinate,s.focal_index)
+       ⇒ ¬(EL i sq.robots).focal)`;
 
 val fill_square_def = Define`
   fill_square (command,policy) sq index =
@@ -222,15 +246,27 @@ val fill_def = Define`
     (s.focal_coordinate,
      fill_square cp (s.state ' s.focal_coordinate) s.focal_index)`;
 
-(*
 val steph_def = Define`
   steph command s =
-    let focal_action =
-      act (fill_square (command,[]) (s.state ' s.focal_coordinate) s.focal_index)
-          (neighbours s.state s.focal_index)
-          s.focal_index
-    in if focal_action = Inspected ∨ focal_action = Destroyed then NONE else
-    let focal_observation =
-*)
+    let events = computeEvents (fill (command,[]) s) in
+    let ev = events ' s.focal_coordinate in
+    if EXISTS (λa. a = Destroyed s.focal_index ∨
+                   ∃r. a = Inspected s.focal_index r)
+              (MAP SND ev.robotActions)
+    then NONE else
+    let (r,a) = EL s.focal_index ev.robotActions in
+    let s' = computeSquare o_f events in
+    let (c,i) =
+      case a of
+      | MovedOut dir =>
+          let c = move_coordinate s.focal_coordinate dir in
+          (c, FST(THE(INDEX_FIND 0 robot_focal (s' ' c).robots)))
+      | _ => (s.focal_coordinate, s.focal_index) in
+    SOME
+      ((s.focal_index, ev, private a),
+       <| state := s'
+        ; focal_coordinate := c
+        ; focal_index := i
+        |>)`;
 
 val _ = export_theory()
