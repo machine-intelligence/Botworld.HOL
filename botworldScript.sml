@@ -182,11 +182,14 @@ val private_def = Define`
   (private Invalid = pInvalid) ∧
   (private _ = pNothing)`;
 
+val ffi_from_observation_def = Define`
+  ffi_from_observation (obs:observation) =
+    initial_ffi_state botworld_oracle
+      (botworld_initial_state obs)`;
+
 val prepare_def = Define`
   prepare ev (i,r,a) =
-    (initial_ffi_state botworld_oracle
-      (botworld_initial_state (i, ev, private a)),
-     r)`;
+    (ffi_from_observation (i, ev, private a), r)`;
 
 val runMachine_def = Define`
   runMachine (ffi,r) =
