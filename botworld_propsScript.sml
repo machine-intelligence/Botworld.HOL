@@ -8,7 +8,7 @@ val get_focal_robot_def = Define`
 
 val policy_fun_def = Define`
   policy_fun p speed obs =
-   let r = runMachine (ffi_from_observation obs, <| memory := p; processor := <| speed := speed |> |>) in
+   let r = runMachine (ffi_from_observation obs, <| memory := p; processor := speed |>) in
    (r.command,r.memory)`;
 
 fun Abbrev_intro th =

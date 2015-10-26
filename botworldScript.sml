@@ -49,9 +49,9 @@ val contested_def = Define`
     1 < LENGTH
         (FILTER (λr. case r.command of
                      | Lift li => li = i ∧ canLift r (EL i sq.items)
-                     | Build is _ => MEM i is ∧
+                     | Build is m => MEM i is ∧
                                      EVERY (λi. i < LENGTH sq.items) is ∧
-                                     IS_SOME (construct (MAP (λi. EL i sq.items) is))
+                                     IS_SOME (construct (MAP (λi. EL i sq.items) is) m)
                      | _ => F)
          sq.robots)`;
 
@@ -114,7 +114,7 @@ val act_def = Define`
     | Build is m =>
       if EVERY (λi. i < LENGTH sq.items) is then
         if ¬EXISTS (contested sq) is then
-          case construct (MAP (λi. EL i sq.items) is) of
+          case construct (MAP (λi. EL i sq.items) is) m of
           | NONE => Invalid
           | SOME r => Built is r
         else BuildInterrupted is
@@ -194,7 +194,7 @@ val prepare_def = Define`
 val runMachine_def = Define`
   runMachine (ffi,r) =
     let (st,env) = THE (basis_sem_env ffi) in
-    let (st',c,res) = evaluate_prog (st with clock := r.processor.speed) env r.memory in
+    let (st',c,res) = evaluate_prog (st with clock := r.processor) env r.memory in
     let (command,prog) = st'.ffi.ffi_state.bot_output in
     r with <| command := command; memory := prog |>`;
 

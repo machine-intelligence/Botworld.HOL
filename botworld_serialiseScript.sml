@@ -11,14 +11,6 @@ val _ = temp_overload_on ("lift", ``OPTION_MAP``)
 val _ = temp_overload_on ("guard", ``λb m. monad_unitbind (assert b) m``)
 val _ = temp_overload_on ("sexpnum", ``odestSXNUM``)
 
-val sexpbool_def = Define`
-  sexpbool s = if s = SX_SYM "#t" then SOME T else
-               if s = SX_SYM "#f" then SOME F else
-               NONE`;
-
-val boolsexp_def = Define`
-  boolsexp b = SX_SYM (if b then "#t" else "#f")`;
-
 (* decoding from sexp to command and policy *)
 
 val sexpframe_def = Define`
@@ -26,13 +18,6 @@ val sexpframe_def = Define`
     do
       (color,strength) <- sexppair sexpnum sexpnum s;
       return <| color:=color; strength:=strength|>
-    od`;
-
-val sexpprocessor_def = Define`
-  sexpprocessor s =
-    do
-      speed <- sexpnum s;
-      return <| speed:=speed |>
     od`;
 
 val sexpcommand_def = Define`
@@ -71,9 +56,7 @@ val sexpitem_def = Define`
       guard (nm = "Cargo" ∧ LENGTH args = 1)
             (lift Cargo (sexpcargo (EL 0 args))) ++
       guard (nm = "ProcessorPart" ∧ LENGTH args = 1)
-            (lift ProcessorPart (sexpprocessor (EL 0 args))) ++
-      guard (nm = "RegisterPart" ∧ LENGTH args = 1)
-            (lift RegisterPart (sexptop (EL 0 args))) ++
+            (lift ProcessorPart (sexpnum (EL 0 args))) ++
       guard (nm = "FramePart" ∧ LENGTH args = 1)
             (lift FramePart (sexpframe (EL 0 args))) ++
       guard (nm = "InspectShield" ∧ args = [])
@@ -85,13 +68,8 @@ val sexpitem_def = Define`
 val sexprobot_def = Define`
   sexprobot s =
     do
-      (frame,processor,inventory,memory,command,focal) <-
-        sexppair sexpframe
-        (sexppair sexpprocessor
-         (sexppair (sexplist sexpitem)
-          (sexppair (sexplist sexptop)
-           (sexppair sexpcommand sexpbool)))) s;
-      return <| frame:=frame; processor:=processor; inventory:=inventory; memory:=memory; command:=command; focal:=focal |>
+      (frame,inventory) <- sexppair sexpframe (sexplist sexpitem) s;
+      return (empty_robot with <| frame:=frame; inventory:=inventory |>)
     od`;
 
 val sexpaction_def = Define`
@@ -120,10 +98,10 @@ val sexpaction_def = Define`
             (lift InspectTargetFled (sexpnum (EL 0 args))) ++
       guard (nm = "InspectBlocked" ∧ LENGTH args = 1)
             (lift InspectBlocked (sexpnum (EL 0 args))) ++
-      guard (nm = "Inspected" ∧ LENGTH args = 2)
+      guard (nm = "Inspected" ∧ LENGTH args = 1)
             (lift2 Inspected
                    (sexpnum (EL 0 args))
-                   (sexprobot (EL 1 args))) ++
+                   (return empty_robot)) ++
       guard (nm = "DestroyTargetFled" ∧ LENGTH args = 1)
             (lift DestroyTargetFled (sexpnum (EL 0 args))) ++
       guard (nm = "DestroyBlocked" ∧ LENGTH args = 1)
@@ -132,12 +110,10 @@ val sexpaction_def = Define`
             (lift Destroyed (sexpnum (EL 0 args))) ++
       guard (nm = "BuildInterrupted" ∧ LENGTH args = 1)
             (lift BuildInterrupted (sexplist sexpnum (EL 0 args))) ++
-      guard (nm = "Built" ∧ LENGTH args = 2)
+      guard (nm = "Built" ∧ LENGTH args = 1)
             (lift2 Built
                    (sexplist sexpnum (EL 0 args))
-                   (sexprobot (EL 1 args))) ++
-      guard (nm = "Invalid" ∧ args = [])
-            (return Invalid)
+                   (return empty_robot))
     od`;
 
 val sexpcommand_def = Define`
@@ -175,17 +151,13 @@ val framesexp_def = Define`
   framesexp f =
     SX_CONS (SX_NUM f.color) (SX_NUM f.strength)`;
 
-val processorsexp_def = Define`
-  processorsexp p = SX_NUM (p.speed)`;
-
 val cargosexp_def = Define`
   cargosexp c =
     SX_CONS (SX_NUM c.cargoType) (SX_NUM c.cargoWeight)`;
 
 val itemsexp_def = Define`
   (itemsexp (Cargo c) = listsexp [SX_SYM "Cargo"; cargosexp c]) ∧
-  (itemsexp (ProcessorPart p) = listsexp [SX_SYM "ProcessorPart"; processorsexp p]) ∧
-  (itemsexp (RegisterPart t) = listsexp [SX_SYM "RegisterPart"; topsexp t]) ∧
+  (itemsexp (ProcessorPart p) = listsexp [SX_SYM "ProcessorPart"; SX_NUM p]) ∧
   (itemsexp (FramePart f) = listsexp [SX_SYM "FramePart"; framesexp f]) ∧
   (itemsexp (InspectShield) = listsexp [SX_SYM "InspectShield"]) ∧
   (itemsexp (DestroyShield) = listsexp [SX_SYM "DestroyShield"])`;
@@ -201,12 +173,7 @@ val commandsexp_def = Define`
 
 val robotsexp_def = Define`
   robotsexp r =
-    SX_CONS (framesexp r.frame)
-      (SX_CONS (processorsexp r.processor)
-         (SX_CONS (listsexp (MAP itemsexp r.inventory))
-            (SX_CONS (listsexp (MAP topsexp r.memory))
-               (SX_CONS (commandsexp r.command)
-                  (boolsexp r.focal)))))`;
+    SX_CONS (framesexp r.frame) (listsexp (MAP itemsexp r.inventory))`;
 
 val actionsexp_def = Define`
   (actionsexp (Created) = listsexp [SX_SYM "Created"]) ∧
@@ -220,13 +187,13 @@ val actionsexp_def = Define`
   (actionsexp (Dropped num) = listsexp [SX_SYM "Dropped"; SX_NUM num]) ∧
   (actionsexp (InspectTargetFled num) = listsexp [SX_SYM "InspectTargetFled"; SX_NUM num]) ∧
   (actionsexp (InspectBlocked num) = listsexp [SX_SYM "InspectBlocked"; SX_NUM num]) ∧
-  (actionsexp (Inspected num r) = listsexp [SX_SYM "Inspected"; SX_NUM num; robotsexp r]) ∧
+  (actionsexp (Inspected num _) = listsexp [SX_SYM "Inspected"; SX_NUM num]) ∧
   (actionsexp (DestroyTargetFled num) = listsexp [SX_SYM "DestroyTargetFled"; SX_NUM num]) ∧
   (actionsexp (DestroyBlocked num) = listsexp [SX_SYM "DestroyBlocked"; SX_NUM num]) ∧
   (actionsexp (Destroyed num) = listsexp [SX_SYM "Destroyed"; SX_NUM num]) ∧
   (actionsexp (BuildInterrupted ns) = listsexp [SX_SYM "BuildInterrupted"; listsexp (MAP SX_NUM ns)]) ∧
-  (actionsexp (Built ns r) = listsexp [SX_SYM "Built"; listsexp (MAP SX_NUM ns); robotsexp r]) ∧
-  (actionsexp (Invalid) = listsexp [SX_SYM "Invalid"])`;
+  (actionsexp (Built ns _) = listsexp [SX_SYM "Built"; listsexp (MAP SX_NUM ns)]) ∧
+  (actionsexp (Invalid) = listsexp [SX_SYM "Passed"])`;
 
 val commandsexp_def = Define`
   (commandsexp (Move num) = listsexp [SX_SYM "Move"; SX_NUM num]) ∧
@@ -254,7 +221,7 @@ val privateDatasexp_def = Define`
   (privateDatasexp pNothing = listsexp [SX_SYM "pNothing"]) ∧
   (privateDatasexp (pInspected proc prog) =
    listsexp [SX_SYM "pInspected";
-             processorsexp proc;
+             SX_NUM proc;
              listsexp (MAP topsexp prog)])`;
 
 val observationsexp_def = Define`

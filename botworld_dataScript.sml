@@ -4,9 +4,7 @@ val _ = new_theory"botworld_data"
 val _ = Datatype`
   frame = <| color: num; strength: num |>`;
 
-val _ = Datatype`
-  (* speed = ticks allowed per Botworld step *)
-  processor = <| speed: num |>`;
+val empty_frame = Define`empty_frame = <| color := 0; strength := 0 |>`;
 
 val _ = Datatype`
   cargo = <| cargoType: num; cargoWeight: num |>`;
@@ -14,22 +12,18 @@ val _ = Datatype`
 val _ = Datatype`
   item =
     Cargo cargo
-  | ProcessorPart processor
-  | RegisterPart top
+  | ProcessorPart num
   | FramePart frame
   | InspectShield
   | DestroyShield`;
 
-val destRegisterPart_def = Define`
-  destRegisterPart (RegisterPart r) = SOME r ∧
-  destRegisterPart _ = NONE`;
 val isInspectShield_def = Define`
   (isInspectShield InspectShield = T) ∧
   (isInspectShield _ = F)`;
 val isDestroyShield_def = Define`
   (isDestroyShield DestroyShield = T) ∧
   (isDestroyShield _ = F)`;
-val _ = export_rewrites["destRegisterPart_def","isInspectShield_def","isDestroyShield_def"];
+val _ = export_rewrites["isInspectShield_def","isDestroyShield_def"];
 
 val weight_def = Define`
   weight (Cargo c) = c.cargoWeight ∧
@@ -49,28 +43,32 @@ val _ = Datatype`
 val _ = Datatype`
   robot =
   <| frame : frame
-   ; processor : processor
+   ; processor : num (* ticks per Botworld step *)
    ; inventory : item list
    ; memory : prog
    ; command : command
    ; focal : bool
    |>`;
 
+val empty_robot_def = Define`
+  empty_robot =
+    <| frame := empty_frame;
+       processor := 0;
+       inventory := [];
+       memory := [];
+       command := Pass;
+       focal := F |>`;
+
 val construct_def = Define`
-  construct ls =
+  construct ls m =
   case ls of
-  | (FramePart f::ProcessorPart p::rs) =>
-    (case map_option (MAP destRegisterPart rs) of
-     | SOME m =>
-       SOME <| frame := f; processor := p; memory := m;
-               inventory := []; command := Pass |>
-     | _ => NONE)
+  | [FramePart f;ProcessorPart p] =>
+     SOME <| frame := f; processor := p; memory := m;
+             inventory := []; command := Pass |>
   | _ => NONE`;
 
 val shatter_def = Define`
-  shatter r =
-    (FramePart r.frame::ProcessorPart r.processor::
-     MAP (K (RegisterPart skip_top)) r.memory)`;
+  shatter r = [FramePart r.frame;ProcessorPart r.processor]`;
 
 val canLift_def = Define`
   canLift r i ⇔
@@ -116,7 +114,7 @@ val _ = Datatype`
   ; fallenItems: itemCache list|>`;
 
 val _ = Datatype`
-  privateData = pInvalid | pNothing | pInspected processor prog`;
+  privateData = pInvalid | pNothing | pInspected num prog`;
 
 val _ = Parse.type_abbrev("observation",``:num # event # privateData``);
 
