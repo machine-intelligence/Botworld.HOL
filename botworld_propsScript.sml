@@ -2,6 +2,17 @@ open preamble botworldTheory botworld_dataTheory
 
 val _ = new_theory"botworld_props";
 
+(* TODO: move *)
+val FLOOKUP_FMAP_MAP2 = Q.store_thm("FLOOKUP_FMAP_MAP2",
+  `FLOOKUP (FMAP_MAP2 f m) x =
+   OPTION_MAP (CURRY f x) (FLOOKUP m x) `,
+  rw[FLOOKUP_DEF,FMAP_MAP2_THM])
+(* -- *)
+
+val LENGTH_localActions = Q.store_thm("LENGTH_localActions[simp]",
+  `LENGTH (localActions sq nb) = LENGTH sq.robots`,
+  EVAL_TAC >> simp[])
+
 val get_focal_robot_def = Define`
   get_focal_robot s =
     EL s.focal_index (s.state ' s.focal_coordinate).robots`;
@@ -17,6 +28,10 @@ fun Abbrev_intro th =
 val set_policy_def = Define`
   set_policy r i ps =
     r with memory updated_by (λm. if i < LENGTH ps then EL i ps else m)`;
+
+val set_policy_const = Q.store_thm("set_policy_const[simp]",
+  `(set_policy r x ps).inventory = r.inventory`,
+  EVAL_TAC)
 
 val set_policies_def = Define`
   (set_policies [] _ = []) ∧
@@ -44,16 +59,43 @@ val set_policies_thm = Q.store_thm("set_policies_thm",
   `set_policies rs ps = GENLIST (λi. set_policy (EL i rs) i ps) (LENGTH rs)`,
   rw[LIST_EQ_REWRITE,EL_set_policies]);
 
-(*
-val set_policies_append = Q.store_thm("set_policies_append",
-  `set_policies (a ++ b) ps =
-   set_policies a ps ++
-   GENLIST (λi. set_policy (EL (LENGTH a + i) b) (LENGTH a + i) ps) (LENGTH b)`,
-  rw[set_policies_thm, GENLIST_APPEND] >>
-*)
+val set_policy_less = Q.store_thm("set_policy_less",
+  `LENGTH ps ≤ i ⇒ set_policy r i ps = r`,
+   simp[set_policy_def] >> rw[robot_component_equality])
+
+val set_policies_APPEND1 = Q.store_thm("set_policies_APPEND1",
+  `LENGTH ps ≤ LENGTH ls ⇒
+    set_policies (ls ++ ex) ps = set_policies ls ps ++ ex`,
+  rw[set_policies_thm,ONCE_REWRITE_RULE[ADD_COMM]GENLIST_APPEND] >>
+  rw[APPEND_EQ_APPEND] >> disj1_tac >> qexists_tac`[]` >>
+  rw[LIST_EQ_REWRITE,EL_APPEND1,EL_APPEND2] >>
+  simp[set_policy_less])
+
+val shatter_ignores_policy = Q.store_thm("shatter_ignores_policy[simp]",
+  `shatter (set_policy r i ps) = shatter r`,
+  EVAL_TAC)
 
 val square_set_policies_def = Define`
   square_set_policies sq ps = sq with <| robots := set_policies sq.robots ps |>`;
+
+val square_set_policies_const = Q.store_thm("square_set_policies_const[simp]",
+  `(square_set_policies sq ps).items = sq.items ∧
+   (square_set_policies sq ps).robots = set_policies sq.robots ps`,
+  EVAL_TAC)
+
+val fill_square_set_policies = Q.store_thm("fill_square_set_policies",
+  `i < LENGTH sq.robots ⇒
+     fill_square (c,p) sq i =
+     square_set_policies
+       (fill_square (c,[]) sq i)
+       (GENLIST (λj. if i = j then p else (EL j sq.robots).memory) (LENGTH sq.robots))`,
+  rw[fill_square_def,square_component_equality,set_policies_thm] >>
+  simp[LIST_EQ_REWRITE,EL_LUPDATE] >>
+  ONCE_REWRITE_TAC[set_policy_def] >>
+  simp[] >>
+  ONCE_REWRITE_TAC[robot_component_equality] >>
+  simp[] >> gen_tac >> strip_tac >>
+  IF_CASES_TAC >> simp[])
 
 val LENGTH_square_set_policies_robots = Q.store_thm("LENGTH_square_set_policies_robots[simp]",
   `LENGTH (square_set_policies sq ps).robots = LENGTH sq.robots`,
@@ -134,16 +176,26 @@ val GENLIST_updateInventory_ignores_policy = Q.store_thm("GENLIST_updateInventor
    GENLIST (λi. set_policy (updateInventory sq i (f i)) i ps) (LENGTH sq.robots)`,
   rw[LIST_EQ_REWRITE,updateInventory_ignores_policy])
 
-(*
+val updateInventory_fix_inspected = Q.store_thm("updateInventory_fix_inspected[simp]",
+  `updateInventory sq x (fix_inspected ps y) = updateInventory sq x y`,
+  Cases_on`y`>>simp[fix_inspected_def] >> EVAL_TAC)
+
+val incomingFrom_MovedIn = Q.store_thm("incomingFrom_MovedIn",
+  `MEM x (incomingFrom y z) ⇒ ∃i. SND x = MovedIn i`,
+  Cases_on`z`>>rw[incomingFrom_def]>>
+  fs[MEM_FLAT,MEM_MAP] >>
+  every_case_tac >> fs[] >> rw[] >> fs[]);
+
 val event_ignores_policy = Q.store_thm("event_ignores_policy",
-  `event (square_set_policies sq ps) nb =
+  `LENGTH ps ≤ LENGTH sq.robots ⇒
+   event (square_set_policies sq ps) nb =
    event sq nb with robotActions updated_by
      (λls. ZIP (set_policies (MAP FST ls) ps, MAP (fix_inspected ps) (MAP SND ls)))`,
   rw[event_def,event_component_equality] >> rw[] >>
   `LENGTH actions = LENGTH actions' ∧
    LENGTH veterans = LENGTH veterans' ∧
    children = children' ∧
-   LENGTH fallen = LENGTH fallen'` by (
+   fallen = fallen'` by (
      unabbrev_all_tac >> simp[] >>
      simp[LENGTH_FLAT,MAP_GENLIST,MAP_MAP_o] >>
      rw[] >> AP_TERM_TAC >>
@@ -151,39 +203,69 @@ val event_ignores_policy = Q.store_thm("event_ignores_policy",
      rw[] >- (
        match_mp_tac EQ_SYM >>
        BasicProvers.CASE_TAC >>
-       simp[fix_inspected_def] ) >>
+       simp[fix_inspected_def] )
      >- (
        match_mp_tac EQ_SYM >>
        BasicProvers.CASE_TAC >>
        simp[fix_inspected_def] ) >>
-     fs[MEM_MAP] >- (
+     fs[MEM_MAP,EL_MAP] >- (
        Cases_on`y`>>fs[fix_inspected_def]>>
        rw[] >> fs[] ) >>
      first_x_assum(qspec_then`Destroyed x`mp_tac) >>
      simp[fix_inspected_def] ) >>
   `LENGTH veterans = LENGTH actions` by (
-    unabbrev_all_tac >> simp[localActions_def] )
+    unabbrev_all_tac >> simp[localActions_def] ) >>
+  `LENGTH actions' = LENGTH sq.robots` by simp[Abbr`actions'`]
   >- (
     simp[GSYM ZIP_APPEND,MAP_MAP_o] >>
     simp[MAP_ZIP,LENGTH_REPLICATE] >>
     simp[REPLICATE_GENLIST,MAP_GENLIST,fix_inspected_def] >>
-    simp[GSYM ZIP_APPEND]
-    simp[set_policies_thm] >>
-    simp[fix_inspected_def] >>
-    ZIP_APPEND
-    ZIP_GENLIST
-    simp[ZIP_MAP]
-    simp[APPEND_LENGTH_EQ,LENGTH_ZIP,MAP_ZIP]
-    match_mp_tac APPEND_EQ
-    f"append_eq"
-    m``l1:'a list ++ l2 = l3 ++ l4``
+    simp[set_policies_APPEND1] >>
+    simp[GSYM ZIP_APPEND] >>
+    `MAP (fix_inspected ps o SND) immigrations = MAP SND immigrations` by (
+      simp[Abbr`immigrations`,MAP_FLAT] >> AP_TERM_TAC >>
+      simp[MAP_GENLIST] >> AP_THM_TAC >> AP_TERM_TAC >>
+      simp[FUN_EQ_THM,MAP_EQ_f] >> rw[] >>
+      imp_res_tac incomingFrom_MovedIn >>
+      rw[fix_inspected_def] ) >>
+    simp[] >>
+    simp[ZIP_MAP,MAP_MAP_o,o_DEF] >>
+    AP_TERM_TAC >> simp[] >>
+    simp[Abbr`veterans'`,Abbr`veterans`] >>
+    simp[set_policies_thm,LIST_EQ_REWRITE] >>
+    simp[Abbr`actions`] >>
+    simp[EL_MAP] )
+  >- (
+    simp[Abbr`actions`] >>
+    simp[EXISTS_MAP] >>
+    rpt AP_THM_TAC >> AP_TERM_TAC >>
+    rw[FUN_EQ_THM] >>
+    AP_THM_TAC >> AP_TERM_TAC >>
+    simp[FUN_EQ_THM] >>
+    Cases >> simp[fix_inspected_def] )
+  >- (
+    AP_TERM_TAC >>
+    simp[LIST_EQ_REWRITE,LENGTH_ZIP,EL_MAP] >>
+    simp[EL_ZIP] >>
+    simp[EL_set_policies] >>
+    simp[Abbr`actions`,EL_MAP] >>
+    rw[] >>
+    Cases_on`EL x actions'` >> fs[fix_inspected_def]))
 
+(*
+val computeEvents_ignores_policy = Q.store_thm("computeEvents_ignores_policy",
+  `fmap_rel (λs1 s2. ∃ls. s1 = square_set_policies s2 ls) g g'
+   ⇒
+   computeEvents g = computeEvents g'`,
+  rw[computeEvents_def,fmap_eq_flookup,FLOOKUP_FMAP_MAP2,fmap_rel_OPTREL_FLOOKUP]
+  neighbours_def
+  OPTION_MAP (robot_command o robots) over the neighbours in event, since that's all that matters about them
 
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
    steph c s = SOME (obs,s')
    ⇒
-   step (fill (c,p) s) = fill (policy_fun p (get_focal_robot s).processor.speed obs) s'`,
+   step (fill (c,p) s) = fill (policy_fun p (get_focal_robot s).processor obs) s'`,
   rw[wf_state_with_hole_def,fill_def,get_focal_robot_def,step_def,steph_def] >>
   `Abbrev(sq = s.state ' s.focal_coordinate)` by (
     fs[FLOOKUP_DEF,markerTheory.Abbrev_def] ) >> simp[] >>
@@ -191,6 +273,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   first_assum(split_applied_pair_tac o lhs o concl) >> fs[] >>
   first_assum(split_applied_pair_tac o lhs o concl) >> fs[] >>
   qpat_assum`_ = s'`(assume_tac o Abbrev_intro o SYM) >>
+
   computeEvents_def
   event_def
   EQ_MP
