@@ -236,22 +236,20 @@ val wf_state_with_hole_def = Define`
        (c,i) ≠ (s.focal_coordinate,s.focal_index)
        ⇒ ¬(EL i sq.robots).focal)`;
 
-val fill_square_def = Define`
-  fill_square (command,policy) sq index =
+val square_update_robot_def = Define`
+  square_update_robot f idx sq =
     sq with robots updated_by
-      LUPDATE (EL index sq.robots with
-                 <| memory := policy; command := command |>)
-                 index`;
+      LUPDATE (f (EL idx sq.robots)) idx`;
 
 val fill_def = Define`
-  fill cp s =
+  fill f s =
     s.state |+
     (s.focal_coordinate,
-     fill_square cp (s.state ' s.focal_coordinate) s.focal_index)`;
+     square_update_robot f s.focal_index (s.state ' s.focal_coordinate))`;
 
 val steph_def = Define`
   steph command s =
-    let events = computeEvents (fill (command,[]) s) in
+    let events = computeEvents (fill (robot_command_fupd (K command)) s) in
     let ev = events ' s.focal_coordinate in
     if EXISTS (λa. a = Destroyed s.focal_index ∨
                    ∃r. a = Inspected s.focal_index r)
