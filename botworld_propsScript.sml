@@ -30,7 +30,6 @@ val square_update_robot_o = Q.store_thm("square_update_robot_o",
   rw[square_update_robot_def,FUN_EQ_THM,square_component_equality] >>
   simp[LIST_EQ_REWRITE,EL_LUPDATE])
 
-(*
 val set_policy_def = Define`
   set_policy r i ps =
     r with memory updated_by (λm. if i < LENGTH ps then EL i ps else m)`;
@@ -254,6 +253,7 @@ val neighbours_ignores_policy = Q.store_thm("neighbours_ignores_policy[simp]",
   Cases_on`c`>>rw[neighbours_def,FLOOKUP_o_f] >>
   BasicProvers.CASE_TAC >> rw[])
 
+(*
 val computeEvents_ignores_policy = Q.store_thm("computeEvents_ignores_policy",
   `computeEvents (square_set_policies ps o_f g) =
      event_set_policies ps o_f computeEvents g`,
@@ -278,9 +278,44 @@ val fill_square_set_policies = Q.store_thm("fill_square_set_policies",
   IF_CASES_TAC >> simp[])
 *)
 
-val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
+val updated_policies_def = Define`
+  updated_policies i f sq =
+    GENLIST (λj. (if i = j then f else I) (EL j sq.robots).memory) (LENGTH sq.robots)`;
+
+val square_update_robot_set_policies = Q.store_thm("square_update_robot_set_policies",
+  `i < LENGTH sq.robots ⇒
+   square_update_robot (memory_fupd f) i sq =
+   square_set_policies (updated_policies i f sq) sq`,
+  rw[square_component_equality,square_update_robot_def,set_policies_thm,updated_policies_def] >>
+  rw[LIST_EQ_REWRITE,EL_LUPDATE] >> rw[] >>
+  rw[set_policy_def,robot_component_equality])
+
+val event_ignores_policy1 = Q.prove(
+  `i < LENGTH sq.robots ⇒
+     event (square_update_robot (memory_fupd f) i sq) nb =
+     event_set_policies (updated_policies i f sq) (event sq nb)`,
+  rw[square_update_robot_set_policies] >>
+  match_mp_tac event_ignores_policy >>
+  rw[updated_policies_def] );
 
 (*
+val computeEvents_ignores_policy = Q.store_thm("computeEvents_ignores_policy",
+  `i < LENGTH sq.robots ⇒
+   computeEvents (g |+ (c,square_update_robot (memory_fupd f) i sq)) =
+   computeEvents (g |+ (c,sq))`,
+  rw[computeEvents_def,fmap_eq_flookup,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE] >>
+  IF_CASES_TAC >> simp[] >- (
+    rw[event_ignores_policy1]
+
+    ... )
+  Cases_on`FLOOKUP g k`>>simp[]
+
+  simp[OPTION_MAP_def]
+  Ca
+  f"option_map"
+
+val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
+
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
    steph c s = SOME (obs,s') ∧
@@ -288,13 +323,14 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
    ⇒
    step (fill (with_policy c p) s) = fill (with_policy c' p') s'`,
   rw[wf_state_with_hole_def,fill_def,get_focal_robot_def,step_def,steph_def] >>
-  simp[square_update_robot_o]
+  simp[square_update_robot_o] >>
   `Abbrev(sq = s.state ' s.focal_coordinate)` by (
     fs[FLOOKUP_DEF,markerTheory.Abbrev_def] ) >> simp[] >>
   fs[LET_THM] >>
   first_assum(split_applied_pair_tac o lhs o concl) >> fs[] >>
   first_assum(split_applied_pair_tac o lhs o concl) >> fs[] >>
   qpat_assum`_ = s'`(assume_tac o Abbrev_intro o SYM) >>
+
 
   computeEvents_def
   event_def
