@@ -253,66 +253,126 @@ val neighbours_ignores_policy = Q.store_thm("neighbours_ignores_policy[simp]",
   Cases_on`c`>>rw[neighbours_def,FLOOKUP_o_f] >>
   BasicProvers.CASE_TAC >> rw[])
 
-(*
-val computeEvents_ignores_policy = Q.store_thm("computeEvents_ignores_policy",
-  `computeEvents (square_set_policies ps o_f g) =
-     event_set_policies ps o_f computeEvents g`,
-  rw[computeEvents_def,fmap_eq_flookup,FLOOKUP_FMAP_MAP2,fmap_rel_OPTREL_FLOOKUP,FLOOKUP_o_f] >>
-  Cases_on`FLOOKUP g k`>>simp[] >>
-  event_ignores_policy
-  neighbours_def
-  OPTION_MAP (robot_command o robots) over the neighbours in event, since that's all that matters about them
+val neighbours_FUPDATE_same = Q.store_thm("neighbours_FUPDATE_same[simp]",
+  `neighbours (g |+ (c,sq)) c = neighbours g c`,
+  Cases_on`c`>>simp[neighbours_def,FLOOKUP_UPDATE] >>
+  simp_tac(srw_ss()++intLib.INT_ARITH_ss)[]);
 
-val fill_square_set_policies = Q.store_thm("fill_square_set_policies",
-  `i < LENGTH sq.robots ⇒
-     fill_square (c,p) sq i =
-     square_set_policies
-       (GENLIST (λj. if i = j then p else (EL j sq.robots).memory) (LENGTH sq.robots))
-       (fill_square (c,[]) sq i)`,
-  rw[fill_square_def,square_component_equality,set_policies_thm] >>
-  simp[LIST_EQ_REWRITE,EL_LUPDATE] >>
-  ONCE_REWRITE_TAC[set_policy_def] >>
-  simp[] >>
-  ONCE_REWRITE_TAC[robot_component_equality] >>
-  simp[] >> gen_tac >> strip_tac >>
-  IF_CASES_TAC >> simp[])
-*)
+val shift4_def = Define`
+  shift4 x = if 4i < x then x-1 else x`;
+
+val neighbour_coord_def = Define`
+  neighbour_coord c k ⇔
+    (Num (ABS (FST c - FST k))) ≤ 1 ∧
+    (Num (ABS (SND c - SND k))) ≤ 1`;
+
+val less8 = Q.prove(
+  `x < 8n ⇔ (x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4 ∨ x = 5 ∨ x = 6 ∨ x = 7)`,
+  rw[EQ_IMP_THM] >> simp[])
+
+val lesseq1 = Q.prove(
+  `x ≤ 1n ⇔ (x = 0 ∨ x = 1)`,
+  rw[EQ_IMP_THM] >> simp[])
+
+val lesseq2 = Q.prove(
+  `x ≤ 2n ⇔ (x = 0 ∨ x = 1 ∨ x = 2)`,
+  rw[EQ_IMP_THM] >> simp[])
+
+val plus_less_eq_1 = Q.prove(
+  `x + y ≤ 1n ⇔ (x = 0 ∧ y ≤ 1) ∨
+                (x = 1 ∧ y ≤ 0)`,
+  rw[EQ_IMP_THM] >> simp[])
+
+val NUM_ABS_eq_0 = Q.prove(
+  `Num (ABS x) = 0 ⇔ x = 0`,
+  rw[EQ_IMP_THM] >> intLib.COOPER_TAC)
+
+val NUM_ABS_eq_1 = Q.prove(
+  `Num (ABS x) = 1 ⇔ x = 1 ∨ x = -1`,
+  rw[EQ_IMP_THM] >> intLib.COOPER_TAC)
+
+val neighbours_FUPDATE = Q.store_thm("neighbours_FUPDATE",
+  `neighbours (g |+ (c,sq)) k =
+   if c ≠ k ∧ neighbour_coord c k then
+     LUPDATE (SOME sq)
+       (Num(shift4((((FST c - FST k)+1)*3)+((SND c - SND k)+1))))
+       (neighbours g k)
+   else neighbours g k`,
+  Cases_on`k`>>Cases_on`c`>>simp[neighbours_def,FLOOKUP_UPDATE,neighbour_coord_def] >>
+  simp[plus_less_eq_1,NUM_ABS_eq_0,NUM_ABS_eq_1,lesseq1,lesseq2] >>
+  match_mp_tac EQ_SYM >>
+  IF_CASES_TAC >- (
+    fs[integerTheory.INT_EQ_SUB_RADD] >> rpt var_eq_tac >>
+    simp_tac(srw_ss()++intLib.INT_ARITH_ss)[] >> fs[] >>
+    fsrw_tac[intLib.INT_ARITH_ss][AC integerTheory.INT_ADD_ASSOC integerTheory.INT_ADD_COMM] >>
+    simp[LIST_EQ_REWRITE,EL_LUPDATE,shift4_def] >>
+    simp[less8] >> rw[] >> simp[] >> simp[FLOOKUP_DEF]) >>
+  rw[] >> fsrw_tac[intLib.INT_ARITH_ss][] >> rw[FLOOKUP_DEF])
+
+val update_focal_robot_def = Define`
+  update_focal_robot f i sq =
+    if i < LENGTH sq.robots ∧ (EL i sq.robots).focal then
+      square_update_robot f i sq
+    else sq`;
 
 val updated_policies_def = Define`
-  updated_policies i f sq =
-    GENLIST (λj. (if i = j then f else I) (EL j sq.robots).memory) (LENGTH sq.robots)`;
+  updated_policies i f ls =
+    GENLIST (λj. (if i = j ∧ (EL i ls).focal then f else I) (EL j ls).memory) (LENGTH ls)`;
 
-val square_update_robot_set_policies = Q.store_thm("square_update_robot_set_policies",
+val update_focal_robot_set_policies = Q.store_thm("update_focal_robot_set_policies",
   `i < LENGTH sq.robots ⇒
-   square_update_robot (memory_fupd f) i sq =
-   square_set_policies (updated_policies i f sq) sq`,
-  rw[square_component_equality,square_update_robot_def,set_policies_thm,updated_policies_def] >>
+   update_focal_robot (memory_fupd f) i sq =
+   square_set_policies (updated_policies i f sq.robots) sq`,
+  rw[square_component_equality,update_focal_robot_def,square_update_robot_def,set_policies_thm,updated_policies_def] >>
   rw[LIST_EQ_REWRITE,EL_LUPDATE] >> rw[] >>
   rw[set_policy_def,robot_component_equality])
 
 val event_ignores_policy1 = Q.prove(
   `i < LENGTH sq.robots ⇒
-     event (square_update_robot (memory_fupd f) i sq) nb =
-     event_set_policies (updated_policies i f sq) (event sq nb)`,
-  rw[square_update_robot_set_policies] >>
+     event (update_focal_robot (memory_fupd f) i sq) nb =
+     event_set_policies (updated_policies i f sq.robots) (event sq nb)`,
+  rw[update_focal_robot_set_policies] >>
   match_mp_tac event_ignores_policy >>
   rw[updated_policies_def] );
 
+val focal_at_def = Define`
+  focal_at g c sq i ⇔
+  (∀c' sq' i'. FLOOKUP g c' = SOME sq' ∧ i' < LENGTH sq'.robots ∧ (EL i' sq'.robots).focal ⇒
+     i' = i ∧ c' = c ∧ sq' = sq)`;
+
+val event_update_policies_def = Define`
+  event_update_policies i f ev =
+    event_set_policies (updated_policies i f (MAP FST (ev.robotActions))) ev`;
+
 (*
+val event_set_policies_update_policies = Q.store_thm("event_set_policies_update_policies",
+  `LENGTH (FILTER robot_focal sq.robots) ≤ 1 ⇒
+   event_set_policies (updated_policies i f sq.robots) (event sq nb) =
+   event_update_policies i f (event sq nb)`,
+  rw[event_update_policies_def] >>
+  rw[event_set_policies_def,event_component_equality] >>
+  rw[event_def] >> rw[] >>
+
 val computeEvents_ignores_policy = Q.store_thm("computeEvents_ignores_policy",
-  `i < LENGTH sq.robots ⇒
-   computeEvents (g |+ (c,square_update_robot (memory_fupd f) i sq)) =
-   computeEvents (g |+ (c,sq))`,
-  rw[computeEvents_def,fmap_eq_flookup,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE] >>
+  `i < LENGTH sq.robots ∧ focal_at g c sq i ⇒
+   computeEvents (g |+ (c,update_focal_robot (memory_fupd f) i sq)) =
+   event_update_policies i f o_f computeEvents (g |+ (c,sq))`,
+  rw[computeEvents_def,fmap_eq_flookup,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE,FLOOKUP_o_f] >>
   IF_CASES_TAC >> simp[] >- (
-    rw[event_ignores_policy1]
+    rw[event_ignores_policy1,update_focal_robot_set_policies] ) >>
+  Cases_on`FLOOKUP g k`>>simp[]>>
+  reverse (Cases_on`neighbour_coord c k`) >- (
+    simp[neighbours_FUPDATE] >>
+    updated_policies_def
+
+    CONV_TAC(LAND_CONV(RAND_CONV(REWR_CONV (INST_TYPE[alpha|->``:square``]neighbours_FUPDATE))))
+    match_term(top_goal() |> snd |> rator |> rand |> rand)(lhs(concl neighbours_FUPDATE))
+    REWRITE_TAC[neighbours_FUPDATE]
+
+    neighbours_ignores_policy
 
     ... )
   Cases_on`FLOOKUP g k`>>simp[]
-
-  simp[OPTION_MAP_def]
-  Ca
-  f"option_map"
 
 val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
 

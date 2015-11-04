@@ -21,14 +21,14 @@ val _ = type_abbrev("grid",``:coordinate |-> square``)
 
 val neighbours_def = Define`
   neighbours g (x,y) = MAP (FLOOKUP g)
-    [(x  ,y+1)
-    ;(x+1,y+1)
-    ;(x+1,y  )
-    ;(x+1,y-1)
-    ;(x  ,y-1)
-    ;(x-1,y-1)
+    [(x-1,y-1)
     ;(x-1,y  )
-    ;(x-1,y+1)]`;
+    ;(x-1,y+1)
+    ;(x  ,y-1)
+    ;(x  ,y+1)
+    ;(x+1,y-1)
+    ;(x+1,y  )
+    ;(x+1,y+1)]`;
 
 val move_coordinate_def = Define`
   move_coordinate (x,y) (dir:num) =
