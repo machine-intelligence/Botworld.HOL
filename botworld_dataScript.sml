@@ -64,7 +64,7 @@ val construct_def = Define`
   case ls of
   | [FramePart f;ProcessorPart p] =>
      SOME <| frame := f; processor := p; memory := m;
-             inventory := []; command := Pass |>
+             inventory := []; command := Pass; focal := F |>
   | _ => NONE`;
 
 val shatter_def = Define`
