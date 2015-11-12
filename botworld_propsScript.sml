@@ -319,6 +319,10 @@ val updated_policies_def = Define`
   updated_policies i f ls =
     GENLIST (λj. (if i = j ∧ (EL i ls).focal then f else I) (EL j ls).memory) (LENGTH ls)`;
 
+val LENGTH_updated_policies = Q.store_thm("LENGTH_updated_policies[simp]",
+  `LENGTH (updated_policies i f ls) = LENGTH ls`,
+  EVAL_TAC >> simp[]);
+
 val update_focal_robot_set_policies = Q.store_thm("update_focal_robot_set_policies",
   `i < LENGTH sq.robots ⇒
    update_focal_robot (memory_fupd f) i sq =
@@ -346,12 +350,50 @@ val event_update_policies_def = Define`
 
 (*
 val event_set_policies_update_policies = Q.store_thm("event_set_policies_update_policies",
-  `LENGTH (FILTER robot_focal sq.robots) ≤ 1 ⇒
+  `LENGTH (FILTER robot_focal (sq.robots ++ MAP (robots o THE) (FILTER IS_SOME nb))) ≤ 1 ⇒
    event_set_policies (updated_policies i f sq.robots) (event sq nb) =
    event_update_policies i f (event sq nb)`,
   rw[event_update_policies_def] >>
   rw[event_set_policies_def,event_component_equality] >>
   rw[event_def] >> rw[] >>
+  rfs[Abbr`fallen'`,Abbr`children'`,Abbr`veterans'`] >>
+  `LENGTH veterans = LENGTH actions` by (
+    unabbrev_all_tac >> simp[localActions_def] ) >>
+  `LENGTH actions = LENGTH sq.robots` by simp[Abbr`actions`] >>
+  simp[MAP_ZIP,LENGTH_REPLICATE] >>
+  simp[REPLICATE_GENLIST,MAP_GENLIST,fix_inspected_def] >>
+  AP_TERM_TAC >> simp[] >>
+  `∀ps. MAP (fix_inspected ps) (MAP SND immigrations) = MAP SND immigrations` by (
+    simp[Abbr`immigrations`,MAP_MAP_o,MAP_FLAT,MAP_GENLIST,o_DEF] >>
+    gen_tac >> rpt (AP_TERM_TAC ORELSE AP_THM_TAC) >>
+    rw[FUN_EQ_THM,LIST_EQ_REWRITE,EL_MAP] >>
+    imp_res_tac(SIMP_RULE std_ss [MEM_EL,PULL_EXISTS] incomingFrom_MovedIn) >>
+    fs[fix_inspected_def] ) >>
+  rfs[] >>
+  simp[set_policies_APPEND1] >>
+  simp[Abbr`actions`] >>
+  REWRITE_TAC[GSYM localActions_ignores_policy] >>
+  `EVERY ($~ o robot_focal) children` by (
+    simp[Abbr`children`,localActions_def,EVERY_MEM,MEM_FLAT,PULL_EXISTS,MAP_GENLIST,MEM_GENLIST] >>
+    rw[act_def,LET_THM] >>
+    every_case_tac >> fs[] >>
+    fs[construct_def] >>
+    every_case_tac >> fs[] >> rw[] ) >>
+  `∀rs ls.
+    set_policies rs (updated_policies i f (ls ++ children)) =
+    set_policies rs (updated_policies i f ls)` by (
+    simp[set_policies_thm,LIST_EQ_REWRITE] >>
+    rw[updated_policies_def] >>
+    simp[set_policy_def] >>
+    Cases_on`x < LENGTH ls`>>simp[EL_APPEND1] >- (
+      IF_CASES_TAC >> simp[] >> fs[] >> rfs[EL_APPEND1] >>
+      IF_CASES_TAC >> fs[] >> rfs[] >> rfs[EL_APPEND1] ) >>
+    simp[robot_component_equality] >>
+    IF_CASES_TAC >> simp[] >>
+
+  conj_tac >- (
+    simp[set_policies_APPEND1] >>
+    type_of``updateInventory``
 
 val computeEvents_ignores_policy = Q.store_thm("computeEvents_ignores_policy",
   `i < LENGTH sq.robots ∧ focal_at g c sq i ⇒
@@ -390,13 +432,9 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   first_assum(split_applied_pair_tac o lhs o concl) >> fs[] >>
   first_assum(split_applied_pair_tac o lhs o concl) >> fs[] >>
   qpat_assum`_ = s'`(assume_tac o Abbrev_intro o SYM) >>
+  qmatch_assum_abbrev_tac`Abbrev(s' = _ with state := state')` >>
+  fs[Abbr`s'`] >>
 
-
-  computeEvents_def
-  event_def
-  EQ_MP
-  var_eq_tac >> simp[]
-  qpat_assum
 *)
 
 val _ = export_theory();
