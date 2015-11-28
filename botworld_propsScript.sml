@@ -319,6 +319,34 @@ val updated_policies_def = Define`
   updated_policies i f ls =
     GENLIST (λj. (if i = j ∧ (EL i ls).focal then f else I) (EL j ls).memory) (LENGTH ls)`;
 
+val updated_policies_APPEND = Q.store_thm("updated_policies_APPEND",
+  `updated_policies i f (l1 ++ l2) =
+   if i < LENGTH l1 then
+     updated_policies i f l1 ++ MAP robot_memory l2
+   else MAP robot_memory l1 ++ updated_policies (i - LENGTH l1) f l2`,
+  rw[updated_policies_def,LIST_EQ_REWRITE] >>
+  Cases_on`x < LENGTH l1`>>simp[EL_APPEND1,EL_APPEND2]>>
+  rw[]>>fsrw_tac[ARITH_ss][]>>
+  rev_full_simp_tac(srw_ss()++ARITH_ss)[EL_APPEND2,EL_APPEND1,EL_MAP]);
+
+val updated_policies_APPEND2_nonfocal = Q.store_thm("updated_policies_APPEND2_nonfocal",
+  `EVERY ($~ o robot_focal) ls ⇒
+   updated_policies i f (l1 ++ ls) = updated_policies i f l1 ++ MAP robot_memory ls`,
+  rw[updated_policies_def] >>
+  simp[LIST_EQ_REWRITE] >>
+  gen_tac >> strip_tac >>
+  Cases_on`x < LENGTH l1`>>
+  simp[EL_APPEND1,EL_APPEND2] >>
+  fs[EVERY_MEM,MEM_EL,PULL_EXISTS] >>
+  rw[] >> fs[] >>
+  rfs[EL_APPEND1] >>
+  rev_full_simp_tac(srw_ss()++ARITH_ss)[EL_APPEND2,EL_MAP])
+
+val updated_policies_nonfocal = save_thm("updated_policies_nonfocal",
+  updated_policies_APPEND2_nonfocal
+  |> Q.GEN`l1` |> Q.SPEC`[]`
+  |> SIMP_RULE (srw_ss())[updated_policies_def,SimpRHS])
+
 val LENGTH_updated_policies = Q.store_thm("LENGTH_updated_policies[simp]",
   `LENGTH (updated_policies i f ls) = LENGTH ls`,
   EVAL_TAC >> simp[]);
@@ -348,9 +376,82 @@ val event_update_policies_def = Define`
   event_update_policies i f ev =
     event_set_policies (updated_policies i f (MAP FST (ev.robotActions))) ev`;
 
+val set_policies_updated_policies_nonfocal = Q.store_thm("set_policies_updated_policies_nonfocal",
+  `EVERY ($~ o robot_focal) l2 ⇒
+   rs ≼ l1 ++ l2 ⇒
+   set_policies rs (updated_policies i f (l1 ++ l2)) =
+   set_policies rs (updated_policies i f l1)`,
+  strip_tac >>
+  simp[set_policies_thm,LIST_EQ_REWRITE] >>
+  rw[updated_policies_def] >>
+  simp[set_policy_def] >>
+  Cases_on`x < LENGTH l1`>>simp[EL_APPEND1] >- (
+    IF_CASES_TAC >> simp[] >> fs[] >> rfs[EL_APPEND1] >>
+    IF_CASES_TAC >> fs[] >> rfs[] >> rfs[EL_APPEND1] ) >>
+  simp[robot_component_equality] >>
+  IF_CASES_TAC >> simp[] >>
+  IF_CASES_TAC >- (
+    fs[] >> rw[] >> pop_assum mp_tac >>
+    simp[EL_APPEND2] >>
+    fs[EVERY_MEM,MEM_EL,PULL_EXISTS] >>
+    strip_tac >>
+    `F` suffices_by rw[] >>
+    pop_assum mp_tac >> simp[] ) >>
+  pop_assum mp_tac >> simp[] >>
+  fs[IS_PREFIX_APPEND] >>
+  simp[EL_APPEND1] );
+
+val set_policies_append1_same = Q.store_thm("set_policies_append1_same",
+  `set_policies (l1 ++ l2) (MAP robot_memory l1 ++ p2) =
+   l1 ++ set_policies l2 p2`,
+  rw[set_policies_thm] >>
+  rw[LIST_EQ_REWRITE] >>
+  Cases_on`x < LENGTH l1`>>
+  simp[EL_APPEND1,EL_APPEND2] >>
+  simp[set_policy_def] >>
+  rw[robot_component_equality] >>
+  simp[EL_APPEND1,EL_APPEND2] >>
+  simp[EL_MAP] >> fs[])
+
+val set_policies_append2_same = Q.store_thm("set_policies_append2_same",
+  `LENGTH l1 = LENGTH p1 ⇒
+   set_policies (l1 ++ l2) (p1 ++ MAP robot_memory l2) =
+   set_policies l1 p1 ++ l2`,
+  rw[set_policies_thm] >>
+  rw[LIST_EQ_REWRITE] >>
+  Cases_on`x < LENGTH l1`>>
+  simp[EL_APPEND1,EL_APPEND2] >>
+  simp[set_policy_def] >>
+  rw[robot_component_equality] >>
+  simp[EL_APPEND1,EL_APPEND2] >>
+  simp[EL_MAP])
+
+val set_policies_same = save_thm("set_policies_same",
+  set_policies_append2_same
+  |> Q.GEN`l1` |> Q.SPEC`[]`
+  |> Q.GEN`p1` |> Q.SPEC`[]`
+  |> SIMP_RULE (srw_ss())[]
+  |> SIMP_RULE (srw_ss())[set_policies_thm,SimpRHS])
+
+val updateInventory_const = Q.store_thm("updateInventory_const[simp]",
+  `(updateInventory sq i a).memory = (EL i sq.robots).memory ∧
+   (updateInventory sq i a).focal = (EL i sq.robots).focal`,
+  rw[updateInventory_def] >>
+  BasicProvers.CASE_TAC >> rw[])
+
+val act_Inspected_less = Q.store_thm("act_Inspected_less",
+  `act sq nb m = Inspected n r ⇒ n < LENGTH sq.robots`,
+  simp[act_def] >> rw[] >>
+  every_case_tac >> fs[] >> rw[])
+
+val MEM_Inspected_localActions_less = Q.store_thm("MEM_Inspected_localActions_less",
+  `MEM (Inspected n r) (localActions sq nb) ⇒ n < LENGTH sq.robots`,
+  rw[localActions_def,MEM_GENLIST] >>
+  metis_tac[act_Inspected_less])
+
 (*
 val event_set_policies_update_policies = Q.store_thm("event_set_policies_update_policies",
-  `LENGTH (FILTER robot_focal (sq.robots ++ MAP (robots o THE) (FILTER IS_SOME nb))) ≤ 1 ⇒
+  `LENGTH (FILTER robot_focal (sq.robots ++ (FLAT (MAP (square_robots o THE) (FILTER IS_SOME nb))))) ≤ 1 ⇒
    event_set_policies (updated_policies i f sq.robots) (event sq nb) =
    event_update_policies i f (event sq nb)`,
   rw[event_update_policies_def] >>
@@ -379,21 +480,55 @@ val event_set_policies_update_policies = Q.store_thm("event_set_policies_update_
     every_case_tac >> fs[] >>
     fs[construct_def] >>
     every_case_tac >> fs[] >> rw[] ) >>
-  `∀rs ls.
-    set_policies rs (updated_policies i f (ls ++ children)) =
-    set_policies rs (updated_policies i f ls)` by (
-    simp[set_policies_thm,LIST_EQ_REWRITE] >>
-    rw[updated_policies_def] >>
-    simp[set_policy_def] >>
-    Cases_on`x < LENGTH ls`>>simp[EL_APPEND1] >- (
-      IF_CASES_TAC >> simp[] >> fs[] >> rfs[EL_APPEND1] >>
-      IF_CASES_TAC >> fs[] >> rfs[] >> rfs[EL_APPEND1] ) >>
-    simp[robot_component_equality] >>
-    IF_CASES_TAC >> simp[] >>
-
-  conj_tac >- (
-    simp[set_policies_APPEND1] >>
-    type_of``updateInventory``
+  first_assum(strip_assume_tac o MATCH_MP (GEN_ALL set_policies_updated_policies_nonfocal)) >>
+  simp[set_policies_APPEND1] >>
+  simp[updated_policies_APPEND2_nonfocal] >>
+  `updated_policies i f veterans = updated_policies i f sq.robots` by (
+    simp[updated_policies_def] >>
+    simp[LIST_EQ_REWRITE] >>
+    rw[Abbr`veterans`] >> rfs[] ) >>
+  reverse conj_tac >- (
+    simp[MAP_EQ_f] >>
+    Cases >> simp[fix_inspected_def] >>
+    strip_tac >>
+    imp_res_tac MEM_Inspected_localActions_less >>
+    simp[set_policy_def,EL_APPEND1] >>
+    rw[updated_policies_APPEND,EL_APPEND1,robot_component_equality,EL_MAP] >>
+    simp[updated_policies_def,Abbr`veterans`]) >>
+  Cases_on`EVERY ($~ o robot_focal) (MAP FST immigrations)` >- (
+    first_assum(strip_assume_tac o MATCH_MP (GEN_ALL set_policies_updated_policies_nonfocal)) >>
+    simp[set_policies_APPEND1] ) >>
+  `EVERY ($~ o robot_focal) sq.robots` by (
+    fs[FILTER_APPEND] >>
+    qmatch_assum_abbrev_tac`a + b ≤ 1n` >>
+    `b ≠ 0` by (
+      simp[Abbr`b`,LENGTH_NIL] >>
+      simp[FILTER_EQ_NIL] >>
+      fs[EXISTS_MEM,Abbr`immigrations`] >>
+      ONCE_REWRITE_TAC[CONJ_COMM] >>
+      first_assum(match_exists_tac o concl) >> simp[] >>
+      fs[MEM_FLAT,MEM_MAP,MEM_GENLIST,PULL_EXISTS,MEM_FILTER] >>
+      qcase_tac`EL k nb` >>
+      Cases_on`EL k nb`>> fs[incomingFrom_def] >>
+      fs[MEM_FLAT,MEM_MAP,PULL_EXISTS] >>
+      qexists_tac`EL k nb` >> simp[] >>
+      every_case_tac >> fs[] >>
+      simp[MEM_EL] >> metis_tac[] ) >>
+    `a = 0` by decide_tac >>
+    fs[Abbr`a`,LENGTH_NIL,FILTER_EQ_NIL,EVERY_MEM] ) >>
+  simp[updated_policies_nonfocal] >>
+  simp[updated_policies_APPEND] >>
+  IF_CASES_TAC >> simp[] >- (
+    simp[set_policies_append2_same] >>
+    simp[updated_policies_nonfocal] ) >>
+  simp[set_policies_append1_same] >>
+  `MAP robot_memory veterans = MAP robot_memory sq.robots` by (
+    simp[Abbr`veterans`,MAP_GENLIST] >>
+    simp[LIST_EQ_REWRITE,EL_MAP] ) >>
+  qspec_then`veterans`mp_tac(Q.GEN`l2`set_policies_same) >>
+  simp[] >> disch_then kall_tac >>
+  simp[set_policies_thm]
+  incomingFrom_def
 
 val computeEvents_ignores_policy = Q.store_thm("computeEvents_ignores_policy",
   `i < LENGTH sq.robots ∧ focal_at g c sq i ⇒
@@ -434,7 +569,10 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   qpat_assum`_ = s'`(assume_tac o Abbrev_intro o SYM) >>
   qmatch_assum_abbrev_tac`Abbrev(s' = _ with state := state')` >>
   fs[Abbr`s'`] >>
-
+  reverse(Cases_on`∃dir. a = MovedOut dir`)>>fs[]>-(
+    `(c'',i) = (s.focal_coordinate,s.focal_index)` by (
+      every_case_tac >> fs[] ) >> fs[] >>
+    rpt var_eq_tac >>
 *)
 
 val _ = export_theory();
