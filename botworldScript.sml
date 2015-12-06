@@ -247,6 +247,10 @@ val fill_def = Define`
     (s.focal_coordinate,
      square_update_robot f s.focal_index (s.state ' s.focal_coordinate))`;
 
+val find_focal_def = Define`
+  find_focal g =
+    @p. ∃c i sq. p = (c,i) ∧ FLOOKUP g c = SOME sq ∧ i < LENGTH sq.robots ∧ (EL i sq.robots).focal`;
+
 val steph_def = Define`
   steph command s =
     let events = computeEvents (fill (robot_command_fupd (K command)) s) in
@@ -255,14 +259,9 @@ val steph_def = Define`
                    ∃r. a = Inspected s.focal_index r)
               (MAP SND ev.robotActions)
     then NONE else
-    let (r,a) = EL s.focal_index ev.robotActions in
+    let a = SND (EL s.focal_index ev.robotActions) in
     let s' = computeSquare o_f events in
-    let (c,i) =
-      case a of
-      | MovedOut dir =>
-          let c = move_coordinate s.focal_coordinate dir in
-          (c, FST(THE(INDEX_FIND 0 robot_focal (s' ' c).robots)))
-      | _ => (s.focal_coordinate, s.focal_index) in
+    let (c,i) = find_focal s' in
     SOME
       ((s.focal_index, ev, private a),
        <| state := s'
