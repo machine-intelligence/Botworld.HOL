@@ -3,6 +3,7 @@ open preamble botworldTheory botworld_dataTheory
 val _ = new_theory"botworld_props";
 
 (* TODO: move *)
+
 val FLOOKUP_FMAP_MAP2 = Q.store_thm("FLOOKUP_FMAP_MAP2",
   `FLOOKUP (FMAP_MAP2 f m) x =
    OPTION_MAP (CURRY f x) (FLOOKUP m x) `,
@@ -25,6 +26,10 @@ val FILTER_INDICES = Q.store_thm("FILTER_INDICES",
       Cases >> simp[] ) >>
     Cases >> simp[] ) >>
   qexists_tac`SUC o f` >> simp[] >> fs[INJ_DEF]);
+
+fun Abbrev_intro th =
+  EQ_MP (SYM(SPEC(concl th)markerTheory.Abbrev_def)) th
+
 (* -- *)
 
 val LENGTH_localActions = Q.store_thm("LENGTH_localActions[simp]",
@@ -40,14 +45,150 @@ val policy_fun_def = Define`
    let r = runMachine (ffi_from_observation obs, <| memory := p; processor := speed |>) in
    (r.command,r.memory)`;
 
-fun Abbrev_intro th =
-  EQ_MP (SYM(SPEC(concl th)markerTheory.Abbrev_def)) th
-
 val square_update_robot_o = Q.store_thm("square_update_robot_o",
   `square_update_robot (f o g) i = square_update_robot f i o square_update_robot g i`,
   rw[square_update_robot_def,FUN_EQ_THM,square_component_equality] >>
   simp[LIST_EQ_REWRITE,EL_LUPDATE])
 
+val wf_state_with_hole_find_focal = Q.store_thm("wf_state_with_hole_find_focal",
+  `wf_state_with_hole s ⇒
+    find_focal s.state = (s.focal_coordinate,s.focal_index)`,
+  rw[wf_state_with_hole_def,find_focal_def] >>
+  SELECT_ELIM_TAC >> metis_tac[])
+
+val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
+
+val map_robotActions_def = Define
+  `map_robotActions f (ra:(robot#action) list) = ZIP(MAP (f o FST) ra,MAP SND ra)`;
+
+val if_focal_def = Define`
+  if_focal f r = if r.focal then f r else r`;
+
+val map_inspected_def = Define`
+  (map_inspected f (Inspected j r) = Inspected j (f r)) ∧
+  (map_inspected _ a = a)`;
+val _ = export_rewrites["map_inspected_def"];
+
+val LENGTH_square_update_robot = Q.store_thm("LENGTH_square_update_robot[simp]",
+  `LENGTH (square_update_robot f i sq).robots = LENGTH sq.robots`,
+  rw[square_update_robot_def]);
+
+val LENGTH_FILTER_memory = Q.prove(
+  `(∀r p. P r ⇔ P (r with memory := p)) ⇒
+   ∀ls ps i. i < LENGTH ls ⇒
+     LENGTH (FILTER P (LUPDATE (EL i ls with memory := p) i ls)) = LENGTH (FILTER P ls)`,
+   strip_tac >>
+   Induct >> simp[] >>
+   gen_tac >> Cases >> simp[] >>
+   simp[LUPDATE_def] >>
+   rw[] >> rfs[] >>
+   metis_tac[]);
+
+val contested_ignores_policy = Q.store_thm("contested_ignores_policy[simp]",
+  `i < LENGTH sq.robots ⇒
+   (contested (sq with robots updated_by LUPDATE (EL i sq.robots with memory := p) i) n ⇔ contested sq n)`,
+  rw[contested_def] >>
+  AP_TERM_TAC >>
+  AP_TERM_TAC >>
+  match_mp_tac (MP_CANON LENGTH_FILTER_memory) >>
+  simp[canLift_def])
+
+val inspectShielded_ignores_policy = Q.store_thm("inspectShielded_ignores_policy[simp]",
+  `i < LENGTH ls ∧ n < LENGTH ls ⇒
+   (inspectShielded (LUPDATE (EL i ls with memory := p) i ls) n ⇔
+    inspectShielded ls n)`,
+  rw[inspectShielded_def] >>
+  simp[EL_LUPDATE] >>
+  simp[inspectAttempts_def,FILTER_MAP] >>
+  simp[LENGTH_FILTER_memory] >> rw[])
+
+val destroyShielded_ignores_policy = Q.store_thm("destroyShielded_ignores_policy[simp]",
+  `i < LENGTH ls ∧ n < LENGTH ls ⇒
+   (destroyShielded (LUPDATE (EL i ls with memory := p) i ls) n ⇔
+    destroyShielded ls n)`,
+  rw[destroyShielded_def] >>
+  simp[EL_LUPDATE] >>
+  simp[destroyAttempts_def,FILTER_MAP] >>
+  simp[LENGTH_FILTER_memory] >> rw[])
+
+val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_policy",
+  `wf_state_with_hole s
+   ⇒
+   computeEvents (s.state|+(s.focal_coordinate,square_update_robot (memory_fupd (K p)) s.focal_index (s.state ' s.focal_coordinate))) =
+   (λev. ev with robotActions updated_by map_robotActions (if_focal (memory_fupd (K p))))
+     o_f computeEvents s.state`,
+  rw[fmap_eq_flookup,FLOOKUP_o_f,computeEvents_def,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE] >>
+  qpat_abbrev_tac`f = memory_fupd _` >>
+  rw[] >- (
+    fs[wf_state_with_hole_def] >>
+    `Abbrev(sq = s.state ' s.focal_coordinate)` by (
+      metis_tac[flookup_thm,markerTheory.Abbrev_def] ) >>
+    fs[] >>
+    Cases_on`s.focal_coordinate` >>
+    simp[neighbours_def,FLOOKUP_UPDATE] >>
+    rpt(IF_CASES_TAC >- (`F` suffices_by rw[] >> intLib.COOPER_TAC)) >>
+    simp[] >>
+    ntac 7 (pop_assum kall_tac) >>
+    qpat_abbrev_tac`nb = _::_` >>
+    pop_assum kall_tac >>
+    rw[event_def] >>
+    `actions = MAP (map_inspected (if_focal f)) actions'` by (
+      unabbrev_all_tac >>
+      simp[localActions_def,MAP_GENLIST] >>
+      rpt(AP_THM_TAC ORELSE AP_TERM_TAC) >>
+      simp[FUN_EQ_THM,act_def] >>
+      rw[square_update_robot_def] >>
+      simp[EL_LUPDATE] >> rw[] >>
+      CASE_TAC >> fs[] >>
+      simp[EVERY_MEM,EXISTS_MEM] >>
+      simp[canLift_def] >> rw[] >>
+      rw[if_focal_def] >>
+      BasicProvers.FULL_CASE_TAC >> fs[] >>
+      metis_tac[] ) >>
+    map_every qunabbrev_tac[`actions`,`actions'`] >> fs[] >>
+    pop_assum kall_tac >>
+    `children = children'` by (
+      match_mp_tac EQ_SYM >>
+      unabbrev_all_tac >> simp[] >>
+      AP_TERM_TAC >>
+      simp[MAP_MAP_o,MAP_EQ_f] >>
+      rw[] >>
+      CASE_TAC >> simp[] ) >>
+    map_every qunabbrev_tac[`children`] >> fs[] >>
+    conj_tac >- (
+      simp[map_robotActions_def,ZIP_MAP,MAP_MAP_o,MAP_ZIP,o_DEF] >>
+      cheat ) >>
+    cheat ) >>
+  Cases_on`FLOOKUP s.state k`>>fs[]>>
+  cheat );
+
+val steph_fill_step = Q.store_thm("steph_fill_step",
+  `wf_state_with_hole s ∧
+   steph c s = SOME (obs,s') ∧
+   policy_fun p (get_focal_robot s).processor obs = (c',p')
+   ⇒
+   step (fill (with_policy c p) s) = fill (with_policy c' p') s'`,
+  rw[wf_state_with_hole_def,fill_def,get_focal_robot_def,step_def,steph_def] >>
+  `Abbrev(sq = s.state ' s.focal_coordinate)` by (
+    fs[FLOOKUP_DEF,markerTheory.Abbrev_def] ) >> simp[] >>
+  fs[LET_THM] >>
+  first_assum(split_applied_pair_tac o lhs o concl) >> fs[] >>
+  qpat_assum`_ = s'`(assume_tac o Abbrev_intro o SYM) >>
+  qmatch_assum_abbrev_tac`Abbrev(s' = _ with state := state')` >>
+  fs[Abbr`s'`] >>
+  simp[Once square_update_robot_o] >>
+  qpat_abbrev_tac`sq' = square_update_robot (command_fupd _) _ _` >>
+  `wf_state_with_hole (s with state := s.state |+ (s.focal_coordinate,sq'))` by (
+    fs[wf_state_with_hole_def] >>
+    simp[FLOOKUP_UPDATE] >>
+    simp[Abbr`sq'`,square_update_robot_def,EL_LUPDATE] >>
+    rw[] >> simp[EL_LUPDATE] >> fs[] >>
+    metis_tac[] ) >>
+  drule computeEvents_with_focal_policy >>
+  simp[] >> disch_then kall_tac >>
+  cheat);
+
+(*
 val set_policy_def = Define`
   set_policy r i ps =
     r with memory updated_by (λm. if i < LENGTH ps then EL i ps else m)`;
@@ -545,7 +686,6 @@ val focal_at_FILTER_1 = Q.store_thm("focal_at_FILTER_1",
     fs[INJ_DEF] >> first_x_assum match_mp_tac >> simp[] ) >>
   metis_tac[MEM,MEM_FILTER,prim_recTheory.LESS_REFL]);
 
-(*
 val computeEvents_ignores_policy = Q.store_thm("computeEvents_ignores_policy",
   `i < LENGTH sq.robots ∧ focal_at g c sq i ∧ sq ∈ FRANGE g ⇒
    computeEvents (g |+ (c,update_focal_robot (memory_fupd f) i sq)) =
@@ -564,7 +704,17 @@ val computeEvents_ignores_policy = Q.store_thm("computeEvents_ignores_policy",
       Cases_on`c`>> simp_tac(srw_ss())[neighbours_def] >>
       metis_tac[PAIR_EQ,intLib.ARITH_PROVE``(∀x. x ≠ x + 1 ∧ x ≠ x -1)``] ) >>
   Cases_on`FLOOKUP g k`>>simp[]>>
-*)
+  match_mp_tac EQ_SYM >>
+  (fn g =>
+     match_mp_tac EQ_TRANS >>
+     match_exists_tac(
+       event_set_policies_update_policies_no_move
+       |> GSYM |>
+       |> PAR
+
+     concl
+       (DISCH_ALL (PART_MATCH lhs (GSYM event_set_policies_update_policies_no_move)
+  match_exists_tac(concl PART_MATCH
 
 (*
 val event_set_policies_update_policies = Q.store_thm("event_set_policies_update_policies",
@@ -647,31 +797,6 @@ val event_set_policies_update_policies = Q.store_thm("event_set_policies_update_
   simp[set_policies_thm]
   incomingFrom_def
 *)
-
-val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
-
-(*
-val steph_fill_step = Q.store_thm("steph_fill_step",
-  `wf_state_with_hole s ∧
-   steph c s = SOME (obs,s') ∧
-   policy_fun p (get_focal_robot s).processor obs = (c',p')
-   ⇒
-   step (fill (with_policy c p) s) = fill (with_policy c' p') s'`,
-  rw[wf_state_with_hole_def,fill_def,get_focal_robot_def,step_def,steph_def] >>
-  simp[square_update_robot_o] >>
-  `Abbrev(sq = s.state ' s.focal_coordinate)` by (
-    fs[FLOOKUP_DEF,markerTheory.Abbrev_def] ) >> simp[] >>
-  fs[LET_THM] >>
-  first_assum(split_applied_pair_tac o lhs o concl) >> fs[] >>
-  first_assum(split_applied_pair_tac o lhs o concl) >> fs[] >>
-  qpat_assum`_ = s'`(assume_tac o Abbrev_intro o SYM) >>
-  qmatch_assum_abbrev_tac`Abbrev(s' = _ with state := state')` >>
-  fs[Abbr`s'`] >>
-  reverse(Cases_on`∃dir. a = MovedOut dir`)>>fs[]>-(
-    `(c'',i) = (s.focal_coordinate,s.focal_index)` by (
-      every_case_tac >> fs[] ) >> fs[] >>
-    rpt var_eq_tac >>
-    qpat_assum`_ = (_,_)`kall_tac >>
 
 *)
 
