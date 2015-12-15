@@ -30,7 +30,20 @@ val FILTER_INDICES = Q.store_thm("FILTER_INDICES",
 fun Abbrev_intro th =
   EQ_MP (SYM(SPEC(concl th)markerTheory.Abbrev_def)) th
 
+val ZIP_MAP_PAIR = Q.store_thm("ZIP_MAP_PAIR",
+  `LENGTH l1 = LENGTH l2 ⇒
+   ZIP (MAP f1 l1,MAP f2 l2) = MAP (f1 ## f2) (ZIP(l1,l2))`,
+  rw[ZIP_MAP,MAP_MAP_o] >> simp[o_DEF] >>
+  rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
+  simp[FUN_EQ_THM,FORALL_PROD]);
+
 (* -- *)
+
+val incomingFrom_MovedIn = Q.store_thm("incomingFrom_MovedIn",
+  `MEM x (incomingFrom y z) ⇒ ∃i. SND x = MovedIn i`,
+  Cases_on`z`>>rw[incomingFrom_def]>>
+  fs[MEM_FLAT,MEM_MAP] >>
+  every_case_tac >> fs[] >> rw[] >> fs[]);
 
 val LENGTH_localActions = Q.store_thm("LENGTH_localActions[simp]",
   `LENGTH (localActions sq nb) = LENGTH sq.robots`,
@@ -111,11 +124,54 @@ val destroyShielded_ignores_policy = Q.store_thm("destroyShielded_ignores_policy
   simp[destroyAttempts_def,FILTER_MAP] >>
   simp[LENGTH_FILTER_memory] >> rw[])
 
+val MAP_robot_command_square_update_robot_memory_fupd = Q.store_thm("MAP_robot_command_square_update_robot_memory_fupd[simp]",
+  `MAP robot_command (square_update_robot (memory_fupd f) x sq).robots =
+   MAP robot_command sq.robots`,
+  rw[square_update_robot_def] >>
+  rw[LIST_EQ_REWRITE,EL_MAP,EL_LUPDATE] >>
+  rw[]);
+
+val updateInventory_ignores_policy = Q.store_thm("updateInventory_ignores_policy",
+  `i < LENGTH sq.robots ∧
+   (∀z. (z < LENGTH sq.robots ∧ (EL z sq.robots).focal) ⇔ z = fi)
+   ⇒
+   updateInventory (square_update_robot (memory_fupd (K p)) fi sq) i a =
+   if_focal (memory_fupd (K p)) (updateInventory sq i a)`,
+  rw[] >>
+  `fi < LENGTH sq.robots` by metis_tac[] >>
+  rw[updateInventory_def] >>
+  Cases_on`a`>>simp[if_focal_def] >>
+  unabbrev_all_tac >> fs[] >>
+  fs[square_update_robot_def,EL_LUPDATE] >>
+  (Cases_on`(EL i sq.robots).focal` >|[
+     `i = fi` by metis_tac[],
+     `i ≠ fi` by metis_tac[]
+     ]) >>
+  simp[]);
+
+val updateInventory_const = Q.store_thm("updateInventory_const[simp]",
+  `(updateInventory sq i a).memory = (EL i sq.robots).memory ∧
+   (updateInventory sq i a).focal = (EL i sq.robots).focal`,
+  rw[updateInventory_def] >>
+  BasicProvers.CASE_TAC >> rw[])
+
+val updateInventory_map_inspected = Q.store_thm("updateInventory_map_inspected[simp]",
+  `updateInventory sq i (map_inspected f a) = updateInventory sq i a`,
+  Cases_on`a`>>simp[updateInventory_def]);
+
+val MEM_Built_localActions_not_focal = Q.store_thm("MEM_Built_localActions_not_focal",
+  `MEM (Built x r) (localActions a b) ⇒ ¬r.focal`,
+  rw[localActions_def,MEM_GENLIST,act_def,LET_THM] >>
+  pop_assum mp_tac >> CASE_TAC >> fs[] >>
+  every_case_tac >> fs[] >>
+  fs[construct_def] >>
+  every_case_tac >> fs[] >> rw[]);
+
 val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_policy",
   `wf_state_with_hole s
    ⇒
    computeEvents (s.state|+(s.focal_coordinate,square_update_robot (memory_fupd (K p)) s.focal_index (s.state ' s.focal_coordinate))) =
-   (λev. ev with robotActions updated_by map_robotActions (if_focal (memory_fupd (K p))))
+   (λev. ev with robotActions updated_by MAP (if_focal (memory_fupd (K p)) ## map_inspected (if_focal (memory_fupd (K p)))))
      o_f computeEvents s.state`,
   rw[fmap_eq_flookup,FLOOKUP_o_f,computeEvents_def,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE] >>
   qpat_abbrev_tac`f = memory_fupd _` >>
@@ -130,8 +186,26 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
     simp[] >>
     ntac 7 (pop_assum kall_tac) >>
     qpat_abbrev_tac`nb = _::_` >>
-    pop_assum kall_tac >>
+    `∀sq. MEM (SOME sq) nb ⇒ EVERY ($~ o robot_focal) sq.robots` by (
+      simp[Abbr`nb`,EVERY_MEM,MEM_EL,PULL_EXISTS] >> rw[] >>
+      first_x_assum(match_mp_tac o MP_CANON) >>
+      qpat_assum`SOME _ = _`(assume_tac o SYM) >>
+      asm_exists_tac >> simp[] >>
+      intLib.COOPER_TAC ) >>
+    qpat_assum`Abbrev (nb = _)` kall_tac >>
     rw[event_def] >>
+    `∀f g. MAP (if_focal f ## map_inspected g) immigrations = immigrations` by (
+      unabbrev_all_tac >> simp[MAP_EQ_ID] >>
+      simp[MEM_FLAT,MEM_GENLIST,PULL_EXISTS] >> rw[] >>
+      imp_res_tac incomingFrom_MovedIn >>
+      Cases_on`x`>>fs[]>>
+      rw[if_focal_def] >>
+      Cases_on`EL i nb`>>
+      fs[incomingFrom_def] >>
+      fs[MEM_FLAT,MEM_MAP,PULL_EXISTS] >>
+      every_case_tac >> fs[] >>
+      fs[MEM_EL,EVERY_MEM,PULL_EXISTS] >>
+      metis_tac[] ) >>
     `actions = MAP (map_inspected (if_focal f)) actions'` by (
       unabbrev_all_tac >>
       simp[localActions_def,MAP_GENLIST] >>
@@ -155,9 +229,41 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
       rw[] >>
       CASE_TAC >> simp[] ) >>
     map_every qunabbrev_tac[`children`] >> fs[] >>
+    pop_assum kall_tac >>
+    `veterans = MAP (if_focal f) veterans'` by (
+      unabbrev_all_tac >>
+      simp[MAP_GENLIST] >>
+      simp[GENLIST_FUN_EQ,EL_MAP] >>
+      gen_tac >> strip_tac >>
+      qmatch_assum_abbrev_tac`i < LENGTH sq.robots` >>
+      `∀z. z < LENGTH sq.robots ∧ (EL z sq.robots).focal ⇔ z = s.focal_index` by (
+        metis_tac[] ) >>
+      simp[updateInventory_ignores_policy] ) >>
+    qunabbrev_tac`veterans`>>fs[] >>
+    pop_assum kall_tac >>
     conj_tac >- (
-      simp[map_robotActions_def,ZIP_MAP,MAP_MAP_o,MAP_ZIP,o_DEF] >>
-      cheat ) >>
+      `LENGTH veterans' = LENGTH sq.robots` by simp[Abbr`veterans'`] >>
+      simp[ZIP_MAP_PAIR] >>
+      simp[GSYM ZIP_MAP_PAIR,LENGTH_REPLICATE] >>
+      AP_TERM_TAC >> simp[] >>
+      simp[REPLICATE_GENLIST,MAP_GENLIST] >>
+      simp[Abbr`children'`] >>
+      simp[MAP_FLAT,MAP_MAP_o,o_DEF] >>
+      AP_TERM_TAC >>
+      simp[MAP_EQ_f] >>
+      rw[] >> Cases_on`a`>>simp[] >>
+      imp_res_tac MEM_Built_localActions_not_focal >>
+      simp[if_focal_def] ) >>
+    conj_tac >- (
+      `(square_update_robot f s.focal_index sq).items = sq.items` by (
+        simp[Abbr`f`,square_update_robot_def] ) >> simp[] >>
+      rpt AP_THM_TAC >> AP_TERM_TAC >>
+      simp[FUN_EQ_THM] >>
+      simp[EXISTS_MAP] >>
+      simp[EXISTS_MEM] >> rw[] >>
+      EQ_TAC >> rw[] >>
+      asm_exists_tac >>
+      (Cases_on`x` ORELSE Cases_on`a`) >> fs[] ) >>
     cheat ) >>
   Cases_on`FLOOKUP s.state k`>>fs[]>>
   cheat );
@@ -329,12 +435,6 @@ val GENLIST_updateInventory_ignores_policy = Q.store_thm("GENLIST_updateInventor
 val updateInventory_fix_inspected = Q.store_thm("updateInventory_fix_inspected[simp]",
   `updateInventory sq x (fix_inspected ps y) = updateInventory sq x y`,
   Cases_on`y`>>simp[fix_inspected_def] >> EVAL_TAC)
-
-val incomingFrom_MovedIn = Q.store_thm("incomingFrom_MovedIn",
-  `MEM x (incomingFrom y z) ⇒ ∃i. SND x = MovedIn i`,
-  Cases_on`z`>>rw[incomingFrom_def]>>
-  fs[MEM_FLAT,MEM_MAP] >>
-  every_case_tac >> fs[] >> rw[] >> fs[]);
 
 val event_set_policies_def = Define`
   event_set_policies ps ev =
@@ -591,12 +691,6 @@ val set_policies_same = save_thm("set_policies_same",
   |> Q.GEN`p1` |> Q.SPEC`[]`
   |> SIMP_RULE (srw_ss())[]
   |> SIMP_RULE (srw_ss())[set_policies_thm,SimpRHS])
-
-val updateInventory_const = Q.store_thm("updateInventory_const[simp]",
-  `(updateInventory sq i a).memory = (EL i sq.robots).memory ∧
-   (updateInventory sq i a).focal = (EL i sq.robots).focal`,
-  rw[updateInventory_def] >>
-  BasicProvers.CASE_TAC >> rw[])
 
 val act_Inspected_less = Q.store_thm("act_Inspected_less",
   `act sq nb m = Inspected n r ⇒ n < LENGTH sq.robots`,
