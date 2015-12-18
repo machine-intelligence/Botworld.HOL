@@ -193,10 +193,10 @@ val updateInventory_ignores_policy2 = Q.store_thm("updateInventory_ignores_polic
 val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_policy",
   `wf_state_with_hole s
    ⇒
-   computeEvents (s.state|+(s.focal_coordinate,square_update_robot (memory_fupd (K p)) s.focal_index (s.state ' s.focal_coordinate))) =
+   computeEvents (fill (memory_fupd (K p)) s) =
    (λev. ev with robotActions updated_by MAP (if_focal (memory_fupd (K p)) ## map_inspected (if_focal (memory_fupd (K p)))))
      o_f computeEvents s.state`,
-  rw[fmap_eq_flookup,FLOOKUP_o_f,computeEvents_def,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE] >>
+  rw[fmap_eq_flookup,FLOOKUP_o_f,computeEvents_def,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE,fill_def] >>
   qpat_abbrev_tac`f = memory_fupd _` >>
   rw[] >- (
     fs[wf_state_with_hole_def] >>
@@ -417,6 +417,18 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
   AP_TERM_TAC >>
   simp[LIST_EQ_REWRITE,EL_GENLIST,MEM_MAP,PULL_EXISTS,MAP_GENLIST]);
 
+val focal_preserved = Q.store_thm("focal_preserved",
+  `wf_state_with_hole s ∧
+   events = computeEvents s.state ∧
+   ev = events ' s.focal_coordinate ∧
+   ¬EXISTS(λa. a = Destroyed s.focal_index ∨ ∃r. a = Inspected s.focal_index r)(MAP SND ev.robotActions) ∧
+   s' = computeSquare o_f events
+   ⇒
+   ∃c' i'. wf_state_with_hole <| state := s'; focal_coordinate := c'; focal_index := i' |>`,
+  rw[wf_state_with_hole_def,FLOOKUP_o_f] >>
+  fs[EVERY_MAP] >>
+  cheat);
+
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
    steph c s = SOME (obs,s') ∧
@@ -440,8 +452,19 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
     rw[] >> simp[EL_LUPDATE] >> fs[] >>
     metis_tac[] ) >>
   drule computeEvents_with_focal_policy >>
-  simp[] >> disch_then kall_tac >>
+  simp[fill_def] >> disch_then kall_tac >>
   simp[o_DEF] >>
+  simp[Abbr`state'`] >>
+  qpat_abbrev_tac`events = computeEvents _` >>
+  simp[fmap_eq_flookup] >> gen_tac >>
+  simp[FLOOKUP_UPDATE,FLOOKUP_o_f] >>
+  CASE_TAC >> simp[] >- (
+    strip_tac >> var_eq_tac >>
+    drule(GEN_ALL focal_preserved) >> simp[] >>
+    spose_not_then strip_assume_tac >>
+    imp_res_tac wf_state_with_hole_find_focal >> fs[] >>
+    fs[wf_state_with_hole_def,FLOOKUP_o_f] >>
+    rveq >> rfs[] ) >>
   cheat);
 
 (*
