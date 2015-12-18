@@ -167,6 +167,29 @@ val MEM_Built_localActions_not_focal = Q.store_thm("MEM_Built_localActions_not_f
   fs[construct_def] >>
   every_case_tac >> fs[] >> rw[]);
 
+val Destroyed_eq_map_inspected = Q.store_thm("Destroyed_eq_map_inspected[simp]",
+  `Destroyed x = map_inspected f a ⇔ Destroyed x = a`,
+  Cases_on`a`>>simp[]);
+
+val shatter_if_focal_memory_fupd = Q.store_thm("shatter_if_focal_memory_fupd[simp]",
+  `shatter (if_focal (memory_fupd x) r) = shatter r`,
+  rw[if_focal_def,shatter_def]);
+
+val if_focal_memory_fupd_inventory = Q.store_thm("if_focal_memory_fupd_inventory[simp]",
+  `(if_focal (memory_fupd x) r).inventory = r.inventory`,
+  rw[if_focal_def]);
+
+val less8 = Q.prove(
+  `x < 8n ⇔ (x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4 ∨ x = 5 ∨ x = 6 ∨ x = 7)`,
+  rw[EQ_IMP_THM] >> simp[])
+
+val updateInventory_ignores_policy2 = Q.store_thm("updateInventory_ignores_policy2",
+  `¬(EL i sq.robots).focal ⇒
+   if_focal (memory_fupd x) (updateInventory sq i a) = updateInventory sq i a`,
+  rw[updateInventory_def] >>
+  rw[if_focal_def] >>
+  CASE_TAC >> fs[]);
+
 val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_policy",
   `wf_state_with_hole s
    ⇒
@@ -264,9 +287,135 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
       EQ_TAC >> rw[] >>
       asm_exists_tac >>
       (Cases_on`x` ORELSE Cases_on`a`) >> fs[] ) >>
-    cheat ) >>
+    conj_tac >- (
+      AP_TERM_TAC >>
+      simp[LIST_EQ_REWRITE,EL_MAP,EL_ZIP] >>
+      qx_gen_tac`n` >>
+      Cases_on`EL n (localActions sq nb)`>>simp[] >>
+      simp[square_update_robot_def,EL_LUPDATE] >>
+      simp[Abbr`f`] >> rw[] ) >>
+    unabbrev_all_tac >>
+    AP_TERM_TAC >>
+    simp[LIST_EQ_REWRITE,EL_GENLIST,MEM_MAP,PULL_EXISTS,MAP_GENLIST]) >>
   Cases_on`FLOOKUP s.state k`>>fs[]>>
-  cheat );
+  qpat_abbrev_tac`nb = neighbours (_ |+ _) _` >>
+  `LENGTH nb = LENGTH (neighbours s.state k)` by (
+    simp[Abbr`nb`] >>
+    Cases_on`k`>>simp[neighbours_def] ) >>
+  `∀n. n < LENGTH nb ⇒ (IS_SOME (EL n nb) ⇔ IS_SOME (EL n (neighbours s.state k)))` by (
+    simp[Abbr`nb`] >>
+    Cases_on`k`>>simp[neighbours_def] >>
+    simp[less8] >>
+    gen_tac >> strip_tac >> simp[FLOOKUP_UPDATE] >>
+    rw[] >> fs[wf_state_with_hole_def] ) >>
+  `∀g. ∀n. n < LENGTH nb ⇒ (incomingFrom n (EL n nb)) = MAP (if_focal f ## map_inspected g) (incomingFrom n (EL n (neighbours s.state k)))` by (
+    rpt gen_tac >> strip_tac >>
+    Cases_on`EL n nb` >>
+    first_x_assum(qspec_then`n`mp_tac)>>simp[incomingFrom_def]>>
+    simp[IS_SOME_EXISTS] >> strip_tac >>
+    simp[incomingFrom_def] >>
+    simp[MAP_FLAT,MAP_MAP_o] >>
+    simp[o_DEF] >>
+    AP_TERM_TAC >>
+    simp[Once LIST_EQ_REWRITE] >>
+    conj_asm1_tac >- (
+      fs[Abbr`nb`] >>
+      Cases_on`k`>>fs[neighbours_def] >>
+      fs[less8,FLOOKUP_UPDATE] >> rfs[] >>
+      every_case_tac >> fs[] >> rveq >>
+      simp[square_update_robot_def] >>
+      fs[FLOOKUP_DEF] ) >>
+    simp[EL_MAP] >>
+    gen_tac >> strip_tac >>
+    fs[Abbr`nb`] >>
+    Cases_on`k`>>fs[neighbours_def,if_focal_def] >>
+    fs[less8,FLOOKUP_UPDATE] >> rfs[if_focal_def] >>
+    every_case_tac >> fs[] >> rveq >>
+    fs[square_update_robot_def,EL_LUPDATE,Abbr`f`] >>
+    rw[] >> rfs[] >> fs[FLOOKUP_DEF,if_focal_def] >> rveq >> fs[] >>
+    every_case_tac >> fs[] >>
+    fs[wf_state_with_hole_def,FLOOKUP_DEF] >>
+    metis_tac[]) >>
+  rw[event_def] >>
+  `∀g. MAP (if_focal f ## map_inspected g) immigrations' = immigrations` by (
+    gen_tac >>
+    map_every qunabbrev_tac[`immigrations'`,`immigrations`] >>
+    simp[MAP_FLAT] >>
+    AP_TERM_TAC >>
+    simp[MAP_GENLIST] >>
+    simp[LIST_EQ_REWRITE,EL_MAP] >>
+    first_x_assum(qspec_then`g`mp_tac) >>
+    simp[] >> rw[] >> simp[EL_MAP]) >>
+  `actions = MAP (map_inspected (if_focal f)) actions'` by (
+    unabbrev_all_tac >>
+    simp[localActions_def,MAP_GENLIST] >>
+    rpt(AP_THM_TAC ORELSE AP_TERM_TAC) >>
+    simp[FUN_EQ_THM,act_def] >>
+    qpat_abbrev_tac`f1 = fled (_ _)` >>
+    qpat_abbrev_tac`f2 = fled _` >>
+    `∀m. f1 m ⇔ f2 m` by (
+      unabbrev_all_tac >>
+      Cases >> simp[fled_def] >> rfs[] >>
+      metis_tac[] ) >>
+    rw[square_update_robot_def] >>
+    simp[EL_LUPDATE] >> rw[] >>
+    CASE_TAC >> fs[] >>
+    simp[EVERY_MEM,EXISTS_MEM] >>
+    simp[canLift_def] >> rw[] >>
+    rw[if_focal_def] >>
+    TRY BasicProvers.FULL_CASE_TAC >> fs[] >>
+    fs[wf_state_with_hole_def] >>
+    metis_tac[] ) >>
+  map_every qunabbrev_tac[`actions`,`actions'`] >> fs[] >>
+  pop_assum kall_tac >>
+  `veterans = MAP (if_focal f) veterans'` by (
+    unabbrev_all_tac >>
+    simp[MAP_GENLIST] >>
+    simp[GENLIST_FUN_EQ,EL_MAP] >>
+    gen_tac >> strip_tac >>
+    qmatch_assum_abbrev_tac`i < LENGTH sq.robots` >>
+    `¬(EL i sq.robots).focal` by (
+      fs[wf_state_with_hole_def] >> metis_tac[] ) >>
+    simp[updateInventory_ignores_policy2] ) >>
+  qunabbrev_tac`veterans`>>fs[] >>
+  pop_assum kall_tac >>
+  conj_tac >- (
+    `LENGTH veterans' = LENGTH x.robots` by simp[Abbr`veterans'`] >>
+    simp[ZIP_MAP_PAIR] >>
+    simp[GSYM ZIP_MAP_PAIR,LENGTH_REPLICATE] >>
+    AP_TERM_TAC >> simp[] >>
+    simp[REPLICATE_GENLIST,MAP_GENLIST] >>
+    simp[Abbr`children'`] >>
+    simp[MAP_FLAT,MAP_MAP_o,o_DEF] >>
+    conj_asm1_tac >- (
+      simp[Abbr`children`] >>
+      AP_TERM_TAC >>
+      simp[LIST_EQ_REWRITE,EL_MAP] >>
+      qx_gen_tac`n` >>
+      Cases_on`EL n (localActions x (neighbours s.state k))`>>simp[] >>
+      simp[if_focal_def] >> rw[] >>
+      metis_tac[MEM_Built_localActions_not_focal,LENGTH_localActions,MEM_EL]) >>
+    simp[] >>
+    AP_TERM_TAC >>
+    simp[LENGTH_FLAT] >>
+    AP_TERM_TAC >>
+    simp[MAP_MAP_o,MAP_EQ_f] ) >>
+  conj_tac >- (
+    AP_THM_TAC >>
+    simp[EXISTS_MAP] >>
+    rpt AP_THM_TAC >> AP_TERM_TAC >>
+    simp[FUN_EQ_THM] >>
+    simp[EXISTS_MEM] >> rw[] >>
+    EQ_TAC >> rw[] >> asm_exists_tac >>
+    (Cases_on`x'` ORELSE Cases_on`a`) >> fs[] ) >>
+  conj_tac >- (
+    AP_TERM_TAC >>
+    simp[LIST_EQ_REWRITE,EL_MAP,EL_ZIP] >>
+    qx_gen_tac`n` >>
+    Cases_on`EL n (localActions x (neighbours s.state k))`>>simp[]) >>
+  unabbrev_all_tac >>
+  AP_TERM_TAC >>
+  simp[LIST_EQ_REWRITE,EL_GENLIST,MEM_MAP,PULL_EXISTS,MAP_GENLIST]);
 
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
@@ -292,6 +441,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
     metis_tac[] ) >>
   drule computeEvents_with_focal_policy >>
   simp[] >> disch_then kall_tac >>
+  simp[o_DEF] >>
   cheat);
 
 (*
@@ -524,10 +674,6 @@ val neighbour_coord_def = Define`
   neighbour_coord c k ⇔
     (Num (ABS (FST c - FST k))) ≤ 1 ∧
     (Num (ABS (SND c - SND k))) ≤ 1`;
-
-val less8 = Q.prove(
-  `x < 8n ⇔ (x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4 ∨ x = 5 ∨ x = 6 ∨ x = 7)`,
-  rw[EQ_IMP_THM] >> simp[])
 
 val lesseq1 = Q.prove(
   `x ≤ 1n ⇔ (x = 0 ∨ x = 1)`,
