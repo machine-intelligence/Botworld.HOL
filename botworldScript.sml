@@ -269,4 +269,24 @@ val steph_def = Define`
         ; focal_index := i
         |>)`;
 
+(* histories *)
+
+val _ = type_abbrev("history",``:grid llist``);
+
+val hist_def = Define`
+  hist s = LUNFOLD (λs. SOME (step s,s)) s`;
+
+(* utility *)
+
+open realTheory
+
+val _ = type_abbrev("utilityfn",``:history -> real``);
+
+val discount_def = Define`
+  discount (u:utilityfn) = sup { (u (s ::: h) - u (s ::: h')) / (u h - u h') | (s,h,h') | T }`
+
+(* suggester/verifier *)
+
+val _ = Datatype`level = MP | Trust num`;
+
 val _ = export_theory()
