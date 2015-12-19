@@ -10,17 +10,11 @@ val _ = new_theory"botworld"
 
 (* Port of Botworld to more idiomatic HOL *)
 
-val _ = Datatype`
-  square = <| robots: robot list; items: item list |>`;
-
 val opposite_def = Define`
   opposite d = d + 4 MOD 8`;
 
-val _ = type_abbrev("coordinate",``:int # int``);
-val _ = type_abbrev("grid",``:coordinate |-> square``)
-
 val neighbours_def = Define`
-  neighbours g (x,y) = MAP (FLOOKUP g)
+  neighbours (g:grid) (x,y) = MAP (FLOOKUP g)
     [(x-1,y-1)
     ;(x-1,y  )
     ;(x-1,y+1)
@@ -212,7 +206,7 @@ val computeSquare_def = Define`
 (* state *)
 
 val computeEvents_def = Define`
-  computeEvents g =
+  computeEvents (g:grid) =
     FMAP_MAP2 (λ(c,sq). event sq (neighbours g c)) g`;
 
 val step_def = Define`
@@ -247,6 +241,8 @@ val fill_def = Define`
     (s.focal_coordinate,
      square_update_robot f s.focal_index (s.state ' s.focal_coordinate))`;
 
+val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
+
 val find_focal_def = Define`
   find_focal g =
     @p. ∃c i sq. p = (c,i) ∧ FLOOKUP g c = SOME sq ∧ i < LENGTH sq.robots ∧ (EL i sq.robots).focal`;
@@ -271,22 +267,45 @@ val steph_def = Define`
 
 (* histories *)
 
-val _ = type_abbrev("history",``:grid llist``);
-
 val hist_def = Define`
   hist s = LUNFOLD (λs. SOME (step s,s)) s`;
 
 (* utility *)
-
-open realTheory
-
-val _ = type_abbrev("utilityfn",``:history -> real``);
 
 val discount_def = Define`
   discount (u:utilityfn) = sup { (u (s ::: h) - u (s ::: h')) / (u h - u h') | (s,h,h') | T }`
 
 (* suggester/verifier *)
 
-val _ = Datatype`level = MP | Trust num`;
+val dominates_def = Define`
+  (dominates (:α) (Trust k) (S,u) cp cp' ⇔
+     LCA k (UNIV:α set) ⇒
+     ∀s. s ∈ S ⇒
+       u (hist (fill (UNCURRY with_policy cp') s)) ≤
+       u (hist (fill (UNCURRY with_policy cp) s))) ∧
+  (dominates (:α) MP (S,u) cp cp' ⇔
+   ∀k. LCA k (UNIV:α set) ⇒
+       ∀s. s ∈ S ⇒
+         u (hist (fill (UNCURRY with_policy cp') s)) ≤
+         u (hist (fill (UNCURRY with_policy cp) s))
+           + ((discount u) pow k))`;
+
+(*
+val sv_def = Define`
+  sv l Stm utm π σ =
+    (* assumes preamble gets run by botworld, defining all the requisite types *)
+    π (* this will read the observation and write the fallback *) ++
+    [Tdec(Dlet(Pvar"input_length")(...figure out the right input length...));
+     Tdec(Dlet(Pvar"encoded_observation")(Op Aw8alloc [Var(Short("input_length"));Lit(Word8 0w)]));
+     Tdec(Dlet(Pcon NONE [])(Op (FFI 1) [Var(Short("encoded_observation"))];
+     ... decode observation - put in variable "observation" ...
+     ... read the output written by π - put in variable "fallback" ...
+     Tdec(Dlet(Pvar"result")
+       Mat (App (Op Opapp) [App (Op Opapp) [σ;(Var(Short"observation"))];(Var(Short"fallback"))])
+         [
+     );
+     ... encode and write result ...
+     ]
+*)
 
 val _ = export_theory()

@@ -1,4 +1,4 @@
-open HolKernel boolLib bossLib lcsymtacs botworld_miscTheory
+open HolKernel boolLib bossLib lcsymtacs botworld_miscTheory realTheory
 val _ = new_theory"botworld_data"
 
 val _ = Datatype`
@@ -117,5 +117,17 @@ val _ = Datatype`
   privateData = pInvalid | pNothing | pInspected num prog`;
 
 val _ = Parse.type_abbrev("observation",``:num # event # privateData``);
+
+val _ = Datatype`
+  square = <| robots: robot list; items: item list |>`;
+
+val _ = Parse.type_abbrev("coordinate",``:int # int``);
+val _ = Parse.type_abbrev("grid",``:coordinate |-> square``)
+
+val _ = Parse.type_abbrev("history",``:grid llist``);
+
+val _ = Parse.type_abbrev("utilityfn",``:history -> real``);
+
+val _ = Datatype`level = MP | Trust num`;
 
 val _ = export_theory()

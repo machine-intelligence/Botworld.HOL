@@ -69,8 +69,6 @@ val wf_state_with_hole_find_focal = Q.store_thm("wf_state_with_hole_find_focal",
   rw[wf_state_with_hole_def,find_focal_def] >>
   SELECT_ELIM_TAC >> metis_tac[])
 
-val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
-
 val map_robotActions_def = Define
   `map_robotActions f (ra:(robot#action) list) = ZIP(MAP (f o FST) ra,MAP SND ra)`;
 

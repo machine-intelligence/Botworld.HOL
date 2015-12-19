@@ -229,9 +229,16 @@ val observationsexp_def = Define`
     SX_CONS (SX_NUM i)
       (SX_CONS (eventsexp e) (privateDatasexp p))`;
 
+val outputsexp_def = Define`
+  outputsexp (c,p) = SX_CONS (commandsexp c) (listsexp (MAP topsexp p))`;
+
 val encode_def = Define`
   (encode:observation -> word8 list) =
     MAP (n2w o ORD) o print_sexp o observationsexp`;
+
+val encode_output_def = Define`
+  encode_output : command # prog -> word8 list=
+    MAP (n2w o ORD) o print_sexp o outputsexp`;
 
 (* botworld ffi *)
 
@@ -261,11 +268,28 @@ val botworld_write_def = Define`
     | SOME output => Oracle_return (st with bot_output := output) bytes
     | NONE => Oracle_return st bytes`;
 
+val botworld_get_output_length_def = Define`
+  botworld_get_output_length st bytes =
+    let n = LENGTH (encode_output st.bot_output) in
+    let s = print_sexp (SX_NUM n) in
+    if LENGTH bytes ≤ LENGTH s then
+      Oracle_return st (MAP (K (0w:word8)) bytes)
+    else
+      Oracle_return st (MAP (n2w o ORD) s ++ GENLIST (K 0w) (LENGTH bytes - LENGTH s))`;
+
+val botworld_read_output_def = Define`
+  botworld_read_output st bytes =
+    let bytes' = encode_output st.bot_output in
+    if LENGTH bytes < LENGTH bytes' then Oracle_fail else
+      Oracle_return st (bytes' ++ (GENLIST (K 0w) (LENGTH bytes - LENGTH bytes')))`;
+
 val botworld_oracle_def = Define`
   botworld_oracle n =
     if n = 0n then botworld_get_input_length
     else if n = 1 then botworld_read
-    else botworld_write`;
+    else if n = 2 then botworld_write
+    else if n = 3 then botworld_get_output_length
+    else botworld_read_output`;
 
 val botworld_initial_state_def = Define`
   botworld_initial_state obs =
