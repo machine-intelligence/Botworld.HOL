@@ -37,6 +37,10 @@ val ZIP_MAP_PAIR = Q.store_thm("ZIP_MAP_PAIR",
   rpt(AP_TERM_TAC ORELSE AP_THM_TAC) >>
   simp[FUN_EQ_THM,FORALL_PROD]);
 
+val MEM_EL_P = Q.store_thm("MEM_EL_P",
+  `∀l. (∃n. n < LENGTH l ∧ P (EL n l)) ⇔ (∃x. MEM x l ∧ P x)`,
+  rw[MEM_EL] >> metis_tac[]);
+
 (* -- *)
 
 val incomingFrom_MovedIn = Q.store_thm("incomingFrom_MovedIn",
@@ -425,6 +429,20 @@ val focal_preserved = Q.store_thm("focal_preserved",
    ∃c' i'. wf_state_with_hole <| state := s'; focal_coordinate := c'; focal_index := i' |>`,
   rw[wf_state_with_hole_def,FLOOKUP_o_f] >>
   fs[EVERY_MAP] >>
+  fs[computeEvents_def] >>
+  fs[FLOOKUP_FMAP_MAP2] >>
+  `s.focal_coordinate ∈ FDOM s.state` by fs[FLOOKUP_DEF] >>
+  fs[FMAP_MAP2_THM] >>
+  rator_x_assum`EVERY`mp_tac >>
+  qpat_abbrev_tac`nb = neighbours _ _` >>
+  `s.state ' s.focal_coordinate = sq` by fs[FLOOKUP_DEF] >>
+  pop_assum SUBST_ALL_TAC >>
+  strip_tac >>
+  reverse(Cases_on`isMovedOut (SND (EL s.focal_index (event sq nb).robotActions))`) >- (
+    qexists_tac`s.focal_coordinate` >> fs[] >>
+    simp[computeSquare_def] >>
+    qho_match_abbrev_tac`∃i. (i < LENGTH l ∧ (EL i (MAP f l)).focal) ∧ R i` >>
+    cheat ) >>
   cheat);
 
 val steph_fill_step = Q.store_thm("steph_fill_step",
@@ -463,6 +481,14 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
     imp_res_tac wf_state_with_hole_find_focal >> fs[] >>
     fs[wf_state_with_hole_def,FLOOKUP_o_f] >>
     rveq >> rfs[] ) >>
+  `(computeSquare o_f events) ' k = computeSquare x` by (
+    fs[FLOOKUP_DEF,o_f_FAPPLY] ) >>
+  pop_assum SUBST_ALL_TAC >>
+  IF_CASES_TAC >> fs[] >- (
+    rveq >>
+    simp[computeSquare_def,square_update_robot_def] >>
+    (* probably want information hiding to happen earlier than encoding *)
+    cheat ) >>
   cheat);
 
 (*
