@@ -41,6 +41,36 @@ val MEM_EL_P = Q.store_thm("MEM_EL_P",
   `∀l. (∃n. n < LENGTH l ∧ P (EL n l)) ⇔ (∃x. MEM x l ∧ P x)`,
   rw[MEM_EL] >> metis_tac[]);
 
+val unique_index_filter = Q.store_thm("unique_index_filter",
+  `∀ls i. i < LENGTH ls ∧
+   (∀j. j < LENGTH ls ⇒ (R (EL j ls) ⇔ j = i)) ∧
+   P (EL i ls) ⇒
+   ∃k. k < LENGTH (FILTER P ls) ∧ (∀j. j < LENGTH (FILTER P ls) ⇒ (R (EL j (FILTER P ls)) ⇔ j = k))`,
+  Induct >> simp[] >> rpt gen_tac >> strip_tac >>
+  IF_CASES_TAC >> fs[] >- (
+    Cases_on`i`>>fs[]>-(
+      qexists_tac`0`>>simp[]>>rw[]>>
+      Cases_on`j`>>fs[]>-(
+        first_x_assum(qspec_then`0`mp_tac)>>simp[])>>
+      `MEM (EL n (FILTER P ls)) ls` by (
+        metis_tac[MEM_FILTER,MEM_EL] ) >>
+      fs[MEM_EL] >>
+      first_x_assum(qspec_then`SUC n'`mp_tac)>>simp[]) >>
+    last_x_assum(qspec_then`n`mp_tac)>>simp[]>>
+    discharge_hyps >- (
+      rw[] >>
+      first_x_assum(qspec_then`SUC j`mp_tac)>>simp[])>>
+    rw[] >>
+    qexists_tac`SUC k`>>simp[]>>rw[]>>
+    Cases_on`j`>>fs[]>>
+    last_x_assum(qspec_then`0`mp_tac)>>simp[]) >>
+  Cases_on`i`>>fs[]>>
+  last_x_assum drule >>
+  discharge_hyps >- (
+    rw[] >>
+    first_x_assum(qspec_then`SUC j`mp_tac)>>simp[])>>
+  rw[]);
+
 (* -- *)
 
 val incomingFrom_MovedIn = Q.store_thm("incomingFrom_MovedIn",
@@ -419,6 +449,14 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
   AP_TERM_TAC >>
   simp[LIST_EQ_REWRITE,EL_GENLIST,MEM_MAP,PULL_EXISTS,MAP_GENLIST]);
 
+val runMachine_focal = Q.store_thm("runMachine_focal[simp]",
+  `(runMachine x).focal ⇔ (SND x).focal`,
+  Cases_on`x`>>rw[runMachine_def]>>rw[]);
+
+val prepare_focal = Q.store_thm("prepare_focal[simp]",
+  `(SND (prepare x y)).focal ⇔ (FST(SND y)).focal`,
+  PairCases_on`y`>>rw[prepare_def]);
+
 val focal_preserved = Q.store_thm("focal_preserved",
   `wf_state_with_hole s ∧
    events = computeEvents s.state ∧
@@ -442,6 +480,86 @@ val focal_preserved = Q.store_thm("focal_preserved",
     qexists_tac`s.focal_coordinate` >> fs[] >>
     simp[computeSquare_def] >>
     qho_match_abbrev_tac`∃i. (i < LENGTH l ∧ (EL i (MAP f l)).focal) ∧ R i` >>
+    `∀i. i < LENGTH l ⇒ ((EL i (MAP f l)).focal ⇔ (FST(SND(EL i l))).focal)` by (
+      simp[EL_MAP] >>
+      simp[Abbr`f`] >>
+      gen_tac >>
+      Cases_on`EL i l` >>
+      Cases_on`r` >>
+      simp[prepare_def] >>
+      simp[runMachine_def] >>
+      simp[UNCURRY]) >>
+    qsuff_tac`∃i. i < LENGTH l ∧ (FST(SND(EL i l))).focal ∧ R i`>-metis_tac[] >>
+    simp[Abbr`f`] >>
+    qmatch_assum_abbrev_tac`Abbrev(l = FILTER P l1)` >>
+    `s.focal_index < LENGTH l1` by (
+      simp[Abbr`l1`] >> simp[event_def] ) >>
+    `∀k. k < LENGTH l1 ⇒ ((FST(SND (EL k l1))).focal ⇔ (s.focal_index = k))` by (
+      simp[Abbr`l1`,EL_GENLIST] >> rw[] >>
+      simp[event_def] >>
+      Cases_on`k < LENGTH sq.robots` >- (
+        simp[EL_APPEND1,LENGTH_ZIP,EL_ZIP] >>
+        reverse(rw[EQ_IMP_THM]) >> rw[] >>
+        spose_not_then strip_assume_tac >>
+        qpat_assum`_.focal`mp_tac >> simp[] >>
+        first_x_assum match_mp_tac >> simp[] >>
+        metis_tac[] ) >>
+      reverse EQ_TAC >- (
+        strip_tac >> fs[] ) >>
+      qmatch_abbrev_tac`(FST (EL k (l1 ++ l2 ++ l3))).focal ⇒ _` >>
+      `LENGTH l1 ≤ k` by simp[Abbr`l1`] >>
+      ONCE_REWRITE_TAC[GSYM APPEND_ASSOC] >>
+      simp[EL_APPEND2] >>
+      `∀x. MEM x (MAP FST (l2 ++ l3)) ⇒ ¬x.focal` by (
+        simp[] >>
+        simp[Abbr`l3`,MAP_ZIP,REPLICATE_GENLIST] >>
+        simp[Abbr`l2`,MEM_FLAT,PULL_EXISTS,MEM_MAP,EXISTS_PROD,MEM_GENLIST] >>
+        rw[] >- (
+          Cases_on`EL i nb`>> fs[incomingFrom_def] >>
+          fs[MEM_FLAT,MEM_MAP] >> rveq >>
+          qpat_assum`MEM _ _`mp_tac >> rw[] >>
+          qpat_assum`MEM _ _`mp_tac >>
+          rw[MEM_EL] >>
+          first_x_assum match_mp_tac >> rw[] >>
+          qpat_assum`EL i nb = _`mp_tac >>
+          simp[Abbr`nb`] >>
+          Cases_on`s.focal_coordinate` >>
+          qpat_assum`i < _`mp_tac >>
+          simp[neighbours_def] >>
+          simp[less8] >>
+          strip_tac >> rw[] >>
+          asm_exists_tac >> simp[] >>
+          disj1_tac >> intLib.COOPER_TAC) >>
+        pop_assum mp_tac >>
+        BasicProvers.TOP_CASE_TAC >> rw[] >>
+        imp_res_tac MEM_Built_localActions_not_focal ) >>
+      `k - LENGTH l1 < LENGTH (l2 ++ l3)` by (
+        qpat_assum`k < _`mp_tac >>
+        simp[event_def] ) >>
+      metis_tac[MEM_EL,MEM_MAP] ) >>
+    qispl_then[`l1`,`s.focal_index`](mp_tac o Q.GEN`R`) unique_index_filter >>
+    disch_then(qspec_then`λx. (FST(SND x)).focal`mp_tac) >>
+    discharge_hyps >- (
+      simp[Abbr`P`,UNCURRY] >>
+      conj_tac >- (
+        qpat_assum`¬_`mp_tac >> fs[Abbr`l1`] ) >>
+      rator_x_assum`EVERY`mp_tac >>
+      fs[Abbr`l1`] >>
+      simp[EVERY_MEM] >>
+      simp[MEM_MAP] >>
+      metis_tac[] ) >>
+    strip_tac >> rfs[] >>
+    asm_exists_tac >> simp[] >>
+    simp[Abbr`R`] >>
+    rpt gen_tac >>
+    BasicProvers.TOP_CASE_TAC >> simp[] >>
+    simp[GSYM AND_IMP_INTRO] >>
+    strip_tac >> rveq >> simp[] >>
+    strip_tac >> simp[EL_MAP] >>
+    Cases_on`c = s.focal_coordinate`>>fs[]>-(
+      rw[] >> rfs[] >> rveq >> rfs[] ) >>
+    rveq >> rfs[] >>
+    last_x_assum drule >> simp[] >>
     cheat ) >>
   cheat);
 
