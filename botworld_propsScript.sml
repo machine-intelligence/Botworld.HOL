@@ -559,7 +559,45 @@ val focal_preserved = Q.store_thm("focal_preserved",
     Cases_on`c = s.focal_coordinate`>>fs[]>-(
       rw[] >> rfs[] >> rveq >> rfs[] ) >>
     rveq >> rfs[] >>
-    last_x_assum drule >> simp[] >>
+    last_assum drule >> simp[] >>
+    strip_tac >>
+    `EVERY ($~ o robot_focal) sq'.robots` by (
+      simp[EVERY_MEM] >> simp[MEM_EL,PULL_EXISTS] ) >>
+    qmatch_abbrev_tac`¬(FST(SND(EL i (FILTER P' ls)))).focal` >>
+    `EVERY ($~ o robot_focal) (MAP (FST o SND) ls)` suffices_by (
+      simp[EVERY_MAP] >>
+      simp[EVERY_MEM] >>
+      metis_tac[MEM_EL,MEM_FILTER] ) >>
+    simp[Abbr`ls`,EVERY_MAP,EVERY_GENLIST] >>
+    qpat_abbrev_tac`ls = _.robotActions` >>
+    `EVERY ($~ o robot_focal) (MAP FST ls)` suffices_by (
+      simp[EVERY_MAP] >> simp[EVERY_MEM] >> simp[MEM_EL,PULL_EXISTS] ) >>
+    simp[Abbr`ls`] >>
+    simp[event_def,MAP_ZIP,REPLICATE_GENLIST] >>
+    reverse conj_tac >- (
+      simp[EVERY_MEM,MEM_FLAT,MEM_MAP,PULL_EXISTS] >>
+      gen_tac >> Cases >> simp[] >>
+      rw[] >> imp_res_tac MEM_Built_localActions_not_focal ) >>
+    conj_tac >- (
+      simp[EVERY_MEM,MEM_GENLIST,PULL_EXISTS] ) >>
+    simp[EVERY_MAP,MEM_FLAT,EVERY_MEM,PULL_EXISTS,MEM_GENLIST] >>
+    rpt gen_tac >>
+    simp[GSYM AND_IMP_INTRO] >> strip_tac >>
+    qpat_abbrev_tac`opt = EL _ _` >>
+    Cases_on`opt`>>simp[incomingFrom_def] >>
+    pop_assum mp_tac >> simp[markerTheory.Abbrev_def] >>
+    disch_then(assume_tac o SYM) >>
+    simp[MEM_FLAT,PULL_EXISTS,MEM_MAP] >> rw[] >>
+    pop_assum mp_tac >>
+    rw[MEM_EL] >>
+    first_x_assum match_mp_tac >>
+    qpat_assum`_ = SOME _`mp_tac >>
+    Cases_on`c` >>
+    qpat_assum`_ < LENGTH (neighbours _ _)`mp_tac >>
+    simp[neighbours_def] >>
+    simp[less8] >> strip_tac >> simp[] >> rw[] >>
+    asm_exists_tac >> simp[] >>
+    spose_not_then strip_assume_tac >> rw[] >>
     cheat ) >>
   cheat);
 
