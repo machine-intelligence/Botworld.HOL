@@ -590,15 +590,34 @@ val focal_preserved = Q.store_thm("focal_preserved",
     simp[MEM_FLAT,PULL_EXISTS,MEM_MAP] >> rw[] >>
     pop_assum mp_tac >>
     rw[MEM_EL] >>
+    `∀c. FLOOKUP s.state c = SOME sq ⇒ c = s.focal_coordinate` by (
+      rw[] >> res_tac >>
+      spose_not_then strip_assume_tac >> fs[] ) >>
     first_x_assum match_mp_tac >>
-    qpat_assum`_ = SOME _`mp_tac >>
+    simp[] >>
+    spose_not_then strip_assume_tac >>
+    `∃c. FLOOKUP s.state c = SOME x'` by (
+      qpat_assum`_ = SOME _`mp_tac >>
+      Cases_on`c` >>
+      qpat_assum`_ < LENGTH (neighbours _ _)`mp_tac >>
+      simp[neighbours_def] >>
+      simp[less8] >> strip_tac >> simp[] >> rw[] >>
+      asm_exists_tac >> simp[] ) >>
+    first_x_assum drule >> strip_tac >> rveq >>
+    rfs[] >> rveq >>
+    qpat_assum`¬isMovedOut _`mp_tac >>
+    simp[] >>
+    simp[event_def,EL_APPEND1,EL_ZIP,localActions_def,act_def] >>
+    rfs[Abbr`nb`] >>
+    Cases_on`s.focal_coordinate` >>
     Cases_on`c` >>
-    qpat_assum`_ < LENGTH (neighbours _ _)`mp_tac >>
-    simp[neighbours_def] >>
-    simp[less8] >> strip_tac >> simp[] >> rw[] >>
-    asm_exists_tac >> simp[] >>
-    spose_not_then strip_assume_tac >> rw[] >>
-    cheat ) >>
+    unabbrev_all_tac >>
+    qpat_assum`_ ≠ _`mp_tac >>
+    fs[neighbours_def,opposite_def] >>
+    fs[less8] >> rveq >> fs[] >> rfs[] >>
+    first_x_assum drule >> simp[] >>
+    strip_tac >> rveq >> simp[] >>
+    simp[int_arithTheory.elim_minus_ones]) >>
   cheat);
 
 val steph_fill_step = Q.store_thm("steph_fill_step",

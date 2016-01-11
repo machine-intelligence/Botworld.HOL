@@ -10,30 +10,19 @@ val _ = new_theory"botworld"
 
 (* Port of Botworld to more idiomatic HOL *)
 
-val opposite_def = Define`
-  opposite d = d + 4 MOD 8`;
-
 val neighbours_def = Define`
   neighbours (g:grid) (x,y) = MAP (FLOOKUP g)
-    [(x-1,y-1)
-    ;(x-1,y  )
-    ;(x-1,y+1)
-    ;(x  ,y-1)
-    ;(x  ,y+1)
-    ;(x+1,y-1)
+    [(x  ,y+1)
+    ;(x+1,y+1)
     ;(x+1,y  )
-    ;(x+1,y+1)]`;
+    ;(x+1,y-1)
+    ;(x  ,y-1)
+    ;(x-1,y-1)
+    ;(x-1,y  )
+    ;(x-1,y+1)]`;
 
-val move_coordinate_def = Define`
-  move_coordinate (x,y) (dir:num) =
-    if dir = 0 then (x  ,y+1) else
-    if dir = 1 then (x+1,y+1) else
-    if dir = 2 then (x+1,y  ) else
-    if dir = 3 then (x+1,y-1) else
-    if dir = 4 then (x  ,y-1) else
-    if dir = 5 then (x-1,y-1) else
-    if dir = 6 then (x-1,y  ) else
-    if dir = 7 then (x-1,y+1) else (x,y)`;
+val opposite_def = Define`
+  opposite d = (d + 4) MOD 8`;
 
 (* environment phase *)
 
