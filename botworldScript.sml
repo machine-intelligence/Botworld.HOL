@@ -10,8 +10,8 @@ val _ = new_theory"botworld"
 
 (* Port of Botworld to more idiomatic HOL *)
 
-val neighbours_def = Define`
-  neighbours (g:grid) (x,y) = MAP (FLOOKUP g)
+val neighbour_coords_def = Define`
+  neighbour_coords ((x,y):coordinate) =
     [(x  ,y+1)
     ;(x+1,y+1)
     ;(x+1,y  )
@@ -23,6 +23,9 @@ val neighbours_def = Define`
 
 val opposite_def = Define`
   opposite d = (d + 4) MOD 8`;
+
+val neighbours_def = Define`
+  neighbours (g:grid) c = MAP (FLOOKUP g) (neighbour_coords c)`;
 
 (* environment phase *)
 

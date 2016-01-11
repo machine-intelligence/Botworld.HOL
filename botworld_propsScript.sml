@@ -236,7 +236,7 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
       metis_tac[flookup_thm,markerTheory.Abbrev_def] ) >>
     fs[] >>
     Cases_on`s.focal_coordinate` >>
-    simp[neighbours_def,FLOOKUP_UPDATE] >>
+    simp[neighbours_def,neighbour_coords_def,FLOOKUP_UPDATE] >>
     rpt(IF_CASES_TAC >- (`F` suffices_by rw[] >> intLib.COOPER_TAC)) >>
     simp[] >>
     ntac 7 (pop_assum kall_tac) >>
@@ -333,10 +333,10 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
   qpat_abbrev_tac`nb = neighbours (_ |+ _) _` >>
   `LENGTH nb = LENGTH (neighbours s.state k)` by (
     simp[Abbr`nb`] >>
-    Cases_on`k`>>simp[neighbours_def] ) >>
+    Cases_on`k`>>simp[neighbours_def,neighbour_coords_def] ) >>
   `∀n. n < LENGTH nb ⇒ (IS_SOME (EL n nb) ⇔ IS_SOME (EL n (neighbours s.state k)))` by (
     simp[Abbr`nb`] >>
-    Cases_on`k`>>simp[neighbours_def] >>
+    Cases_on`k`>>simp[neighbours_def,neighbour_coords_def] >>
     simp[less8] >>
     gen_tac >> strip_tac >> simp[FLOOKUP_UPDATE] >>
     rw[] >> fs[wf_state_with_hole_def] ) >>
@@ -352,7 +352,7 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
     simp[Once LIST_EQ_REWRITE] >>
     conj_asm1_tac >- (
       fs[Abbr`nb`] >>
-      Cases_on`k`>>fs[neighbours_def] >>
+      Cases_on`k`>>fs[neighbours_def,neighbour_coords_def] >>
       fs[less8,FLOOKUP_UPDATE] >> rfs[] >>
       every_case_tac >> fs[] >> rveq >>
       simp[square_update_robot_def] >>
@@ -360,7 +360,7 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
     simp[EL_MAP] >>
     gen_tac >> strip_tac >>
     fs[Abbr`nb`] >>
-    Cases_on`k`>>fs[neighbours_def,if_focal_def] >>
+    Cases_on`k`>>fs[neighbours_def,neighbour_coords_def,if_focal_def] >>
     fs[less8,FLOOKUP_UPDATE] >> rfs[if_focal_def] >>
     every_case_tac >> fs[] >> rveq >>
     fs[square_update_robot_def,EL_LUPDATE,Abbr`f`] >>
@@ -457,6 +457,14 @@ val prepare_focal = Q.store_thm("prepare_focal[simp]",
   `(SND (prepare x y)).focal ⇔ (FST(SND y)).focal`,
   PairCases_on`y`>>rw[prepare_def]);
 
+val LENGTH_neighbour_coords = Q.store_thm("LENGTH_neighbour_coords[simp]",
+  `LENGTH (neighbour_coords x) = 8`,
+  Cases_on`x`>>simp[neighbour_coords_def]);
+
+val LENGTH_neighbours = Q.store_thm("LENGTH_neighbours[simp]",
+  `LENGTH (neighbours x y) = 8`,
+  simp[neighbours_def]);
+
 val focal_preserved = Q.store_thm("focal_preserved",
   `wf_state_with_hole s ∧
    events = computeEvents s.state ∧
@@ -525,7 +533,7 @@ val focal_preserved = Q.store_thm("focal_preserved",
           simp[Abbr`nb`] >>
           Cases_on`s.focal_coordinate` >>
           qpat_assum`i < _`mp_tac >>
-          simp[neighbours_def] >>
+          simp[neighbours_def,neighbour_coords_def] >>
           simp[less8] >>
           strip_tac >> rw[] >>
           asm_exists_tac >> simp[] >>
@@ -573,6 +581,7 @@ val focal_preserved = Q.store_thm("focal_preserved",
     `EVERY ($~ o robot_focal) (MAP FST ls)` suffices_by (
       simp[EVERY_MAP] >> simp[EVERY_MEM] >> simp[MEM_EL,PULL_EXISTS] ) >>
     simp[Abbr`ls`] >>
+    qpat_abbrev_tac`nb' = neighbours _ _` >>
     simp[event_def,MAP_ZIP,REPLICATE_GENLIST] >>
     reverse conj_tac >- (
       simp[EVERY_MEM,MEM_FLAT,MEM_MAP,PULL_EXISTS] >>
@@ -597,10 +606,11 @@ val focal_preserved = Q.store_thm("focal_preserved",
     simp[] >>
     spose_not_then strip_assume_tac >>
     `∃c. FLOOKUP s.state c = SOME x'` by (
+      qunabbrev_tac`nb'` >>
       qpat_assum`_ = SOME _`mp_tac >>
       Cases_on`c` >>
       qpat_assum`_ < LENGTH (neighbours _ _)`mp_tac >>
-      simp[neighbours_def] >>
+      simp[neighbours_def,neighbour_coords_def] >>
       simp[less8] >> strip_tac >> simp[] >> rw[] >>
       asm_exists_tac >> simp[] ) >>
     first_x_assum drule >> strip_tac >> rveq >>
@@ -613,11 +623,25 @@ val focal_preserved = Q.store_thm("focal_preserved",
     Cases_on`c` >>
     unabbrev_all_tac >>
     qpat_assum`_ ≠ _`mp_tac >>
-    fs[neighbours_def,opposite_def] >>
+    fs[neighbours_def,neighbour_coords_def,opposite_def] >>
     fs[less8] >> rveq >> fs[] >> rfs[] >>
     first_x_assum drule >> simp[] >>
     strip_tac >> rveq >> simp[] >>
     simp[int_arithTheory.elim_minus_ones]) >>
+  `∃dir.
+    (EL s.focal_index sq.robots).command = Move dir ∧ dir < 8 ∧
+    IS_SOME (FLOOKUP s.state (EL dir (neighbour_coords s.focal_coordinate)))`
+  by (
+    qpat_assum`isMovedOut _`mp_tac >>
+    simp[event_def,EL_APPEND1,EL_ZIP,localActions_def] >>
+    simp[act_def] >>
+    BasicProvers.TOP_CASE_TAC >> simp[]>> rw[] >- (
+      fs[Abbr`nb`] )
+    >- (
+      fs[neighbours_def,Abbr`nb`] >> rfs[EL_MAP] ) >>
+    BasicProvers.CASE_TAC >> simp[] ) >>
+  qexists_tac`EL dir (neighbour_coords s.focal_coordinate)` >>
+  fs[IS_SOME_EXISTS] >>
   cheat);
 
 val steph_fill_step = Q.store_thm("steph_fill_step",
