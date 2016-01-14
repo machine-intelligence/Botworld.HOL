@@ -465,6 +465,36 @@ val LENGTH_neighbours = Q.store_thm("LENGTH_neighbours[simp]",
   `LENGTH (neighbours x y) = 8`,
   simp[neighbours_def]);
 
+val neighbours_EL_neighbour_coords = Q.store_thm("neighbours_EL_neighbour_coords",
+  `dir < 8 ∧ FLOOKUP s i = SOME sq ⇒
+   EL (opposite dir) (neighbours s (EL dir (neighbour_coords i))) = SOME sq`,
+  simp[neighbours_def] >>
+  Cases_on`EL dir (neighbour_coords i)` >>
+  Cases_on`i` >>
+  fs[neighbour_coords_def] >>
+  simp[less8] >>
+  strip_tac >> fs[opposite_def] >> rveq
+  \\ pop_assum (SUBST1_TAC o SYM)
+  \\ rpt AP_TERM_TAC
+  \\ simp[]
+  \\ intLib.COOPER_TAC);
+
+val opposite_opposite = Q.store_thm("opposite_opposite[simp]",
+  `dir < 8 ⇒ opposite (opposite dir) = dir`,
+  EVAL_TAC >> rw[less8] >> simp[]);
+
+val neighbour_coords_imp_opposite = Q.store_thm("neighbour_coords_imp_opposite",
+  `d1 < 8 ∧ d2 < 8 ∧
+   EL d1 (neighbour_coords (EL d2 (neighbour_coords c))) = c ⇒
+   d1 = opposite d2`,
+  Cases_on`EL d2 (neighbour_coords c)` >>
+  Cases_on`c`>>
+  fs[neighbour_coords_def]
+  \\ rw[less8,opposite_def]
+  \\ fs[] \\ rveq
+  \\ simp[]
+  \\ intLib.COOPER_TAC);
+
 val focal_preserved = Q.store_thm("focal_preserved",
   `wf_state_with_hole s ∧
    events = computeEvents s.state ∧
@@ -642,7 +672,121 @@ val focal_preserved = Q.store_thm("focal_preserved",
     BasicProvers.CASE_TAC >> simp[] ) >>
   qexists_tac`EL dir (neighbour_coords s.focal_coordinate)` >>
   fs[IS_SOME_EXISTS] >>
-  cheat);
+  simp[computeSquare_def] >>
+  qho_match_abbrev_tac`∃i. (i < LENGTH l ∧ (EL i (MAP f l)).focal) ∧ R i` >>
+  `∀i. i < LENGTH l ⇒ ((EL i (MAP f l)).focal ⇔ (FST(SND(EL i l))).focal)` by (
+    simp[EL_MAP] >>
+    simp[Abbr`f`]) >>
+  qsuff_tac`∃i. i < LENGTH l ∧ (FST(SND(EL i l))).focal ∧ R i`>-metis_tac[] >>
+  simp[Abbr`f`] >>
+  qmatch_assum_abbrev_tac`Abbrev(l = FILTER P l1)` >>
+  `∃i. i < LENGTH l1  ∧ (∀k. k < LENGTH l1 ⇒ ((FST(SND(EL k l1))).focal ⇔ (i = k)))` by (
+    qmatch_assum_abbrev_tac`Abbrev(l1 = GENLIST (λi. (i,EL i l2)) (LENGTH l2))` >>
+    `MAP SND l1 = l2` by (
+      simp[Abbr`l1`,Abbr`l2`,LIST_EQ_REWRITE,EL_MAP] ) >>
+    simp[Once (GSYM EL_MAP)] >>
+    pop_assum kall_tac >>
+    simp[Abbr`l1`] >>
+    simp[Abbr`l2`] >>
+    qpat_abbrev_tac`nxb = neighbours _ _` >>
+    simp[event_def,REPLICATE_GENLIST,LENGTH_ZIP] >>
+    qpat_abbrev_tac`veterans = ZIP(_,localActions _ _)` >>
+    qpat_abbrev_tac`immigrations = FLAT (GENLIST _ _)` >>
+    qpat_abbrev_tac`children = ZIP(_,GENLIST(K Created)_)` >>
+    qpat_abbrev_tac`builders = FLAT(MAP _ _)` >>
+    `EVERY ($~ o robot_focal) (MAP FST veterans)` by (
+      simp[Abbr`veterans`,MAP_ZIP,EVERY_GENLIST] >> rw[] >>
+      first_x_assum match_mp_tac >> simp[] >>
+      asm_exists_tac >> simp[] >>
+      qpat_assum`dir < _`mp_tac >>
+      Cases_on`s.focal_coordinate` >>
+      simp[less8,neighbour_coords_def] >>
+      strip_tac >> simp[] >>
+      intLib.COOPER_TAC ) >>
+    `EVERY ($~ o robot_focal) (MAP FST children)` by (
+      simp[Abbr`children`,MAP_ZIP] >>
+      simp[Abbr`builders`,EVERY_MEM,MEM_FLAT,PULL_EXISTS,MEM_MAP] >>
+      gen_tac >> Cases >> simp[] >> rw[] >>
+      imp_res_tac MEM_Built_localActions_not_focal ) >>
+    `∃j. j < LENGTH immigrations ∧ (∀k. k < LENGTH immigrations ⇒ ((EL k (MAP FST immigrations)).focal ⇔ (k = j)))` by (
+      ntac 4 (pop_assum kall_tac) >>
+      simp[Abbr`veterans`,Abbr`R`] >>
+      qmatch_assum_abbrev_tac`r.focal` >>
+      `MEM r (MAP FST immigrations)` by (
+        simp[Abbr`immigrations`,MAP_FLAT,MEM_FLAT,MAP_GENLIST,MEM_GENLIST,PULL_EXISTS]
+        \\ drule (GEN_ALL neighbours_EL_neighbour_coords)
+        \\ last_assum(fn th => disch_then(strip_assume_tac o C MATCH_MP th))
+        \\ qexists_tac`opposite dir`
+        \\ rfs[]
+        \\ conj_tac >- ( simp[Abbr`nxb`,opposite_def] )
+        \\ simp[incomingFrom_def]
+        \\ simp[MAP_FLAT,MEM_FLAT,MAP_MAP_o,o_DEF,MEM_MAP,PULL_EXISTS,EXISTS_PROD]
+        \\ CONV_TAC SWAP_EXISTS_CONV
+        \\ qexists_tac`r` >> simp[]
+        \\ simp[MEM_EL,Abbr`r`]
+        \\ metis_tac[] )
+      \\ pop_assum mp_tac
+      \\ simp[MEM_EL]
+      \\ strip_tac
+      \\ asm_exists_tac
+      \\ simp[]
+      \\ qx_gen_tac`k` >> strip_tac
+      \\ Cases_on`k=n` >- fs[]
+      \\ simp[Abbr`r`]
+      \\ `EVERY (λ(r,a).
+            ∃d sq.
+              FLOOKUP s.state (EL d (neighbour_coords (EL dir (neighbour_coords s.focal_coordinate)))) = SOME sq ∧
+              a = MovedIn d ∧ d < 8 ∧ MEM r sq.robots)
+            immigrations`
+      by (
+        simp[Abbr`immigrations`,EVERY_MEM,MEM_MAP,PULL_EXISTS,MEM_FLAT,MEM_GENLIST]
+        \\ rpt gen_tac
+        \\ strip_tac
+        \\ Cases_on`EL i nxb` \\ fs[incomingFrom_def]
+        \\ pop_assum mp_tac
+        \\ qpat_assum`i < LENGTH _`mp_tac
+        \\ simp[Abbr`nxb`,neighbours_def,EL_MAP]
+        \\ rpt strip_tac
+        \\ simp[UNCURRY]
+        \\ asm_exists_tac
+        \\ simp[]
+        \\ qpat_assum`MEM _ _`mp_tac
+        \\ simp[MEM_FLAT,MEM_MAP,PULL_EXISTS]
+        \\ rw[])
+      \\ pop_assum mp_tac
+      \\ simp[EVERY_MEM,Once MEM_EL,PULL_EXISTS]
+      \\ disch_then drule
+      \\ simp[UNCURRY,EL_MAP]
+      \\ strip_tac
+      \\ pop_assum mp_tac
+      \\ simp[MEM_EL] \\ strip_tac
+      \\ simp[]
+      \\ first_x_assum match_mp_tac
+      \\ asm_exists_tac
+      \\ simp[]
+      \\ spose_not_then strip_assume_tac
+      \\ rveq \\ rfs[]
+      \\ `d = opposite dir` by metis_tac[neighbour_coords_imp_opposite]
+      \\ rveq
+      \\ cheat )
+    \\ qexists_tac`LENGTH veterans + j`
+    \\ `LENGTH veterans = LENGTH x.robots` by ( simp[Abbr`veterans`] )
+    \\ simp[]
+    \\ qx_gen_tac`k`>>strip_tac
+    \\ Cases_on`k < LENGTH veterans` \\ simp[EL_APPEND1]
+    >- (
+      fs[EVERY_MAP,EVERY_MEM,MEM_EL,PULL_EXISTS]
+      \\ metis_tac[] )
+    \\ Cases_on`k < LENGTH veterans + LENGTH immigrations`
+    \\ simp[EL_APPEND1,EL_APPEND2]
+    >- (
+      first_x_assum(qspec_then`k - LENGTH x.robots`mp_tac)
+      \\ simp[EL_MAP] )
+    \\ `LENGTH builders = LENGTH children` by simp[Abbr`children`]
+    \\ fs[EVERY_MAP,EVERY_MEM,MEM_EL,PULL_EXISTS]
+    \\ first_x_assum match_mp_tac
+    \\ simp[])
+  \\ cheat);
 
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
