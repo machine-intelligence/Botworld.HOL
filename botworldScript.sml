@@ -282,22 +282,43 @@ val dominates_def = Define`
          u (hist (fill (UNCURRY with_policy cp) s))
            + ((discount u) pow k))`;
 
-(*
+val level_to_deep = Define`
+  level_to_deep (l:level) = (ARB:exp) (* TODO *)`;
+
+val term_to_deep = Define`
+  term_to_deep (t:term) = (ARB:exp) (* TODO *)`;
+
 val sv_def = Define`
   sv l Stm utm π σ =
     (* assumes preamble gets run by botworld, defining all the requisite types *)
+    (* preamble also includes helper functions:
+       Botworld.read_observation : unit -> observation
+       Botworld.read_output : unit -> command * prog
+       Botworld.write_output : command * prog -> unit
+       Botworld.check_theorem : thm * level * term * observation * term * (command * prog) * (command * prog) -> bool
+    *)
+    (* assume σ is an expression that is closed by the definitions of the
+       preamble and two variables "observation" and "fallback", and it returns
+       a (command * prog * thm) option  *)
     π (* this will read the observation and write the fallback *) ++
-    [Tdec(Dlet(Pvar"input_length")(...figure out the right input length...));
-     Tdec(Dlet(Pvar"encoded_observation")(Op Aw8alloc [Var(Short("input_length"));Lit(Word8 0w)]));
-     Tdec(Dlet(Pcon NONE [])(Op (FFI 1) [Var(Short("encoded_observation"))];
-     ... decode observation - put in variable "observation" ...
-     ... read the output written by π - put in variable "fallback" ...
+    [Tdec(Dlet(Pvar"observation")(App Opapp [Var(Long"Botworld""read_observation");Con NONE []]));
+     Tdec(Dlet(Pvar"fallback")(App Opapp [Var(Long"Botworld""read_output");Con NONE []]));
      Tdec(Dlet(Pvar"result")
-       Mat (App (Op Opapp) [App (Op Opapp) [σ;(Var(Short"observation"))];(Var(Short"fallback"))])
-         [
-     );
-     ... encode and write result ...
-     ]
-*)
+           (Mat σ
+              [(Pcon(SOME(Short"NONE"))[],Con NONE [])
+              ;(Pcon(SOME(Short"SOME"))[Pcon NONE [Pvar"policy";Pvar"thm"]],
+               If (App Opapp
+                   [Var(Long"Botworld""check_theorem");
+                    Con NONE
+                      [Var(Short"thm")
+                      ;level_to_deep l
+                      ;term_to_deep Stm
+                      ;Var(Short"observation")
+                      ;term_to_deep utm
+                      ;Var(Short"policy")
+                      ;Var(Short"fallback")
+                      ]])
+                   (App Opapp [Var(Long"Botworld""write_output");Var(Short"policy")])
+                   (Con NONE []))]))]`;
 
 val _ = export_theory()
