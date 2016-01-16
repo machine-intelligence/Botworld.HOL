@@ -174,14 +174,18 @@ val ffi_from_observation_def = Define`
       (botworld_initial_state obs)`;
 
 val prepare_def = Define`
-  prepare ev (i,r,a) =
-    (ffi_from_observation (i, ev, private a), r)`;
+  prepare ev (i,r,a) = ((i, ev, private a), r)`;
+
+val run_policy_def = Define`
+  run_policy policy clock obs =
+    let ffi = ffi_from_observation obs in
+    let (st,env) = THE (basis_sem_env ffi) in
+    let (st',c,res) = evaluate_prog (st with clock := clock) env policy in
+    st'.ffi.ffi_state.bot_output`;
 
 val runMachine_def = Define`
-  runMachine (ffi,r) =
-    let (st,env) = THE (basis_sem_env ffi) in
-    let (st',c,res) = evaluate_prog (st with clock := r.processor) env r.memory in
-    let (command,prog) = st'.ffi.ffi_state.bot_output in
+  runMachine (obs,r) =
+    let (command,prog) = run_policy r.memory r.processor obs in
     r with <| command := command; memory := prog |>`;
 
 val computeSquare_def = Define`
@@ -266,6 +270,10 @@ val hist_def = Define`
 
 val discount_def = Define`
   discount (u:utilityfn) = sup { (u (s ::: h) - u (s ::: h')) / (u h - u h') | (s,h,h') | T }`
+
+val weaklyExtensional_def = Define`
+  weaklyExtensional (u:utilityfn) ⇔
+    ∀s p1 p2 h. u (fill p1 s ::: h) = u (fill p2 s ::: h)`;
 
 (* suggester/verifier *)
 

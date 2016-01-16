@@ -83,15 +83,6 @@ val LENGTH_localActions = Q.store_thm("LENGTH_localActions[simp]",
   `LENGTH (localActions sq nb) = LENGTH sq.robots`,
   EVAL_TAC >> simp[])
 
-val get_focal_robot_def = Define`
-  get_focal_robot s =
-    EL s.focal_index (s.state ' s.focal_coordinate).robots`;
-
-val policy_fun_def = Define`
-  policy_fun p speed obs =
-   let r = runMachine (ffi_from_observation obs, <| memory := p; processor := speed |>) in
-   (r.command,r.memory)`;
-
 val square_update_robot_o = Q.store_thm("square_update_robot_o",
   `square_update_robot (f o g) i = square_update_robot f i o square_update_robot g i`,
   rw[square_update_robot_def,FUN_EQ_THM,square_component_equality] >>
@@ -971,10 +962,14 @@ val focal_preserved = Q.store_thm("focal_preserved",
   strip_tac >> simp[EL_MAP] >>
   cheat);
 
+val get_focal_robot_def = Define`
+  get_focal_robot s =
+    EL s.focal_index (s.state ' s.focal_coordinate).robots`;
+
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
    steph c s = SOME (obs,s') ∧
-   policy_fun p (get_focal_robot s).processor obs = (c',p')
+   run_policy p (get_focal_robot s).processor obs = (c',p')
    ⇒
    step (fill (with_policy c p) s) = fill (with_policy c' p') s'`,
   rw[wf_state_with_hole_def,fill_def,get_focal_robot_def,step_def,steph_def] >>
@@ -1016,6 +1011,64 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
     (* probably want information hiding to happen earlier than encoding *)
     cheat ) >>
   cheat);
+
+val steph_focal_clock = Q.store_thm("steph_focal_clock",
+  `wf_state_with_hole s ∧
+   steph c s = SOME (obs,s') ⇒
+   (get_focal_robot s).processor = (get_focal_robot s').processor`,
+   cheat);
+
+(* sv theorem *)
+
+val next_def = Define`
+  (next MP = MP) ∧
+  (next (Trust k) = Trust (k+1))`;
+
+val canupdateh_def = Define`
+  canupdateh S c = ∀s. s ∈ S ⇒ wf_state_with_hole s ∧ IS_SOME(steph c s)`;
+
+val updateh_def = Define`
+  updateh S c o' s' ⇔ ∃s. s ∈ S ∧ steph c s = SOME (o',s')`;
+
+val _ = overload_on("fill_with",
+  ``λp. fill (UNCURRY with_policy p)``);
+
+val _ = Parse.hide"S";
+
+val lemmaA = Q.store_thm("lemmaA",
+  `∀δ l S u c p1 p2.
+     canupdateh S c ∧
+     weaklyExtensional u ∧
+     (∀o' s'. updateh S c o' s' ⇒
+       let k = (get_focal_robot s').processor in
+       u (hist (fill_with (run_policy p1 k o') s')) + δ ≥
+       u (hist (fill_with (run_policy p2 k o') s')))
+     ⇒
+     ∀s. s ∈ S ⇒
+       u (hist (fill_with (c,p1) s)) + (discount u)*δ ≥
+       u (hist (fill_with (c,p2) s))`,
+  rpt gen_tac
+  \\ strip_tac
+  \\ gen_tac \\ strip_tac
+  \\ `∃o' s'. steph c s = SOME (o',s') ∧ wf_state_with_hole s`
+  by ( fs[canupdateh_def,IS_SOME_EXISTS,EXISTS_PROD])
+  \\ `updateh S c o' s'` by metis_tac[updateh_def]
+  \\ first_x_assum drule
+  \\ BasicProvers.LET_ELIM_TAC
+  \\ drule (GEN_ALL steph_fill_step)
+  \\ disch_then drule
+  \\ drule (GEN_ALL steph_focal_clock)
+  \\ disch_then drule
+  \\ simp[]
+  \\ disch_then kall_tac
+  \\ disch_then(fn th =>
+       let val th = CONV_RULE SWAP_FORALL_CONV th in
+       qspec_then`p1`mp_tac th >>
+       qspec_then`p2`mp_tac th end)
+  \\ Cases_on`run_policy p1 k o'`
+  \\ Cases_on`run_policy p2 k o'`
+  \\ simp[] \\ ntac 2 strip_tac
+  \\ cheat);
 
 (*
 val set_policy_def = Define`
