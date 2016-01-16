@@ -1196,13 +1196,67 @@ val lemmaA = Q.store_thm("lemmaA",
   \\ simp[]
   \\ disch_then kall_tac
   \\ disch_then(fn th =>
-       let val th = CONV_RULE SWAP_FORALL_CONV th in
+       let val th = GSYM (CONV_RULE SWAP_FORALL_CONV th) in
        qspec_then`p1`mp_tac th >>
        qspec_then`p2`mp_tac th end)
   \\ Cases_on`run_policy p1 k o'`
   \\ Cases_on`run_policy p2 k o'`
   \\ simp[] \\ ntac 2 strip_tac
-  \\ cheat);
+  \\ fs[weaklyExtensional_def]
+  \\ qmatch_assum_abbrev_tac`u1 + δ ≥ u2`
+  \\ `u2 - u1 ≤ δ` by ( srw_tac[realSimps.REAL_ARITH_ss][] )
+  \\ `∀p. hist (fill p s) = fill p s ::: hist (step (fill p s))`
+  by ( simp[hist_def,LUNFOLD_THM] )
+  \\ simp[]
+  \\ qmatch_abbrev_tac`u (fill cp1 s ::: h1) + _ ≥ u (fill cp2 s ::: h2)`
+  \\ `u (fill cp2 s ::: h2) - u (fill cp1 s ::: h1) =
+      u (fill cp1 s ::: h2) - u (fill cp1 s ::: h1)`
+  by metis_tac[]
+  \\ qmatch_assum_abbrev_tac`_ = rhs`
+  \\ `rhs ≤ discount u * (u h2 - u h1)`
+  by (
+    simp[Abbr`rhs`,Abbr`u2`,Abbr`u1`]
+    \\ qmatch_abbrev_tac`a - b ≤ d * e`
+    \\ Cases_on`0 < e`
+    >- (
+      simp[GSYM realTheory.REAL_LE_LDIV_EQ]
+      \\ simp[Abbr`d`,discount_def]
+      \\ match_mp_tac (MP_CANON realTheory.REAL_SUP_UBOUND)
+      \\ conj_tac
+      >- (
+        simp[UNCURRY,PULL_EXISTS,FORALL_PROD]
+        \\ cheat (* how to show discount supremum exists? *)
+        )
+      \\ simp[UNCURRY]
+      \\ simp[EXISTS_PROD]
+      \\ simp[Abbr`a`,Abbr`b`,Abbr`e`]
+      \\ metis_tac[] )
+    \\ Cases_on`e = 0`
+    >- (
+      fs[Abbr`e`]
+      \\ simp[Abbr`a`,Abbr`b`]
+      \\ cheat (* need u to satisfy some congruence? *)
+      )
+    \\ ONCE_REWRITE_TAC[GSYM realTheory.REAL_LE_NEG]
+    \\ REWRITE_TAC[realTheory.REAL_NEG_RMUL]
+    \\ simp[realTheory.REAL_NEG_SUB]
+    \\ `0 < -e` by (
+      simp[]
+      \\ metis_tac[realaxTheory.REAL_LT_TOTAL] )
+    \\ simp[GSYM realTheory.REAL_LE_RDIV_EQ]
+    \\ `(b - a) / -e = - ((b - a) / e)`
+    by simp[realTheory.neg_rat]
+    \\ pop_assum SUBST1_TAC
+    \\ simp[]
+    \\ cheat (* can e even be negative? does this work if so? *) )
+  \\ `0 ≤ discount u` by cheat
+  \\ `rhs ≤ discount u * δ`
+  by metis_tac[realTheory.REAL_LE_LMUL_IMP,realTheory.REAL_LE_TRANS]
+  \\ qmatch_abbrev_tac`x + y ≥ z`
+  \\ `rhs = z - x`
+  by ( simp[Abbr`z`,Abbr`x`,Abbr`rhs`] )
+  \\ simp[realTheory.real_ge]
+  \\ metis_tac[realTheory.REAL_LE_SUB_RADD,realTheory.REAL_ADD_SYM]);
 
 (*
 val set_policy_def = Define`
