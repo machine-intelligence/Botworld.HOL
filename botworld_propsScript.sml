@@ -490,6 +490,13 @@ val neighbour_coords_imp_opposite = Q.store_thm("neighbour_coords_imp_opposite",
   \\ simp[]
   \\ intLib.COOPER_TAC);
 
+val neighbour_coords_opposite_imp = Q.store_thm("neighbour_coords_opposite_imp",
+  `d < 8 ⇒
+   EL (opposite d) (neighbour_coords (EL d (neighbour_coords c))) = c`,
+  Cases_on`c`>>
+  rw[less8] >> simp[neighbour_coords_def,opposite_def] >>
+  intLib.COOPER_TAC);
+
 val immigration_sources = Q.store_thm("immigration_sources",
   `immigrations = FLAT (GENLIST (λi. incomingFrom (f i) (EL i nb)) (LENGTH nb)) ⇒
    ∃sources.
@@ -959,8 +966,135 @@ val focal_preserved = Q.store_thm("focal_preserved",
   BasicProvers.TOP_CASE_TAC >> simp[] >>
   simp[GSYM AND_IMP_INTRO] >>
   strip_tac >> rveq >> simp[] >>
-  strip_tac >> simp[EL_MAP] >>
-  cheat);
+  strip_tac >> simp[EL_MAP]
+  \\ Cases_on`c = EL dir (neighbour_coords s.focal_coordinate)`
+  >- ( fs[] \\ rfs[] \\ rveq \\ fs[] \\ rfs[])
+  \\ simp[]
+  \\ qmatch_abbrev_tac`¬ (FST (SND (EL _ (FILTER P' ls)))).focal`
+  \\ `∀r. MEM r ls ∧ P' r ⇒ ¬(FST(SND r)).focal`
+  suffices_by (
+    rw[] \\ fs[]
+    \\ first_x_assum match_mp_tac
+    \\ qpat_abbrev_tac`e = EL _ _`
+    \\ `MEM e (FILTER P' ls)`
+    by ( simp[MEM_EL] \\ metis_tac[] )
+    \\ fs[MEM_FILTER])
+  \\ simp[Abbr`ls`,MAP_GENLIST,o_DEF]
+  \\ simp[MEM_GENLIST]
+  \\ Cases_on`FLOOKUP s.state c` \\ fs[]
+  \\ qpat_abbrev_tac`nxb = neighbours _ _`
+  \\ qpat_abbrev_tac`ras = _.robotActions`
+  \\ rveq
+  \\ Cases_on`c = s.focal_coordinate`
+  >- (
+    fs[] \\ rfs[]
+    \\ rveq
+    \\ `∀r. MEM r ras ∧ ¬isMovedOut(SND r) ⇒ ¬(FST r).focal`
+    suffices_by (
+      simp[Abbr`P'`,PULL_EXISTS,MEM_EL,UNCURRY] )
+    \\ simp[Abbr`ras`,event_def,REPLICATE_GENLIST]
+    \\ qpat_abbrev_tac`veterans = ZIP(_,localActions _ _)`
+    \\ qpat_abbrev_tac`immigrations = FLAT (GENLIST _ _)`
+    \\ qpat_abbrev_tac`children = ZIP(_,GENLIST(K Created)_)`
+    \\ gen_tac
+    \\ ONCE_REWRITE_TAC[CONJ_COMM]
+    \\ simp[GSYM AND_IMP_INTRO]
+    \\ strip_tac
+    \\ Cases_on`MEM r veterans`
+    \\ simp[]
+    >- (
+      pop_assum mp_tac
+      \\ simp[Abbr`veterans`,MAP_ZIP,ZIP_GENLIST]
+      \\ simp[MEM_ZIP,PULL_EXISTS]
+      \\ simp[GSYM AND_IMP_INTRO]
+      \\ rw[]
+      \\ first_x_assum match_mp_tac
+      \\ asm_exists_tac \\ simp[]
+      \\ spose_not_then strip_assume_tac
+      \\ rveq
+      \\ qpat_assum`¬isMovedOut _`mp_tac
+      \\ simp[localActions_def]
+      \\ simp[act_def,Abbr`nb`]
+      \\ simp[neighbours_def,EL_MAP] )
+    \\ Cases_on`MEM r children`
+    \\ simp[]
+    >- (
+      `MEM (FST r) (MAP FST children)` by metis_tac[MEM_MAP]
+      \\ pop_assum mp_tac
+      \\ simp[Abbr`children`,MAP_ZIP,MEM_FLAT,PULL_EXISTS]
+      \\ simp[MEM_MAP,PULL_EXISTS]
+      \\ Cases \\ simp[]
+      \\ metis_tac[MEM_Built_localActions_not_focal] )
+    \\ simp[Abbr`immigrations`,MEM_FLAT,MEM_GENLIST,PULL_EXISTS]
+    \\ simp[Abbr`children`] \\ pop_assum kall_tac
+    \\ qx_gen_tac`z`
+    \\ simp[GSYM AND_IMP_INTRO]
+    \\ strip_tac
+    \\ Cases_on`EL z nb`
+    \\ simp[incomingFrom_def]
+    \\ simp[MEM_FLAT,MEM_MAP,PULL_EXISTS]
+    \\ rw[]
+    \\ pop_assum mp_tac
+    \\ rw[MEM_EL]
+    \\ first_x_assum match_mp_tac
+    \\ fs[Abbr`nb`]
+    \\ qpat_assum`_ = SOME _`mp_tac
+    \\ Cases_on`s.focal_coordinate`
+    \\ simp[neighbours_def,neighbour_coords_def]
+    \\ qpat_assum`z < 8`mp_tac
+    \\ simp[less8]
+    \\ strip_tac \\ rw[]
+    \\ asm_exists_tac \\ simp[]
+    \\ spose_not_then strip_assume_tac
+    \\ intLib.COOPER_TAC)
+  \\ `∀r. MEM r ras ⇒ ¬(FST r).focal`
+  suffices_by (
+    simp[Abbr`P'`,PULL_EXISTS,MEM_EL,UNCURRY] )
+  \\ simp[Abbr`ras`,event_def,REPLICATE_GENLIST]
+  \\ qpat_abbrev_tac`veterans = ZIP(_,localActions _ _)`
+  \\ qpat_abbrev_tac`immigrations = FLAT (GENLIST _ _)`
+  \\ qpat_abbrev_tac`children = ZIP(_,GENLIST(K Created)_)`
+  \\ gen_tac
+  \\ Cases_on`MEM r veterans`
+  \\ simp[]
+  >- (
+    pop_assum mp_tac
+    \\ simp[Abbr`veterans`,MAP_ZIP,ZIP_GENLIST]
+    \\ simp[MEM_ZIP,PULL_EXISTS]
+    \\ simp[GSYM AND_IMP_INTRO]
+    \\ rw[]
+    \\ first_x_assum match_mp_tac
+    \\ asm_exists_tac \\ simp[])
+  \\ Cases_on`MEM r children`
+  \\ simp[]
+  >- (
+    `MEM (FST r) (MAP FST children)` by metis_tac[MEM_MAP]
+    \\ pop_assum mp_tac
+    \\ simp[Abbr`children`,MAP_ZIP,MEM_FLAT,PULL_EXISTS]
+    \\ simp[MEM_MAP,PULL_EXISTS]
+    \\ Cases \\ simp[]
+    \\ metis_tac[MEM_Built_localActions_not_focal] )
+  \\ simp[Abbr`immigrations`,MEM_FLAT,MEM_GENLIST,PULL_EXISTS]
+  \\ simp[Abbr`children`] \\ pop_assum kall_tac
+  \\ qx_gen_tac`z`
+  \\ simp[GSYM AND_IMP_INTRO]
+  \\ strip_tac
+  \\ Cases_on`EL z nxb`
+  \\ simp[incomingFrom_def]
+  \\ simp[MEM_FLAT,MEM_MAP,PULL_EXISTS]
+  \\ rw[]
+  \\ pop_assum mp_tac
+  \\ rw[MEM_EL]
+  \\ first_x_assum match_mp_tac
+  \\ fs[Abbr`nxb`]
+  \\ `FLOOKUP s.state (EL z (neighbour_coords c)) = SOME x'`
+  by ( fs[neighbours_def] \\ rfs[EL_MAP] )
+  \\ asm_exists_tac
+  \\ simp[]
+  \\ spose_not_then strip_assume_tac
+  \\ fs[] \\ rveq
+  \\ fs[] \\ rveq
+  \\ metis_tac[neighbour_coords_opposite_imp]);
 
 val get_focal_robot_def = Define`
   get_focal_robot s =
