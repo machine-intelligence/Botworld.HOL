@@ -71,6 +71,21 @@ val unique_index_filter = Q.store_thm("unique_index_filter",
     first_x_assum(qspec_then`SUC j`mp_tac)>>simp[])>>
   rw[]);
 
+val LENGTH_FILTER_EQ = Q.store_thm("LENGTH_FILTER_EQ",
+  `∀l1 l2.
+   LENGTH l1 = LENGTH l2 ∧ (∀i. i < LENGTH l1 ⇒ (P (EL i l1) ⇔ P (EL i l2)))
+   ⇒ LENGTH (FILTER P l1) = LENGTH (FILTER P l2)`,
+  Induct \\ simp[LENGTH_NIL_SYM]
+  \\ gen_tac \\ Cases \\ simp[]
+  \\ strip_tac
+  \\ first_assum(qspec_then`0`mp_tac)
+  \\ simp_tac(srw_ss())[] \\ strip_tac
+  \\ IF_CASES_TAC \\ simp[]
+  \\ first_x_assum(match_mp_tac o MP_CANON)
+  \\ simp[] \\ qx_gen_tac`i` \\ strip_tac
+  \\ first_x_assum(qspec_then`SUC i`mp_tac)
+  \\ simp[]);
+
 (* -- *)
 
 val incomingFrom_MovedIn = Q.store_thm("incomingFrom_MovedIn",
@@ -1100,6 +1115,10 @@ val get_focal_robot_def = Define`
   get_focal_robot s =
     EL s.focal_index (s.state ' s.focal_coordinate).robots`;
 
+val isMovedOut_map_inspected = Q.store_thm("isMovedOut_map_inspected[simp]",
+  `isMovedOut (map_inspected f x) = isMovedOut x`,
+  Cases_on`x` \\ simp[]);
+
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
    steph c s = SOME (obs,s') ∧
@@ -1139,12 +1158,85 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   `(computeSquare o_f events) ' k = computeSquare x` by (
     fs[FLOOKUP_DEF,o_f_FAPPLY] ) >>
   pop_assum SUBST_ALL_TAC >>
-  IF_CASES_TAC >> fs[] >- (
+  rveq
+  \\ drule (GEN_ALL focal_preserved)
+  \\ simp[]
+  \\ strip_tac
+  \\ drule wf_state_with_hole_find_focal
+  \\ simp[]
+  \\ strip_tac \\ rveq
+  \\ first_assum mp_tac
+  \\ simp_tac std_ss [wf_state_with_hole_def]
+  \\ strip_tac
+  \\ fs[]
+  \\ IF_CASES_TAC >> fs[] >- (
     rveq >>
-    simp[computeSquare_def,square_update_robot_def] >>
-    (* probably want information hiding to happen earlier than encoding *)
-    cheat ) >>
-  cheat);
+    simp[computeSquare_def,square_update_robot_def]
+    \\ match_mp_tac EQ_SYM
+    \\ qpat_abbrev_tac`ls = FILTER _ _`
+    \\ `i < LENGTH ls`
+    by (
+      fs[FLOOKUP_o_f]
+      \\ rfs[]
+      \\ rveq
+      \\ fs[computeSquare_def,LET_THM] )
+    \\ simp[EL_MAP]
+    \\ simp[LIST_EQ_REWRITE]
+    \\ conj_tac
+    >- (
+      simp[Abbr`ls`]
+      \\ simp[MAP_MAP_o,o_DEF]
+      \\ simp[MEM_MAP]
+      \\ match_mp_tac LENGTH_FILTER_EQ
+      \\ simp[EL_MAP,UNCURRY] )
+    \\ gen_tac \\ strip_tac
+    \\ simp[EL_MAP,EL_LUPDATE]
+    \\ qpat_abbrev_tac`ls' = MAP _ (FILTER _ _)`
+    \\ `x' < LENGTH ls'`
+    by (
+      simp[Abbr`ls'`]
+      \\ pop_assum mp_tac
+      \\ simp[Abbr`ls`]
+      \\ simp[MAP_MAP_o,o_DEF,MEM_MAP,PULL_EXISTS]
+      \\ qmatch_abbrev_tac`_ < LENGTH l1 ⇒ _ < LENGTH l2`
+      \\ `LENGTH l1 = LENGTH l2` suffices_by rw[]
+      \\ simp[Abbr`l1`,Abbr`l2`]
+      \\ match_mp_tac LENGTH_FILTER_EQ
+      \\ simp[]
+      \\ simp[EL_MAP,UNCURRY] )
+    \\ fs[Abbr`ls'`,EL_MAP]
+    \\ simp[Abbr`ls`]
+    \\ simp[MAP_MAP_o,o_DEF,MEM_MAP,PULL_EXISTS]
+    \\ qpat_abbrev_tac`l1 = FILTER P (GENLIST _ _)`
+    \\ qpat_abbrev_tac`l2 = FILTER P (GENLIST _ _)`
+    \\ qmatch_assum_abbrev_tac`Abbrev(l2 = FILTER P (GENLIST (λi. (i, EL i (MAP f ras))) _))`
+    \\ `l2 = FILTER P (MAP (I ## f) (GENLIST (λi. (i, EL i ras)) (LENGTH ras)))`
+    by (
+      simp[Abbr`l2`]
+      \\ simp[MAP_GENLIST,o_DEF]
+      \\ AP_TERM_TAC
+      \\ simp[LIST_EQ_REWRITE,EL_MAP] )
+    \\ qunabbrev_tac`l2`
+    \\ simp[Abbr`l1`]
+    \\ qpat_abbrev_tac`ls = GENLIST _ _`
+    \\ qispl_then[`I ## f`,`P`,`ls`]mp_tac MAP_FILTER
+    \\ discharge_hyps
+    >- ( simp[Abbr`P`,Abbr`f`,UNCURRY] )
+    \\ disch_then(SUBST_ALL_TAC o SYM)
+    \\ qpat_abbrev_tac`ll = MAP (I ## f) _`
+    \\ `x' < LENGTH ll`
+    by (
+      qpat_assum`x' < _`mp_tac
+      \\ simp[Abbr`ll`,Abbr`ls`]
+      \\ qmatch_abbrev_tac`_ < LENGTH l1 ⇒ _ < LENGTH l2`
+      \\ `LENGTH l1 = LENGTH l2` suffices_by rw[]
+      \\ simp[Abbr`l1`,Abbr`l2`]
+      \\ simp[Abbr`P`,Abbr`f`,o_DEF,UNCURRY]
+      \\ simp[MEM_MAP,PULL_EXISTS,MAP_MAP_o,o_DEF,MAP_GENLIST,UNCURRY] )
+    \\ fs[Abbr`ll`,EL_MAP]
+    \\ cheat )
+  \\ simp[computeSquare_def]
+  \\ cheat);
 
 val steph_focal_clock = Q.store_thm("steph_focal_clock",
   `wf_state_with_hole s ∧
