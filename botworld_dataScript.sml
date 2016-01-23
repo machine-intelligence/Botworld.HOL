@@ -128,6 +128,9 @@ val _ = Parse.type_abbrev("history",``:grid llist``);
 
 val _ = Parse.type_abbrev("utilityfn",``:history -> real``);
 
+val utilityfn_def = Define`
+  utilityfn (u:utilityfn) ⇔ ∀s h h'. u h ≤ u h' ⇒ u (s ::: h) ≤ u (s ::: h')`;
+
 val _ = Datatype`level = MP | Trust num`;
 
 val _ = export_theory()

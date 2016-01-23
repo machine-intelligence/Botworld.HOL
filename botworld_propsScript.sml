@@ -1261,10 +1261,59 @@ val _ = overload_on("fill_with",
 
 val _ = Parse.hide"S";
 
+val discount_exists_def = Define`
+  discount_exists (u:utilityfn) ⇔
+    (∃h1 h2. u h1 ≠ u h2) ∧
+    (∃z. ∀s h1 h2. u h1 ≠ u h2 ⇒ (u (s:::h2) − u (s:::h1)) / (u h2 − u h1) < z)`;
+
+val discount_not_negative = Q.store_thm("discount_not_negative",
+  `utilityfn u ∧ discount_exists u ⇒ 0 ≤ discount u`,
+  rw[utilityfn_def,discount_def,discount_exists_def]
+  \\ qmatch_goalsub_abbrev_tac`sup P`
+  \\ `∃x. P x` by ( simp[Abbr`P`,UNCURRY] \\ simp[EXISTS_PROD] \\ metis_tac[])
+  \\ `∃z. ∀x. P x ⇒ x < z`
+  by (
+    simp[Abbr`P`,UNCURRY] \\ simp[EXISTS_PROD]
+    \\ simp[PULL_EXISTS] \\ metis_tac[] )
+  \\ `∃x. P x ∧ 0 ≤ x` suffices_by metis_tac[realTheory.REAL_SUP_UBOUND,realTheory.REAL_LE_TRANS]
+  \\ simp[Abbr`P`,UNCURRY,EXISTS_PROD]
+  \\ simp[PULL_EXISTS]
+  \\ asm_exists_tac \\ simp[]
+  \\ Cases_on`u h2 ≤ u h1`
+  >- (
+    last_x_assum drule
+    \\ disch_then(qspec_then`s`strip_assume_tac)
+    \\ qexists_tac`s`
+    \\ match_mp_tac realTheory.REAL_LE_DIV
+    \\ simp[realTheory.REAL_SUB_LE] )
+  \\ pop_assum mp_tac
+  \\ simp[realTheory.REAL_NOT_LE,realTheory.REAL_LT_LE]
+  \\ strip_tac
+  \\ last_x_assum drule
+  \\ disch_then(qspec_then`s`strip_assume_tac)
+  \\ qexists_tac`s`
+  \\ ONCE_REWRITE_TAC [GSYM realTheory.REAL_NEG_LE0]
+  \\ ONCE_REWRITE_TAC [realTheory.neg_rat]
+  \\ IF_CASES_TAC >- metis_tac[realTheory.REAL_SUB_0]
+  \\ simp[realTheory.REAL_NEG_SUB]
+  \\ qmatch_abbrev_tac`a / b ≤ 0`
+  \\ `0 ≤ a / -b`
+  suffices_by (
+    REWRITE_TAC[realTheory.neg_rat]
+    \\ IF_CASES_TAC >- metis_tac[realTheory.REAL_SUB_0]
+    \\ ONCE_REWRITE_TAC[GSYM realTheory.REAL_NEG_LE0]
+    \\ REWRITE_TAC[realTheory.neg_rat]
+    \\ IF_CASES_TAC >- metis_tac[realTheory.REAL_SUB_0]
+    \\ simp[] )
+  \\ simp[realTheory.REAL_NEG_SUB,Abbr`a`,Abbr`b`]
+  \\ match_mp_tac realTheory.REAL_LE_DIV
+  \\ simp[realTheory.REAL_SUB_LE] )
+
 val lemmaA = Q.store_thm("lemmaA",
   `∀δ l S u c p1 p2.
      canupdateh S c ∧
-     weaklyExtensional u ∧
+     utilityfn u ∧ weaklyExtensional u ∧ discount_exists u ∧
+     0 ≤ δ ∧
      (∀o' s'. updateh S c o' s' ⇒
        let k = (get_focal_robot s').processor in
        u (hist (fill_with (run_policy p1 k o') s')) + δ ≥
@@ -1305,45 +1354,41 @@ val lemmaA = Q.store_thm("lemmaA",
       u (fill cp1 s ::: h2) - u (fill cp1 s ::: h1)`
   by metis_tac[]
   \\ qmatch_assum_abbrev_tac`_ = rhs`
-  \\ `rhs ≤ discount u * (u h2 - u h1)`
+  \\ `0 ≤ discount u` by metis_tac[discount_not_negative]
+  \\ `rhs ≤ discount u * δ`
   by (
     simp[Abbr`rhs`,Abbr`u2`,Abbr`u1`]
-    \\ qmatch_abbrev_tac`a - b ≤ d * e`
+    \\ qmatch_abbrev_tac`a - b ≤ d * _`
+    \\ qmatch_assum_abbrev_tac`e ≤ δ`
     \\ Cases_on`0 < e`
     >- (
-      simp[GSYM realTheory.REAL_LE_LDIV_EQ]
+      `a - b ≤ d * e` suffices_by
+        metis_tac[realTheory.REAL_LE_LMUL_IMP,realTheory.REAL_LE_TRANS]
+      \\ simp[GSYM realTheory.REAL_LE_LDIV_EQ]
       \\ simp[Abbr`d`,discount_def]
       \\ match_mp_tac (MP_CANON realTheory.REAL_SUP_UBOUND)
       \\ conj_tac
       >- (
         simp[UNCURRY,PULL_EXISTS,FORALL_PROD]
-        \\ cheat (* how to show discount supremum exists? *)
-        )
+        \\ fs[discount_exists_def]
+        \\ simp[EXISTS_PROD]
+        \\ metis_tac[])
       \\ simp[UNCURRY]
       \\ simp[EXISTS_PROD]
       \\ simp[Abbr`a`,Abbr`b`,Abbr`e`]
-      \\ metis_tac[] )
-    \\ Cases_on`e = 0`
-    >- (
-      fs[Abbr`e`]
-      \\ simp[Abbr`a`,Abbr`b`]
-      \\ cheat (* need u to satisfy some congruence? *)
-      )
+      \\ metis_tac[realTheory.REAL_LT_REFL,realTheory.REAL_SUB_0] )
+    \\ `0 ≤ d * δ` by metis_tac[realTheory.REAL_LE_MUL]
+    \\ `a - b ≤ 0` suffices_by metis_tac[realTheory.REAL_LE_TRANS]
     \\ ONCE_REWRITE_TAC[GSYM realTheory.REAL_LE_NEG]
-    \\ REWRITE_TAC[realTheory.REAL_NEG_RMUL]
-    \\ simp[realTheory.REAL_NEG_SUB]
-    \\ `0 < -e` by (
-      simp[]
-      \\ metis_tac[realaxTheory.REAL_LT_TOTAL] )
-    \\ simp[GSYM realTheory.REAL_LE_RDIV_EQ]
-    \\ `(b - a) / -e = - ((b - a) / e)`
-    by simp[realTheory.neg_rat]
-    \\ pop_assum SUBST1_TAC
-    \\ simp[]
-    \\ cheat (* can e even be negative? does this work if so? *) )
-  \\ `0 ≤ discount u` by cheat
-  \\ `rhs ≤ discount u * δ`
-  by metis_tac[realTheory.REAL_LE_LMUL_IMP,realTheory.REAL_LE_TRANS]
+    \\ REWRITE_TAC[realTheory.REAL_NEG_SUB]
+    \\ simp[realTheory.REAL_SUB_LE]
+    \\ fs[utilityfn_def,Abbr`a`,Abbr`b`]
+    \\ first_x_assum match_mp_tac
+    \\ fs[Abbr`e`,realTheory.REAL_NOT_LT]
+    \\ ONCE_REWRITE_TAC[GSYM realTheory.REAL_SUB_LE]
+    \\ ONCE_REWRITE_TAC[GSYM realTheory.REAL_LE_NEG]
+    \\ REWRITE_TAC[realTheory.REAL_NEG_SUB]
+    \\ simp[] )
   \\ qmatch_abbrev_tac`x + y ≥ z`
   \\ `rhs = z - x`
   by ( simp[Abbr`z`,Abbr`x`,Abbr`rhs`] )

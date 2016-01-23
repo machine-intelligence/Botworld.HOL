@@ -269,7 +269,7 @@ val hist_def = Define`
 (* utility *)
 
 val discount_def = Define`
-  discount (u:utilityfn) = sup { (u (s ::: h) - u (s ::: h')) / (u h - u h') | (s,h,h') | T }`
+  discount (u:utilityfn) = sup { (u (s ::: h) - u (s ::: h')) / (u h - u h') | (s,h,h') | u h ≠ u h' }`
 
 val weaklyExtensional_def = Define`
   weaklyExtensional (u:utilityfn) ⇔
