@@ -1,4 +1,5 @@
 open preamble botworldTheory botworld_dataTheory
+local open realSimps in end
 
 val _ = new_theory"botworld_props";
 
@@ -1307,7 +1308,7 @@ val discount_not_negative = Q.store_thm("discount_not_negative",
     \\ simp[] )
   \\ simp[realTheory.REAL_NEG_SUB,Abbr`a`,Abbr`b`]
   \\ match_mp_tac realTheory.REAL_LE_DIV
-  \\ simp[realTheory.REAL_SUB_LE] )
+  \\ simp[realTheory.REAL_SUB_LE] );
 
 val lemmaA = Q.store_thm("lemmaA",
   `∀δ l S u c p1 p2.
@@ -1394,6 +1395,96 @@ val lemmaA = Q.store_thm("lemmaA",
   by ( simp[Abbr`z`,Abbr`x`,Abbr`rhs`] )
   \\ simp[realTheory.real_ge]
   \\ metis_tac[realTheory.REAL_LE_SUB_RADD,realTheory.REAL_ADD_SYM]);
+
+val dominates'_def = Define`
+  (dominates' a (Trust k) g cp cp' = dominates a (Trust (SUC k)) g cp cp') ∧
+  (dominates' (:α) MP (S,u) cp cp' =
+   ∀k. LCA (SUC k) 𝕌(:α) ⇒ ∀s. s ∈ S ⇒
+     u (hist (fill_with cp' s)) ≤ u (hist (fill_with cp s)) + (discount u) pow k)`;
+
+val wf_game_def = Define`
+  wf_game (S,u) ⇔
+    (∀s. s ∈ S ⇒ wf_state_with_hole s) ∧
+    (∃k. ∀s. s ∈ S ⇒ (get_focal_robot s).processor = k) ∧
+    utilityfn u ∧ weaklyExtensional u ∧ discount_exists u`;
+
+val get_game_clock_def = Define`
+  get_game_clock S =
+    @k. ∀s. s ∈ S ⇒ (get_focal_robot s).processor = k`;
+
+val lemmaB = Q.store_thm("lemmaB",
+  `∀a l. canupdateh S c ∧ wf_game (S,u)
+   ⇒
+     (∀o'.
+       dominates' a l (updateh S c o',u)
+         (run_policy p1 (get_game_clock S) o')
+         (run_policy p2 (get_game_clock S) o'))
+     ⇒
+     dominates a (next l) (S,u) (c,p1) (c,p2)`,
+  Cases
+  \\ reverse Cases
+  >- (
+    simp[dominates'_def,next_def,dominates_def,ADD1,wf_game_def]
+    \\ rw[]
+    \\ qspec_then`0`mp_tac lemmaA
+    \\ simp[Once(GSYM AND_IMP_INTRO)]
+    \\ disch_then drule
+    \\ disch_then drule
+    \\ simp[]
+    \\ simp[PULL_FORALL]
+    \\ simp[realTheory.real_ge]
+    \\ disch_then (match_mp_tac o MP_CANON)
+    \\ simp[] \\ fs[IN_DEF]
+    \\ rw[]
+    \\ `get_game_clock S = (get_focal_robot s').processor`
+    by (
+      simp[get_game_clock_def,IN_DEF]
+      \\ SELECT_ELIM_TAC
+      \\ conj_tac >- metis_tac[]
+      \\ rw[]
+      \\ fs[updateh_def]
+      \\ metis_tac[steph_focal_clock,IN_DEF] )
+    \\ fs[] )
+  \\ strip_tac
+  \\ simp[dominates'_def,next_def,dominates_def]
+  \\ strip_tac
+  \\ Cases
+  >- (
+    simp[] \\ rw[]
+    \\ fs[wf_game_def,utilityfn_def]
+    \\ qmatch_abbrev_tac`u a ≤ u b + 1`
+    \\ `u a ≤ 1` by metis_tac[]
+    \\ `1 ≤ u b + 1` suffices_by metis_tac[realTheory.REAL_LE_TRANS]
+    \\ ONCE_REWRITE_TAC[realTheory.REAL_ADD_COMM]
+    \\ simp[realTheory.REAL_LE_ADDR] )
+  \\ rw[]
+  \\ first_x_assum drule
+  \\ strip_tac
+  \\ drule (ONCE_REWRITE_RULE[GSYM AND_IMP_INTRO]lemmaA)
+  \\ fs[wf_game_def]
+  \\ disch_then drule
+  \\ simp[]
+  \\ simp[realTheory.pow]
+  \\ disch_then(qspec_then`discount u pow n`mp_tac)
+  \\ simp[GSYM AND_IMP_INTRO,RIGHT_FORALL_IMP_THM]
+  \\ discharge_hyps
+  >- (
+    match_mp_tac realTheory.POW_POS
+    \\ match_mp_tac discount_not_negative
+    \\ simp[] )
+  \\ simp[PULL_FORALL,realTheory.real_ge]
+  \\ disch_then (match_mp_tac o MP_CANON)
+  \\ fs[IN_DEF]
+  \\ rw[]
+  \\ `get_game_clock S = (get_focal_robot s').processor`
+  by (
+    simp[get_game_clock_def,IN_DEF]
+    \\ SELECT_ELIM_TAC
+    \\ conj_tac >- metis_tac[]
+    \\ rw[]
+    \\ fs[updateh_def]
+    \\ metis_tac[steph_focal_clock,IN_DEF] )
+  \\ fs[] );
 
 (*
 val set_policy_def = Define`
