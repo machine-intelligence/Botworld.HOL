@@ -6,7 +6,7 @@ ifndef HOLREFLDIR
 HOLREFLDIR = $(HOME)/hol-reflection
 endif
 
-INCLUDES = $(CAKEMLDIR)/semantics $(CAKEMLDIR)/compiler/parsing $(HOLDIR)/examples/formal-languages/context-free $(HOLREFLDIR) $(HOLREFLDIR)/lca
+INCLUDES = $(CAKEMLDIR)/semantics $(CAKEMLDIR)/compiler/parsing $(HOLDIR)/examples/formal-languages/context-free $(CAKEMLDIR)/candle/standard/syntax $(CAKEMLDIR)/candle/standard/semantics $(HOLREFLDIR) $(HOLREFLDIR)/lca
 THYFILES = $(patsubst %Script.sml,%Theory.uo,$(wildcard *.sml))
 TARGETS = $(patsubst %.sml,%.uo,$(THYFILES))
 all: $(TARGETS)

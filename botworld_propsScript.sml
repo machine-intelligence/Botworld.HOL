@@ -1402,6 +1402,19 @@ val dominates'_def = Define`
    ∀k. LCA (SUC k) 𝕌(:α) ⇒ ∀s. s ∈ S ⇒
      u (hist (fill_with cp' s)) ≤ u (hist (fill_with cp s)) + (discount u) pow k)`;
 
+val dominates_refl = Q.store_thm("dominates_refl",
+  `utilityfn u ∧ discount_exists u ⇒ dominates a l (S,u) cp cp`,
+  Cases_on`a`\\Cases_on`l`\\simp[dominates_def]
+  \\ simp[realTheory.REAL_LE_ADDR]
+  \\ metis_tac[discount_not_negative,realTheory.POW_POS]);
+
+val dominates'_refl = Q.store_thm("dominates'_refl",
+  `utilityfn u ∧ discount_exists u ⇒ dominates' a l (S,u) cp cp`,
+  Cases_on`a`\\reverse(Cases_on`l`)\\simp[dominates'_def]
+  >- metis_tac[dominates_refl]
+  \\ simp[realTheory.REAL_LE_ADDR]
+  \\ metis_tac[discount_not_negative,realTheory.POW_POS]);
+
 val wf_game_def = Define`
   wf_game (S,u) ⇔
     (∀s. s ∈ S ⇒ wf_state_with_hole s) ∧
@@ -1485,6 +1498,110 @@ val lemmaB = Q.store_thm("lemmaB",
     \\ fs[updateh_def]
     \\ metis_tac[steph_focal_clock,IN_DEF] )
   \\ fs[] );
+
+open basicReflectionLib
+
+val _ = bring_to_front_overload","{Name=",",Thy="pair"}
+
+val sv_ctxt_def = Define`
+  sv_ctxt:update list = ARB (* TODO *)`;
+
+val _ = Parse.overload_on("Num", ``Tyapp(strlit"num")[]``)
+val quote_num_aux_def = Define`
+  (quote_num_aux 0 = Const(strlit"0") Num) ∧
+  (quote_num_aux (SUC n) =
+    (Comb (Const(strlit"SUC")(Fun Num Num)) (quote_num_aux n)))`;
+    (* TODO: this is the same as quote in lcaProofTheory *)
+
+val quote_num_def = Define`
+  quote_num = (quote_num_aux,Num)`;
+
+val quote_level_def = Define`
+  quote_level = (ARB(:level->term),ARB:type) (* TODO *)`;
+
+val quote_observation_def = Define`
+  quote_observation = (ARB(:observation->term),ARB:type) (* TODO *)`;
+
+val quote_command_def = Define`
+  quote_command = (ARB(:command->term),ARB:type) (* TODO *)`;
+
+val quote_prog_def = Define`
+  quote_prog = (ARB(:prog->term),ARB:type) (* TODO *)`;
+
+(*
+quote_foo : (('a -> term) # type) -> (('a foo -> term) # type)
+quote_bar : ((('a -> term) # type), (('b -> term) # type)) -> ((('a, 'b) bar -> term) # type)
+*)
+
+val quote_pair_def = Define`
+  quote_pair ((q1,tx),(q2,ty)) =
+    let p = Tyapp(strlit"prod")[tx;ty] in
+    (λ(x,y).
+       Comb (Comb (Const(strlit",") (Fun tx (Fun ty p)))
+               (q1 x)) (q2 y)),
+    p`;
+
+val quote_list_aux_def = Define`
+  (quote_list_aux (q,t) lt [] = Const(strlit"NIL") lt) ∧
+  (quote_list_aux (q,t) lt (x::xs) =
+   Comb
+     (Comb
+        (Const (strlit"CONS") (Fun t (Fun lt lt))) (q x))
+         (quote_list_aux (q,t) lt xs))`;
+
+val quote_list_def = Define`
+  quote_list (q,t) =
+  let lt = Tyapp(strlit"list")[t] in
+  (quote_list_aux (q,t) lt, lt)`;
+
+val no_ffi_def = Define`
+  no_ffi (p:exp) ⇔ (ARB:bool) (* TODO *) `;
+
+val _ = temp_overload_on("state_with_hole_ty",type_to_deep``:state_with_hole``);
+val _ = temp_overload_on("observation_ty",type_to_deep``:observation``);
+val _ = temp_overload_on("utilityfn_ty",type_to_deep``:utilityfn``);
+val _ = temp_overload_on("dominates_tm",term_to_deep``dominates (:α)``);
+
+val sv_thm = Q.store_thm("sv_thm",
+  `wf_game (S,u) ∧
+   canupdateh S c ∧
+   typeof Stm' = Fun observation_ty (Fun state_with_hole_ty Bool) ∧
+   typeof utm = utilityfn_ty ∧
+   no_ffi σ ∧
+   (∀o' cp' cp''.
+     (thyof sv_ctxt,[]) |-
+       (Comb
+         (Comb
+           (Comb
+              (Comb dominates_tm (FST quote_level l))
+              (FST (quote_pair
+                      ((I, Fun state_with_hole_ty Bool), (I, utilityfn_ty)))
+                 (Comb Stm' (FST quote_observation o'), utm)))
+           (FST (quote_pair (quote_command, quote_prog)) cp'))
+         (FST (quote_pair (quote_command, quote_prog)) cp''))
+     ⇒
+       dominates' a l (updateh S c o',u) cp' cp'')
+   ⇒
+   dominates a (next l) (S,u) (c, sv l Stm' utm' p σ) (c,p)`,
+  qpat_abbrev_tac`psv = sv _ _ _ _ _`
+  \\ qpat_abbrev_tac`S' = updateh _ _`
+  \\ strip_tac
+  \\ match_mp_tac (MP_CANON lemmaB)
+  \\ conj_tac >- simp[]
+  \\ gen_tac \\ simp[]
+  \\ qpat_abbrev_tac`ck = get_game_clock S`
+  \\ qpat_assum`∀x. _`mp_tac
+  \\ qho_match_abbrev_tac`(∀o' cp' cp''. thm o' cp' cp'' ⇒ (_ o' cp' cp'')) ⇒ _`
+  \\ simp[] \\ strip_tac
+  \\ `run_policy psv ck o' = run_policy p ck o' ∨
+      thm o' (run_policy psv ck o') (run_policy p ck o')`
+  by cheat (* "by inspection" *)
+  >- (
+    simp[]
+    \\ match_mp_tac dominates'_refl
+    \\ fs[wf_game_def] )
+  \\ first_x_assum match_mp_tac
+  \\ simp[]);
 
 (*
 val set_policy_def = Define`
