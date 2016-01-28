@@ -1503,9 +1503,6 @@ open basicReflectionLib
 
 val _ = bring_to_front_overload","{Name=",",Thy="pair"}
 
-val sv_ctxt_def = Define`
-  sv_ctxt:update list = ARB (* TODO *)`;
-
 val _ = Parse.overload_on("Num", ``Tyapp(strlit"num")[]``)
 val quote_num_aux_def = Define`
   (quote_num_aux 0 = Const(strlit"0") Num) ∧
@@ -1569,7 +1566,7 @@ val sv_thm = Q.store_thm("sv_thm",
    typeof utm = utilityfn_ty ∧
    no_ffi σ ∧
    (∀o' cp' cp''.
-     (thyof sv_ctxt,[]) |-
+     (thy,[]) |-
        (Comb
          (Comb
            (Comb
@@ -1595,7 +1592,7 @@ val sv_thm = Q.store_thm("sv_thm",
   \\ simp[] \\ strip_tac
   \\ `run_policy psv ck o' = run_policy p ck o' ∨
       thm o' (run_policy psv ck o') (run_policy p ck o')`
-  by cheat (* "by inspection" *)
+  by ( cheat (* "by inspection" *))
   >- (
     simp[]
     \\ match_mp_tac dominates'_refl
