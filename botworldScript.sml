@@ -332,17 +332,23 @@ val sv_def = Define`
     (* preamble also includes helper functions:
        Botworld.read_observation : unit -> observation
        Botworld.read_output : unit -> command * prog
-       Botworld.write_output : command * prog -> unit
        Botworld.check_theorem : thm * level * term * observation * term * (command * prog) * (command * prog) -> bool
+       However, the preamble syntactically contains no FFI-writing (on FFI 2) capability.
+       This is declared separately (by write_output_dec) _after_ the suggester
+       is defined, so it is easy to show that the suggester does not write anything.
+       The write helper has this signature:
+       Botworld_writer.write_output : command * prog -> unit
     *)
     (* assume σ is an expression that is closed by the definitions of the
        preamble and two variables "observation" and "fallback", and it returns
-       a (command * prog * thm) option  *)
+       a (command * prog * thm) option *)
+    [Tdec(Dlet(Pvar"suggester")(Fun "observation" (Fun "fallback" σ)));
+     Tmod"Botworld_writer"NONE[write_output_dec]] ++
     π (* this will read the observation and write the fallback *) ++
     [Tdec(Dlet(Pvar"observation")(App Opapp [Var(Long"Botworld""read_observation");Con NONE []]));
      Tdec(Dlet(Pvar"fallback")(App Opapp [Var(Long"Botworld""read_output");Con NONE []]));
      Tdec(Dlet(Pvar"result")
-           (Mat σ
+           (Mat (App Opapp [App Opapp [Var(Short"suggester");Var(Short"observation")];Var(Short"fallback")])
               [(Pcon(SOME(Short"NONE"))[],Con NONE [])
               ;(Pcon(SOME(Short"SOME"))[Pcon NONE [Pvar"policy";Pvar"thm"]],
                If (App Opapp
