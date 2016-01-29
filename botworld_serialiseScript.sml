@@ -35,10 +35,9 @@ val sexpcommand_def = Define`
       guard (nm = "Destroy" ∧ LENGTH args = 1)
             (lift Destroy (sexpnum (EL 0 args))) ++
       guard (nm = "Build" ∧ LENGTH args = 2)
-            (lift2 Build
-                   (sexplist sexpnum (EL 0 args))
-                   (sexplist sexptop (EL 1 args))) ++
-      guard (nm = "Pass" ∧ args = [])
+            (lift2 Build (sexplist sexpnum (EL 0 args))
+                         (sexplist sexptop (EL 1 args))) ++
+      guard (nm = "Pass" ∧ LENGTH args = 0)
             (return Pass)
     od`;
 
@@ -116,26 +115,6 @@ val sexpaction_def = Define`
                    (return empty_robot))
     od`;
 
-val sexpcommand_def = Define`
-  sexpcommand s =
-    do
-      (nm, args) <- dstrip_sexp s;
-      guard (nm = "Move" ∧ LENGTH args = 1)
-            (lift Move (sexpnum (EL 0 args))) ++
-      guard (nm = "Lift" ∧ LENGTH args = 1)
-            (lift Lift (sexpnum (EL 0 args))) ++
-      guard (nm = "Drop" ∧ LENGTH args = 1)
-            (lift Drop (sexpnum (EL 0 args))) ++
-      guard (nm = "Inspect" ∧ LENGTH args = 1)
-            (lift Inspect (sexpnum (EL 0 args))) ++
-      guard (nm = "Destroy" ∧ LENGTH args = 1)
-            (lift Destroy (sexpnum (EL 0 args))) ++
-      guard (nm = "Build" ∧ LENGTH args = 2)
-            (lift2 Build (sexplist sexpnum (EL 0 args)) (sexplist sexptop (EL 1 args))) ++
-      guard (nm = "Pass" ∧ LENGTH args = 0)
-            (return Pass)
-    od`;
-
 val sexpoutput_def = Define`
   sexpoutput = sexppair sexpcommand (sexplist sexptop)`;
 
@@ -194,15 +173,6 @@ val actionsexp_def = Define`
   (actionsexp (BuildInterrupted ns) = listsexp [SX_SYM "BuildInterrupted"; listsexp (MAP SX_NUM ns)]) ∧
   (actionsexp (Built ns _) = listsexp [SX_SYM "Built"; listsexp (MAP SX_NUM ns)]) ∧
   (actionsexp (Invalid) = listsexp [SX_SYM "Passed"])`;
-
-val commandsexp_def = Define`
-  (commandsexp (Move num) = listsexp [SX_SYM "Move"; SX_NUM num]) ∧
-  (commandsexp (Lift num) = listsexp [SX_SYM "Lift"; SX_NUM num]) ∧
-  (commandsexp (Drop num) = listsexp [SX_SYM "Drop"; SX_NUM num]) ∧
-  (commandsexp (Inspect num) = listsexp [SX_SYM "Inspect"; SX_NUM num]) ∧
-  (commandsexp (Destroy num) = listsexp [SX_SYM "Destroy"; SX_NUM num]) ∧
-  (commandsexp (Build ns prog) = listsexp [SX_SYM "Build"; listsexp (MAP SX_NUM ns); listsexp (MAP topsexp prog)]) ∧
-  (commandsexp (Pass) = listsexp [SX_SYM "Pass"])`;
 
 val itemCachesexp_def = Define`
   itemCachesexp c =
