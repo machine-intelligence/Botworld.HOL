@@ -1,4 +1,4 @@
-open HolKernel boolLib bossLib lcsymtacs botworld_miscTheory realTheory
+open HolKernel boolLib bossLib lcsymtacs botworld_miscTheory
 val _ = new_theory"botworld_data"
 
 val _ = Datatype`
@@ -123,15 +123,6 @@ val _ = Datatype`
 
 val _ = Parse.type_abbrev("coordinate",``:int # int``);
 val _ = Parse.type_abbrev("grid",``:coordinate |-> square``)
-
-val _ = Parse.type_abbrev("history",``:grid llist``);
-
-val _ = Parse.type_abbrev("utilityfn",``:history -> real``);
-
-val utilityfn_def = Define`
-  utilityfn (u:utilityfn) ⇔
-    (∀x. 0 ≤ u x ∧ u x ≤ 1) ∧
-    ∀s h h'. u h ≤ u h' ⇒ u (s ::: h) ≤ u (s ::: h')`;
 
 val _ = Datatype`level = MP | Trust num`;
 
