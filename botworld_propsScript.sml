@@ -1579,7 +1579,7 @@ val sv_thm = Q.store_thm("sv_thm",
      ⇒
        dominates' a l (updateh S c o',u) cp' cp'')
    ⇒
-   dominates a (next l) (S,u) (c, sv l Stm' utm' p σ) (c,p)`,
+   dominates a (next l) (S,u) (c, sv l Stm' utm p σ) (c,p)`,
   qpat_abbrev_tac`psv = sv _ _ _ _ _`
   \\ qpat_abbrev_tac`S' = updateh _ _`
   \\ strip_tac
