@@ -1677,6 +1677,22 @@ val _ = temp_overload_on("observation_ty",type_to_deep``:observation``);
 val _ = temp_overload_on("utilityfn_ty",type_to_deep``:utilityfn``);
 val _ = temp_overload_on("dominates_tm",term_to_deep``dominates (:α)``);
 
+val mk_target_concl_def = Define`
+  mk_target_concl obs cp1 cp2 l Stm utm =
+  Comb
+  (Comb
+   (Comb
+    (Comb dominates_tm (FST quote_level l))
+    (FST (quote_prod
+          ((I, Fun state_with_hole_ty Bool), (I, utilityfn_ty)))
+     (Comb Stm (FST quote_observation obs), utm)))
+   (FST (quote_prod (quote_command, quote_prog)) cp1))
+  (FST (quote_prod (quote_command, quote_prog)) cp2)`;
+
+(* TODO: translate mk_target_concl *)
+
+(* TODO: constrain thy to be an extension of the theory set up by the Botworld preamble *)
+
 val sv_thm = Q.store_thm("sv_thm",
   `wf_game (S,u) ∧
    canupdateh S c ∧
@@ -1684,17 +1700,7 @@ val sv_thm = Q.store_thm("sv_thm",
    typeof utm = utilityfn_ty ∧
    no_ffi σ ∧
    (∀o' cp' cp''.
-     (thy,[]) |-
-       (Comb
-         (Comb
-           (Comb
-              (Comb dominates_tm (FST quote_level l))
-              (FST (quote_pair
-                      ((I, Fun state_with_hole_ty Bool), (I, utilityfn_ty)))
-                 (Comb Stm' (FST quote_observation o'), utm)))
-           (FST (quote_pair (quote_command, quote_prog)) cp'))
-         (FST (quote_pair (quote_command, quote_prog)) cp''))
-     ⇒
+     (thy,[]) |- mk_target_concl o' cp' cp'' l Stm' utm ⇒
        dominates' a l (updateh S c o',u) cp' cp'')
    ⇒
    dominates a (next l) (S,u) (c, sv l Stm' utm p σ) (c,p)`,
