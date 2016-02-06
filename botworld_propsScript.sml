@@ -1499,57 +1499,150 @@ val lemmaB = Q.store_thm("lemmaB",
     \\ metis_tac[steph_focal_clock,IN_DEF] )
   \\ fs[] );
 
-open basicReflectionLib
+open basicReflectionLib holSyntaxSyntax listSyntax
 
 val _ = bring_to_front_overload","{Name=",",Thy="pair"}
 
 val _ = Parse.overload_on("Num", ``Tyapp(strlit"num")[]``)
-val quote_num_aux_def = Define`
-  (quote_num_aux 0 = Const(strlit"0") Num) ∧
-  (quote_num_aux (SUC n) =
-    (Comb (Const(strlit"SUC")(Fun Num Num)) (quote_num_aux n)))`;
-    (* TODO: this is the same as quote in lcaProofTheory *)
+val _ = Parse.overload_on("Level", ``Tyapp(strlit"level")[]``)
+val _ = Parse.overload_on("Pair", ``λt1 t2. Tyapp(strlit"prod")[t1;t2]``)
 
-val quote_num_def = Define`
-  quote_num = (quote_num_aux,Num)`;
+fun assoc [] k = NONE
+  | assoc ((k',v)::ls) k = if k = k' then SOME v else assoc ls k
 
-val quote_level_def = Define`
-  quote_level = (ARB(:level->term),ARB:type) (* TODO *)`;
+fun quoter table ty =
+  let
+    val (tyop,argl) = dest_type ty
+    fun get_qt a =
+      if is_vartype a then mk_pair (valOf (assoc table a))
+      else rand(quoter table a)
+    val qts = map get_qt argl
+    val args = list_mk_pair qts handle HOL_ERR _ => T
+    val quote_ty = "quote_"^(fst(dest_type ty))
+    val q = if null argl then [QUOTE("FST "^quote_ty)]
+            else [QUOTE("FST ("^quote_ty),ANTIQUOTE args,QUOTE")"]
+  in
+    Term q
+  end
 
-val quote_observation_def = Define`
-  quote_observation = (ARB(:observation->term),ARB:type) (* TODO *)`;
+fun quote_type_to_deep table ty =
+  case type_view ty of
+    Tyvar name =>
+      (case assoc table ty of
+         SOME (_,t) => t
+       | NONE => mk_Tyvar (string_to_inner (tyvar_to_deep name)))
+  | Tyapp (thy,name,args) =>
+      mk_Tyapp(string_to_inner name, mk_list(List.map (quote_type_to_deep table) args, type_ty))
+
+(*
+val (type_being_defined,quote_ty_aux) = (ty,quote_ty_aux_applied)
+*)
+
+fun quote_term_to_deep table (type_being_defined,quote_ty_aux) =
+  let
+    val type_to_deep = quote_type_to_deep table
+    fun ttd tm =
+      case dest_term tm of
+        VAR(x,ty) =>
+        if ty = type_being_defined then mk_comb(quote_ty_aux,tm)
+        else
+          (case assoc table ty of
+             SOME (q,_) => mk_comb(q,tm)
+           | NONE => mk_comb(quoter table ty, tm))
+      | CONST {Name,Thy,Ty} => mk_Const(string_to_inner Name, type_to_deep Ty)
+      | COMB (f,x) => mk_Comb(ttd f, ttd x)
+      | LAMB (x,b) =>
+          let
+            val (x,ty) = dest_var x
+          in
+            mk_Abs(mk_Var(string_to_inner x, type_to_deep ty), ttd b)
+          end
+  in ttd end
+
+(*
+val vnames = NONE
+val ty = ``:privateData``
+val ty = ``:'a list``
+*)
+
+fun mk_quote vnames ty =
+  let
+    val tyvs = type_vars ty
+    val ax = TypeBase.axiom_of ty
+    val target_ty = ax |> concl |> dest_forall |> fst |> type_of |> strip_fun |> snd
+    val (tyname,_) = dest_type ty
+    val quote_ty_name = "quote_"^tyname
+    val quote_ty_aux_name = quote_ty_name^"_aux"
+    val (v,b) = ax |> SPEC_ALL |> concl |> inst [target_ty|->holSyntaxSyntax.term_ty]
+                |> boolSyntax.dest_exists
+    val (argts,argqs) =
+      case vnames of NONE =>
+        (map (fn _ => genvar type_ty) tyvs,
+         map (fn ty => genvar(ty --> term_ty)) tyvs)
+      | SOME (qnames,tnames) =>
+        (map (fn n => mk_var(n,type_ty)) tnames,
+         map2 (fn n => fn ty => mk_var(n,ty --> term_ty)) qnames tyvs)
+    val qts = zip argqs argts
+    val argslist = map mk_pair qts
+    val args = list_mk_pair argslist handle HOL_ERR _ => T
+    val table = zip tyvs qts
+    val quote_ty_aux = mk_var(quote_ty_aux_name,
+                              if null tyvs then type_of v
+                              else type_of args --> ty --> term_ty)
+    val quote_ty_aux_applied = if null tyvs then quote_ty_aux else mk_comb(quote_ty_aux,args)
+    val lhses = b |> strip_conj |> map (lhs o snd o strip_forall)
+                  |> map (subst [v|->quote_ty_aux_applied])
+    fun mk_rhs l =
+    (*
+      val l = el 3 lhses
+      val tm = rand l
+    *)
+      quote_term_to_deep table (ty,quote_ty_aux_applied) (rand l)
+    val eqs = map (fn l => mk_eq(l,mk_rhs l)) lhses
+    val aux_def = Define[ANTIQUOTE(list_mk_conj eqs)]
+    val quote_ty = mk_var(quote_ty_name,
+                              if null tyvs then
+                                mk_prod(type_of quote_ty_aux,type_ty)
+                              else
+                              type_of args -->
+                              mk_prod(type_of quote_ty_aux_applied,type_ty))
+    val quote_ty_applied = if null tyvs then quote_ty else mk_comb(quote_ty,args)
+    val defined_quote_ty_aux =
+      aux_def |> CONJUNCTS |> hd |> concl |> strip_forall |> snd |> lhs |> strip_comb |> fst
+    val defined_quote_ty_aux_applied =
+      if null tyvs then defined_quote_ty_aux else mk_comb(defined_quote_ty_aux,args)
+    val quote_ty_rhs = mk_pair(defined_quote_ty_aux_applied,
+                               quote_type_to_deep table ty)
+    val q_def = Define[ANTIQUOTE(mk_eq(quote_ty_applied,quote_ty_rhs))]
+  in
+   (aux_def,q_def)
+  end
+
+val (quote_num_aux_def,quote_num_def) = mk_quote NONE ``:num``
+val (quote_level_aux_def,quote_level_def) = mk_quote NONE ``:level``
+val (quote_prod_aux_def,quote_prod_def) = mk_quote (SOME(["q1","q2"],["t1","t2"])) ``:'a # 'b``
+val (quote_list_aux_def,quote_list_def) = mk_quote (SOME(["q"],["t"])) ``:'a list``
 
 val quote_command_def = Define`
-  quote_command = (ARB(:command->term),ARB:type) (* TODO *)`;
+  quote_command = (ARB:command->term,ARB:type) (* TODO *)`;
 
-val quote_prog_def = Define`
-  quote_prog = (ARB(:prog->term),ARB:type) (* TODO *)`;
+val quote_top_def = Define`
+  quote_top = (ARB:top->term,ARB:type) (* TODO *)`;
+
+val _ = overload_on("quote_prog",``quote_list quote_top``);
+
+val (quote_privateData_aux_def,quote_privateData_def) = mk_quote NONE ``:privateData``
+
+val quote_event_def = Define`
+  quote_event = (ARB:event->term,ARB:type) (* TODO *)`;
+
+val _ = overload_on("quote_observation",
+    ``quote_prod (quote_num,(quote_prod (quote_event,quote_privateData)))``);
 
 (*
 quote_foo : (('a -> term) # type) -> (('a foo -> term) # type)
 quote_bar : ((('a -> term) # type), (('b -> term) # type)) -> ((('a, 'b) bar -> term) # type)
 *)
-
-val quote_pair_def = Define`
-  quote_pair ((q1,tx),(q2,ty)) =
-    let p = Tyapp(strlit"prod")[tx;ty] in
-    (λ(x,y).
-       Comb (Comb (Const(strlit",") (Fun tx (Fun ty p)))
-               (q1 x)) (q2 y)),
-    p`;
-
-val quote_list_aux_def = Define`
-  (quote_list_aux (q,t) lt [] = Const(strlit"NIL") lt) ∧
-  (quote_list_aux (q,t) lt (x::xs) =
-   Comb
-     (Comb
-        (Const (strlit"CONS") (Fun t (Fun lt lt))) (q x))
-         (quote_list_aux (q,t) lt xs))`;
-
-val quote_list_def = Define`
-  quote_list (q,t) =
-  let lt = Tyapp(strlit"list")[t] in
-  (quote_list_aux (q,t) lt, lt)`;
 
 val no_ffi_def = Define`
   no_ffi (p:exp) ⇔ (ARB:bool) (* TODO *) `;
