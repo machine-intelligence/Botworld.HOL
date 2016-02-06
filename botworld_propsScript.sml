@@ -1644,8 +1644,33 @@ quote_foo : (('a -> term) # type) -> (('a foo -> term) # type)
 quote_bar : ((('a -> term) # type), (('b -> term) # type)) -> ((('a, 'b) bar -> term) # type)
 *)
 
-val no_ffi_def = Define`
-  no_ffi (p:exp) ⇔ (ARB:bool) (* TODO *) `;
+val no_ffi_op_def = Define`
+  (no_ffi_op (FFI n) ⇔ (n ≠ 2)) ∧
+  (no_ffi_op _ ⇔ T)`;
+val _ = export_rewrites["no_ffi_op_def"];
+
+val no_ffi_def = tDefine"no_ffi"`
+  (no_ffi (Raise e) ⇔ no_ffi e) ∧
+  (no_ffi (Handle e pes) ⇔ no_ffi e ∧ EVERY no_ffi (MAP SND pes)) ∧
+  (no_ffi (Lit _) ⇔ T) ∧
+  (no_ffi (Con _ es) ⇔ EVERY no_ffi es) ∧
+  (no_ffi (Var _) ⇔ T) ∧
+  (no_ffi (Fun _ e) ⇔ no_ffi e) ∧
+  (no_ffi (App op es) ⇔ no_ffi_op op ∧ EVERY no_ffi es) ∧
+  (no_ffi (Log _ e1 e2) ⇔ no_ffi e1 ∧ no_ffi e2) ∧
+  (no_ffi (If e1 e2 e3) ⇔ no_ffi e1 ∧ no_ffi e2 ∧ no_ffi e3) ∧
+  (no_ffi (Mat e pes) ⇔ no_ffi e ∧ EVERY no_ffi (MAP SND pes)) ∧
+  (no_ffi (Let _ e1 e2) ⇔ no_ffi e1 ∧ no_ffi e2) ∧
+  (no_ffi (Letrec funs e) ⇔ EVERY no_ffi (MAP (SND o SND) funs) ∧ no_ffi e)`
+(WF_REL_TAC`measure exp_size`
+ \\ simp[astTheory.exp_size_def]
+ \\ rpt conj_tac
+ \\ gen_tac \\ Induct \\ simp[astTheory.exp_size_def]
+ \\ qx_gen_tac `p`
+ \\ TRY (PairCases_on`p`) \\ fs[]
+ \\ rw[] \\ res_tac \\ simp[astTheory.exp_size_def]);
+val no_ffi_def = save_thm("no_ffi_def",no_ffi_def |> REWRITE_RULE[ETA_AX])
+val _ = export_rewrites["no_ffi_def"];
 
 val _ = temp_overload_on("state_with_hole_ty",type_to_deep``:state_with_hole``);
 val _ = temp_overload_on("observation_ty",type_to_deep``:observation``);
