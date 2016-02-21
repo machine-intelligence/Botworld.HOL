@@ -7,17 +7,19 @@ val (quote_level_aux_def,quote_level_def) = mk_quote NONE ``:level``
 val (quote_prod_aux_def,quote_prod_def) = mk_quote (SOME(["q1","q2"],["t1","t2"])) ``:'a # 'b``
 val (quote_list_aux_def,quote_list_def) = mk_quote (SOME(["q"],["t"])) ``:'a list``
 
-val quote_list_aux_cong = Q.store_thm("quote_list_aux_cong",`!l1 l2 t1 t2 q1 q2.
-l1 = l2 /\
-t1 = t2 /\
-(!a. MEM a l1 ==> q1 a = q2 a)
-==> quote_list_aux (q1,t1) l1 = quote_list_aux (q2,t2) l2`,
-Induct \\ rw[quote_list_aux_def] \\ rw[quote_list_aux_def]
-)
+val quote_list_aux_cong = Q.store_thm("quote_list_aux_cong",
+  `!l1 l2 t1 t2 q1 q2.
+      l1 = l2 /\
+      t1 = t2 /\
+      (!a. MEM a l1 ==> q1 a = q2 a)
+      ==> quote_list_aux (q1,t1) l1 = quote_list_aux (q2,t2) l2`,
+  Induct \\ rw[quote_list_aux_def] \\ rw[quote_list_aux_def]);
+val _ = DefnBase.export_cong "quote_list_aux_cong";
 
-val quote_list_is_aux = Q.prove(`FST (quote_list (x,y)) z = quote_list_aux (x,y) z`, rw[quote_list_def])
+val quote_list_is_aux = Q.prove(
+  `FST (quote_list (x,y)) z = quote_list_aux (x,y) z`,
+  rw[quote_list_def]);
 
-val _ = DefnBase.export_cong "quote_list_aux_cong"
 val _ = aux_rws := concl quote_list_is_aux :: !aux_rws
 
 val quote_char_aux_def = Define `quote_char_aux c = Comb ^(term_to_deep ``CHR``) (quote_num_aux (ORD c))`
@@ -30,7 +32,8 @@ val _ = mk_quote_tac := (wf_rel_tac `measure t_size` \\ gen_tac \\ Induct \\ rw[
                                    \\ simp[] \\ res_tac \\ simp[])
 
 val (quote_t_aux_def,quote_t_def) = mk_quote NONE ``:t``
-val quote_t_aux_def = save_thm("quote_t_aux_def",quote_t_aux_def |> REWRITE_RULE[GSYM quote_list_is_aux,ETA_AX])
+val quote_t_aux_def = save_thm("quote_t_aux_def",
+    quote_t_aux_def |> REWRITE_RULE[GSYM quote_list_is_aux,ETA_AX])
 
 val (quote_spec_aux_def,quote_spec_def) = mk_quote NONE ``:spec``
 val (quote_option_aux_def,quote_option_def) = mk_quote (SOME(["q"],["t"])) ``:'a option``
@@ -53,7 +56,7 @@ val (quote_lit_aux_def,quote_lit_def) = mk_quote NONE ``:lit``
 val _ = mk_quote_tac := (wf_rel_tac `measure pat_size` \\ gen_tac \\ Induct \\ rw[astTheory.pat_size_def]
                                    \\ simp[] \\ res_tac \\ simp[])
 val (quote_pat_aux_def,quote_pat_def) = mk_quote NONE ``:pat``
-val quote_pat_aux_def = save_thm("quote_t_aux_def",quote_pat_aux_def |> REWRITE_RULE[GSYM quote_list_is_aux,ETA_AX])
+val quote_pat_aux_def = save_thm("quote_pat_aux_def",quote_pat_aux_def |> REWRITE_RULE[GSYM quote_list_is_aux,ETA_AX])
 
 val (quote_opn_aux_def,quote_opn_def) = mk_quote NONE ``:opn``
 val (quote_opb_aux_def,quote_opb_def) = mk_quote NONE ``:opb``
