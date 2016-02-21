@@ -135,12 +135,13 @@ fun mk_quote vnames ty =
     val lhses = b |> map (lhs o snd o strip_forall)
                   |> map (subst [v|->quote_ty_aux_applied])
     val inner_ty = quote_type_to_deep table ty
+    val current_quote = mk_pair(quote_ty_aux_applied, inner_ty)
     fun mk_rhs l =
     (*
       val l = el 3 lhses
       val tm = rand l
     *)
-      quote_term_to_deep table (mk_pair(quote_ty_aux_applied, inner_ty)) (ty,quote_ty_aux_applied) (rand l)
+      quote_term_to_deep table current_quote (ty,quote_ty_aux_applied) (rand l)
     val eqs = map (fn l => mk_eq(l,mk_rhs l |> term_rewrite (!aux_rws))) lhses
     val aux_def = Define [ANTIQUOTE(list_mk_conj eqs)]
                   handle HOL_ERR _ => tDefine (quote_ty_name^"_def") [ANTIQUOTE(list_mk_conj eqs)] (!mk_quote_tac)
