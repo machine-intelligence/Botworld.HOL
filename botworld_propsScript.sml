@@ -1499,7 +1499,7 @@ val lemmaB = Q.store_thm("lemmaB",
     \\ metis_tac[steph_focal_clock,IN_DEF] )
   \\ fs[] );
 
-open quoteLib
+open botworld_quoteTheory basicReflectionLib
 
 val no_ffi_op_def = Define`
   (no_ffi_op (FFI n) ⇔ (n ≠ 2)) ∧
