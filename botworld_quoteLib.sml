@@ -143,9 +143,8 @@ fun mk_quote vnames ty =
     *)
       quote_term_to_deep table current_quote (ty,quote_ty_aux_applied) (rand l)
     val eqs = map (fn l => mk_eq(l,mk_rhs l |> term_rewrite (!aux_rws))) lhses
-    val aux_def = Define [ANTIQUOTE(list_mk_conj eqs)]
+    val aux_def = with_flag (ERR_to_string,K"") (trace ("auto Defn.tgoal",0) Define) [ANTIQUOTE(list_mk_conj eqs)]
                   handle HOL_ERR _ => tDefine (quote_ty_name^"_def") [ANTIQUOTE(list_mk_conj eqs)] (!mk_quote_tac)
-                                      before ignore (proofManagerLib.drop())
     val quote_ty = mk_var(quote_ty_name,
                               if null tyvs then
                                 mk_prod(type_of quote_ty_aux,type_ty)
