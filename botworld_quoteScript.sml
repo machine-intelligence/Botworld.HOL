@@ -42,12 +42,13 @@ val quote_int_aux_def = Define `quote_int_aux i = if i < 0i
                                                   else Comb ^(term_to_deep ``int_of_num``) (FST quote_num (Num i))`
 val quote_int_def = Define `quote_int = (quote_int_aux, ^(type_to_deep ``:int``))`
 
-val quote_lit = Define `quote_lit = (ARB:lit->term,ARB:type) (* TODO *)`
+val quote_word8_aux_def = Define`quote_word8_aux (w:word8) =
+  Comb ^(term_to_deep``w2n:word8->num``) (FST quote_num (w2n w))`;
+val quote_word8_def = Define`quote_word8 = (quote_word8_aux,^(type_to_deep``:word8``))`;
 
-(* val quote_word_aux_def = Define `quote_word_aux ((q:'a -> term),t) (w:'a word) = Comb (Const (strlit "n2w") *)
-(*     (Fun Num (Tyapp (strlit "cart") [Bool; t]))) (FST quote_num (w2n w))` *)
-(* val quote_word_def = Define `quote_word (q,t) = (quote_word_aux (q,t) , type)` *)
-(* val _ = overload_on("quote_word8",``) *)
+val _ = special_quoters := (``:word8``,``FST quote_word8``) :: !special_quoters;
+
+val (quote_lit_aux_def,quote_lit_def) = mk_quote NONE ``:lit``
 
 val _ = mk_quote_tac := (wf_rel_tac `measure pat_size` \\ gen_tac \\ Induct \\ rw[astTheory.pat_size_def]
                                    \\ simp[] \\ res_tac \\ simp[])

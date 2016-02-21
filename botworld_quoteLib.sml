@@ -28,7 +28,10 @@ quote_foo : (('a -> term) # type) -> (('a foo -> term) # type)
 quote_bar : ((('a -> term) # type), (('b -> term) # type)) -> ((('a, 'b) bar -> term) # type)
 *)
 
+val special_quoters = ref ([]:(hol_type * term)list);
+
 fun quoter table (current_quote_ty,current_ty) ty =
+  case assoc (!special_quoters) ty of SOME q => q | NONE =>
   let
     val (tyop,argl) = dest_type ty
     fun get_qt a =
