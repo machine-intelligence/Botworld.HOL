@@ -154,8 +154,18 @@ val _ = overload_on("quote_prog",``quote_list quote_top``);
 
 val (quote_privateData_aux_def,quote_privateData_def) = mk_quote NONE ``:privateData``
 
-val quote_event_def = Define`
-  quote_event = (ARB:event->term,ARB:type) (* TODO *)`;
+val (quote_frame_aux_def,quote_frame_def) = mk_quote NONE ``:frame``;
+val (quote_cargo_aux_def,quote_cargo_def) = mk_quote NONE ``:cargo``;
+val (quote_item_aux_def,quote_item_def) = mk_quote NONE ``:item``;
+val (quote_itemCache_aux_def,quote_itemCache_def) = mk_quote NONE ``:itemCache``;
+
+val (quote_bool_aux_def,quote_bool_def) = mk_quote NONE ``:bool``;
+
+val (quote_robot_aux_def,quote_robot_def) = mk_quote NONE ``:robot``;
+
+val (quote_action_aux_def,quote_action_def) = mk_quote NONE ``:action``;
+
+val (quote_event_aux_def,quote_event_def) = mk_quote NONE ``:event``;
 
 val _ = overload_on("quote_observation",
     ``quote_prod (quote_num,(quote_prod (quote_event,quote_privateData)))``);
