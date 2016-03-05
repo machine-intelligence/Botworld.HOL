@@ -78,14 +78,7 @@ val LENGTH_FILTER_EQ = Q.store_thm("LENGTH_FILTER_EQ",
    ⇒ LENGTH (FILTER P l1) = LENGTH (FILTER P l2)`,
   Induct \\ simp[LENGTH_NIL_SYM]
   \\ gen_tac \\ Cases \\ simp[]
-  \\ strip_tac
-  \\ first_assum(qspec_then`0`mp_tac)
-  \\ simp_tac(srw_ss())[] \\ strip_tac
-  \\ IF_CASES_TAC \\ simp[]
-  \\ first_x_assum(match_mp_tac o MP_CANON)
-  \\ simp[] \\ qx_gen_tac`i` \\ strip_tac
-  \\ first_x_assum(qspec_then`SUC i`mp_tac)
-  \\ simp[]);
+  \\ metis_tac[LESS_MONO_EQ,EL_restricted,HD,prim_recTheory.LESS_0,LENGTH]);
 
 (* -- *)
 
