@@ -248,7 +248,7 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
       asm_exists_tac >> simp[] >>
       intLib.COOPER_TAC ) >>
     qpat_assum`Abbrev (nb = _)` kall_tac >>
-    rw[event_def] >>
+    srw_tac[][event_def] >>
     `∀f g. MAP (if_focal f ## map_inspected g) immigrations = immigrations` by (
       unabbrev_all_tac >> simp[MAP_EQ_ID] >>
       simp[MEM_FLAT,MEM_GENLIST,PULL_EXISTS] >> rw[] >>
@@ -368,7 +368,7 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
     every_case_tac >> fs[] >>
     fs[wf_state_with_hole_def,FLOOKUP_DEF] >>
     metis_tac[]) >>
-  rw[event_def] >>
+  srw_tac[][event_def] >>
   `∀g. MAP (if_focal f ## map_inspected g) immigrations' = immigrations` by (
     gen_tac >>
     map_every qunabbrev_tac[`immigrations'`,`immigrations`] >>
@@ -451,7 +451,7 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
 
 val runMachine_focal = Q.store_thm("runMachine_focal[simp]",
   `(runMachine x).focal ⇔ (SND x).focal`,
-  Cases_on`x`>>rw[runMachine_def]>>rw[]);
+  Cases_on`x`>>srw_tac[][runMachine_def]>>rw[]);
 
 val prepare_focal = Q.store_thm("prepare_focal[simp]",
   `(SND (prepare x y)).focal ⇔ (FST(SND y)).focal`,
