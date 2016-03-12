@@ -1205,6 +1205,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
       \\ match_mp_tac LENGTH_FILTER_EQ
       \\ simp[]
       \\ simp[EL_MAP,UNCURRY] )
+    \\ qmatch_assum_rename_tac `FLOOKUP events coord = SOME ev`
     \\ fs[Abbr`ls'`,EL_MAP]
     \\ simp[Abbr`ls`]
     \\ simp[MAP_MAP_o,o_DEF,MEM_MAP,PULL_EXISTS]
@@ -1235,7 +1236,23 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
       \\ simp[Abbr`P`,Abbr`f`,o_DEF,UNCURRY]
       \\ simp[MEM_MAP,PULL_EXISTS,MAP_MAP_o,o_DEF,MAP_GENLIST,UNCURRY] )
     \\ fs[Abbr`ll`,EL_MAP]
-    \\ cheat )
+    \\ Cases_on `prepare ev (EL i (FILTER P ls))` \\ simp[UNCURRY, Once runMachine_def]
+    \\ qpat_abbrev_tac `ir = EL _ (FILTER _ _)` \\ PairCases_on `ir`
+    \\ pop_assum mp_tac \\ simp[markerTheory.Abbrev_def] \\ disch_then (assume_tac o SYM)
+    \\ simp[Abbr`f`, prepare_def]
+    \\ rw[] 
+    >- (
+      rw[runMachine_def]
+      \\ rpt(rator_x_assum`run_policy`mp_tac)
+      \\ `ir1.focal` 
+      by (
+        qpat_assum `FLOOKUP _ coord = _` mp_tac 
+        \\ simp[FLOOKUP_o_f] \\ rw[]
+        \\ qpat_assum `_.focal` mp_tac \\ simp[computeSquare_def]
+        \\ fs[MEM_MAP,PULL_EXISTS] \\ simp[EL_MAP] \\ fs[prepare_def])
+      \\ simp[if_focal_def, robot_component_equality]
+      \\ fs[prepare_def] \\ rveq \\ fs[] \\ cheat)
+    \\ cheat)
   \\ simp[computeSquare_def]
   \\ cheat);
 
