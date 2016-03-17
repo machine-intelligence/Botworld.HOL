@@ -78,14 +78,7 @@ val LENGTH_FILTER_EQ = Q.store_thm("LENGTH_FILTER_EQ",
    ⇒ LENGTH (FILTER P l1) = LENGTH (FILTER P l2)`,
   Induct \\ simp[LENGTH_NIL_SYM]
   \\ gen_tac \\ Cases \\ simp[]
-  \\ strip_tac
-  \\ first_assum(qspec_then`0`mp_tac)
-  \\ simp_tac(srw_ss())[] \\ strip_tac
-  \\ IF_CASES_TAC \\ simp[]
-  \\ first_x_assum(match_mp_tac o MP_CANON)
-  \\ simp[] \\ qx_gen_tac`i` \\ strip_tac
-  \\ first_x_assum(qspec_then`SUC i`mp_tac)
-  \\ simp[]);
+  \\ metis_tac[LESS_MONO_EQ,EL_restricted,HD,prim_recTheory.LESS_0,LENGTH]);
 
 (* -- *)
 
@@ -255,7 +248,7 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
       asm_exists_tac >> simp[] >>
       intLib.COOPER_TAC ) >>
     qpat_assum`Abbrev (nb = _)` kall_tac >>
-    rw[event_def] >>
+    srw_tac[][event_def] >>
     `∀f g. MAP (if_focal f ## map_inspected g) immigrations = immigrations` by (
       unabbrev_all_tac >> simp[MAP_EQ_ID] >>
       simp[MEM_FLAT,MEM_GENLIST,PULL_EXISTS] >> rw[] >>
@@ -375,7 +368,7 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
     every_case_tac >> fs[] >>
     fs[wf_state_with_hole_def,FLOOKUP_DEF] >>
     metis_tac[]) >>
-  rw[event_def] >>
+  srw_tac[][event_def] >>
   `∀g. MAP (if_focal f ## map_inspected g) immigrations' = immigrations` by (
     gen_tac >>
     map_every qunabbrev_tac[`immigrations'`,`immigrations`] >>
@@ -458,7 +451,7 @@ val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_poli
 
 val runMachine_focal = Q.store_thm("runMachine_focal[simp]",
   `(runMachine x).focal ⇔ (SND x).focal`,
-  Cases_on`x`>>rw[runMachine_def]>>rw[]);
+  Cases_on`x`>>srw_tac[][runMachine_def]>>rw[]);
 
 val prepare_focal = Q.store_thm("prepare_focal[simp]",
   `(SND (prepare x y)).focal ⇔ (FST(SND y)).focal`,
