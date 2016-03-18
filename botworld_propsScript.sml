@@ -1113,12 +1113,19 @@ val isMovedOut_map_inspected = Q.store_thm("isMovedOut_map_inspected[simp]",
   `isMovedOut (map_inspected f x) = isMovedOut x`,
   Cases_on`x` \\ simp[]);
 
+val steph_focal_clock = Q.store_thm("steph_focal_clock",
+  `wf_state_with_hole s ∧
+   steph c s = SOME (obs,s') ⇒
+   (get_focal_robot s).processor = (get_focal_robot s').processor`,
+  cheat);
+
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
    steph c s = SOME (obs,s') ∧
    run_policy p (get_focal_robot s).processor obs = (c',p')
    ⇒
    step (fill (with_policy c p) s) = fill (with_policy c' p') s'`,
+
   rw[wf_state_with_hole_def,fill_def,get_focal_robot_def,step_def,steph_def] >>
   `Abbrev(sq = s.state ' s.focal_coordinate)` by (
     fs[FLOOKUP_DEF,markerTheory.Abbrev_def] ) >> simp[] >>
@@ -1244,16 +1251,17 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
         \\ qpat_assum `_.focal` mp_tac \\ simp[computeSquare_def]
         \\ fs[MEM_MAP,PULL_EXISTS] \\ simp[EL_MAP] \\ fs[prepare_def])
       \\ simp[if_focal_def, robot_component_equality]
-      \\ fs[prepare_def] \\ rveq \\ fs[] \\ cheat)
+      \\ fs[prepare_def] \\ rveq \\ fs[]
+
+      \\ `EL ir0 ras = (ir1,ir2) /\ ir0 < LENGTH ras` by (
+          `MEM (ir0,ir1,ir2) (FILTER P ls)` by (metis_tac[MEM_EL])
+          \\ fs[Abbr`ls`, MEM_FILTER, MEM_EL] \\ rfs[EL_GENLIST])
+      \\ cheat
+    )
     \\ cheat)
   \\ simp[computeSquare_def]
   \\ cheat);
 
-val steph_focal_clock = Q.store_thm("steph_focal_clock",
-  `wf_state_with_hole s ∧
-   steph c s = SOME (obs,s') ⇒
-   (get_focal_robot s).processor = (get_focal_robot s').processor`,
-   cheat);
 
 (* sv theorem *)
 
