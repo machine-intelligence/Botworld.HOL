@@ -179,7 +179,7 @@ val prepare_def = Define`
 val run_policy_def = Define`
   run_policy policy clock obs =
     let ffi = ffi_from_observation obs in
-    let (st,env) = THE (basis_sem_env ffi) in
+    let (st,env) = THE (prim_sem_env ffi) in
     let (st',c,res) = evaluate_prog (st with clock := clock) env policy in
     st'.ffi.ffi_state.bot_output`;
 
