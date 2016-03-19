@@ -58,7 +58,37 @@ val res = translate (
   |> SIMP_RULE std_ss [FUN_EQ_THM,combinTheory.o_DEF]
   );
 
-val res = translate decode_observation_def;
+open patternMatchesLib
+
+(* TODO: these don't work...
+
+val res = translate (
+  fromSexpTheory.sexppair_def
+  |> CONV_RULE (STRIP_QUANT_CONV(RAND_CONV PMATCH_INTRO_CONV))
+  )
+
+val res = translate fromSexpTheory.odestSXNUM_def;
+
+val res = translate optionTheory.OPTION_BIND_def;
+
+val sexplist_alt = Q.prove(
+  `∀p s. sexplist p s =
+    PMATCH s
+    [PMATCH_ROW (λ(h,t). SX_CONS h t) (λ(h,t). T) (λ(h,t). OPTION_BIND (p h) (λph. OPTION_BIND (sexplist p t) (λpt. SOME (ph::pt))));
+     PMATCH_ROW (λ(). SX_SYM "nil") (λ(). T) (λ(). SOME []);
+     PMATCH_ROW (λ_. _) (λ_. T) (λ_. NONE)]`,
+  rw[Once fromSexpTheory.sexplist_def]
+  \\ BasicProvers.CASE_TAC
+  \\ fsrw_tac[PMATCH_SIMP_ss][] \\ rw[]
+  \\ fsrw_tac[PMATCH_SIMP_ss][]);
+
+val res = translate sexplist_alt;
+
+val res = translate (
+  decode_observation_def
+  |> SIMP_RULE std_ss [FUN_EQ_THM,combinTheory.o_DEF]
+  );
+*)
 
 (* preamble declarations *)
 
@@ -96,7 +126,7 @@ val get_input_length_dec_def = Define`
   get_input_length_dec =
     Dlet(Pvar "get_input_length")
     (Fun "x"
-      (Letrec [("f","n", 
+      (Letrec [("f","n",
                 (Let (SOME "bs") (App Aw8alloc [Var(Short"n")])
                 (Let NONE (App (FFI 0) (Var(Short"bs"))))
                 (Mat (App Opapp [App Opapp [Var(Long "Botworld" "output_length_rec"); Var(Short"bs")]; Var(Short "n")])
@@ -108,7 +138,7 @@ val get_input_length_dec_def = Define`
 val read_observation_dec_def = Define`
   read_observation_dec =
     Dlet (Pvar "read_observation")
-      (Fun "x" 
+      (Fun "x"
            (Let (SOME "bs") (App Aw8alloc [App Opapp [Var(Short"get_input_length"); Var(Short"x")]]))
            (Let NONE (App (FFI 1) [Var(Short"bs")]))
            (App Opapp [Var(Long "Botworld" "decode_observation"); App Opapp [Var(Long "ByteArray" "toList") ; Var(Short"bs")]])
@@ -118,4 +148,3 @@ val read_observation_dec_def = Define`
 val _ = Feedback.set_trace "TheoryPP.include_docs" 0;
 
 val _ = export_theory();
-

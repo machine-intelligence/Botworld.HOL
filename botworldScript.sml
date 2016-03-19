@@ -1,5 +1,5 @@
 open HolKernel Parse boolLib bossLib realTheory lcsymtacs
-open botworld_dataTheory botworld_serialiseTheory
+open botworld_dataTheory botworld_serialiseTheory botworld_preambleTheory
 open terminationTheory initialProgramTheory
 
 (* TODO: initialProgram should be imported by termination *)
