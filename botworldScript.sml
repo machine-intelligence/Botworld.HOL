@@ -308,7 +308,7 @@ val term_to_deep = Define`
 (* -- *)
 
 val sv_def = Define`
-  sv l Stm utm π σ 
+  sv l Stm utm π σ =
     (* assumes preamble gets run by botworld, defining all the requisite types *)
     (* preamble also includes helper functions:
        Botworld.read_observation : unit -> observation
