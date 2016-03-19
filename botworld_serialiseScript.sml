@@ -11,7 +11,7 @@ val _ = temp_overload_on ("lift", ``OPTION_MAP``)
 val _ = temp_overload_on ("guard", ``λb m. monad_unitbind (assert b) m``)
 val _ = temp_overload_on ("sexpnum", ``odestSXNUM``)
 
-(* decoding from sexp to command and policy *)
+(* decoding from sexp *)
 
 val sexpframe_def = Define`
   sexpframe s =
@@ -119,10 +119,9 @@ val sexpoutput_def = Define`
   sexpoutput = sexppair sexpcommand (sexplist sexptop)`;
 
 val sexpitemCache_def = Define`
-  sexpitemCache s = do (com,pos) <- sexppair (sexplist sexpitem) (sexplist sexpitem) s
+  sexpitemCache s = do (com,pos) <- sexppair (sexplist sexpitem) (sexplist sexpitem) s;
                        return <| components := com ; possessions := pos |>
-                    od
-`;
+                    od`;
 
 val sexpprivateData_def = Define`
   sexpprivateData s = do (nm,args) <- dstrip_sexp s;
@@ -133,15 +132,14 @@ val sexpprivateData_def = Define`
                          guard (nm = "pInspected" ∧ LENGTH args = 2)
                                (lift2 pInspected (sexpnum (EL 0 args))
                                                  (sexplist sexptop (EL 1 args)))
-                      od
-`;
+                      od`;
 
 val sexpevent_def = Define`
 sexpevent s = do (ras,unt,drop,fall) <- sexppair (sexplist (sexppair sexprobot sexpaction))
                  (sexppair (sexplist sexpitem)
                            (sexppair (sexplist sexpitem)
                                      (sexplist sexpitemCache))) s ;
-                  return <| robotActions := ras; untouchedItems := unt; droppedItems := drop; fallenItems := fall |> 
+                  return <| robotActions := ras; untouchedItems := unt; droppedItems := drop; fallenItems := fall |>
               od
 `;
 
@@ -155,13 +153,13 @@ val decode_observation_def = Define`
     sexpobservation s
   od`;
 
-val decode_def = Define`
-  decode (bytes:word8 list) = do
+val decode_output_def = Define`
+  decode_output (bytes:word8 list) = do
     s <- parse_sexp (MAP (CHR o w2n) bytes);
     sexpoutput s
   od`;
 
-(* encoding from observation to sexp *)
+(* encoding to sexp *)
 
 val framesexp_def = Define`
   framesexp f =
@@ -239,8 +237,8 @@ val observationsexp_def = Define`
 val outputsexp_def = Define`
   outputsexp (c,p) = SX_CONS (commandsexp c) (listsexp (MAP topsexp p))`;
 
-val encode_def = Define`
-  (encode:observation -> word8 list) =
+val encode_observation_def = Define`
+  (encode_observation:observation -> word8 list) =
     MAP (n2w o ORD) o print_sexp o observationsexp`;
 
 val encode_output_def = Define`
@@ -256,7 +254,7 @@ val _ = Datatype`
 
 val botworld_get_input_length_def = Define`
   botworld_get_input_length st bytes =
-    let n = LENGTH (encode st.bot_input) in
+    let n = LENGTH (encode_observation st.bot_input) in
     let s = print_sexp (SX_NUM n) in
     if LENGTH bytes ≤ LENGTH s then
       Oracle_return st (MAP (K (0w:word8)) bytes)
@@ -265,13 +263,13 @@ val botworld_get_input_length_def = Define`
 
 val botworld_read_def = Define`
   botworld_read st bytes =
-    let bytes' = encode st.bot_input in
+    let bytes' = encode_observation st.bot_input in
     if LENGTH bytes < LENGTH bytes' then Oracle_fail else
       Oracle_return st (bytes' ++ (GENLIST (K 0w) (LENGTH bytes - LENGTH bytes')))`;
 
 val botworld_write_def = Define`
   botworld_write st bytes =
-    case decode bytes of
+    case decode_output bytes of
     | SOME output => Oracle_return (st with bot_output := output) bytes
     | NONE => Oracle_return st bytes`;
 
