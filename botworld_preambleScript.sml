@@ -117,10 +117,10 @@ val write_output_dec_def = Define`
               App Opapp [Var(Long"Botworld""encode_output");Var(Short"x")]]]))`;
 
 val output_length_rec_def = Define`
-    output_length_rec bs n = if EVERY (λb. b = 0w) bs
-                             then INL (2 * n)
-                             else INR do p <- parse_sexp (MAP (CHR o w2n) bs) ; odestSXNUM p od
-`
+    output_length_rec bs n =
+      if EVERY (λb. b = 0w) bs
+      then INL (2 * n)
+      else INR (OPTION_BIND (parse_sexp (MAP (CHR o w2n) bs)) odestSXNUM)`;
 
 val get_input_length_dec_def = Define`
   get_input_length_dec =
@@ -128,22 +128,19 @@ val get_input_length_dec_def = Define`
     (Fun "x"
       (Letrec [("f","n",
                 (Let (SOME "bs") (App Aw8alloc [Var(Short"n")])
-                (Let NONE (App (FFI 0) (Var(Short"bs"))))
+                (Let NONE (App (FFI 0) [Var(Short"bs")])
                 (Mat (App Opapp [App Opapp [Var(Long "Botworld" "output_length_rec"); Var(Short"bs")]; Var(Short "n")])
                      [(Pcon (SOME(Short "inl")) [Pvar "n"], App Opapp [Var(Short"f"); Var(Short"n")] )
                      ;(Pcon (SOME(Short "inr")) [Pcon (SOME(Short "some")) [Pvar "len"]], Var(Short"len"))
-                     ])))] (App Opapp [Var(Short "f") ; Lit(IntLit 1)])))
-`
+                     ]))))] (App Opapp [Var(Short "f") ; Lit(IntLit 1)])))`
 
 val read_observation_dec_def = Define`
   read_observation_dec =
     Dlet (Pvar "read_observation")
       (Fun "x"
-           (Let (SOME "bs") (App Aw8alloc [App Opapp [Var(Short"get_input_length"); Var(Short"x")]]))
-           (Let NONE (App (FFI 1) [Var(Short"bs")]))
-           (App Opapp [Var(Long "Botworld" "decode_observation"); App Opapp [Var(Long "ByteArray" "toList") ; Var(Short"bs")]])
-)
-`
+           (Let (SOME "bs") (App Aw8alloc [App Opapp [Var(Short"get_input_length"); Var(Short"x")]])
+           (Let NONE (App (FFI 1) [Var(Short"bs")])
+           (App Opapp [Var(Long "Botworld" "decode_observation"); App Opapp [Var(Long "ByteArray" "toList") ; Var(Short"bs")]]))))`
 
 val _ = Feedback.set_trace "TheoryPP.include_docs" 0;
 
