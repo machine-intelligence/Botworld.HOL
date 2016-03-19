@@ -10,6 +10,15 @@ val _ = translate_into_module "Botworld";
 val _ = std_preludeLib.std_prelude();
 
 (* TODO: want a version of sexp that uses mlstring rather than string *)
+(* more precisely, here are some example steps to follow:
+   1. Define a copy of sexp (from $HOLDIR/examples/formal-languages/context-free/simpleSexpScript.sml
+      that uses mlstring instead of string
+   2. Define conversions between old sexp and new sexp (mlstringTheory already has the conversions between string and mlstring)
+   3. Prove some rewrite rules?
+   4. Apply some transformations (either rewrites, or automatic definitions of
+      new constants if necessary...) to the below definitions, so that the
+      translator sees mlstring.
+*)
 
 val res = translate simpleSexpTheory.strip_sxcons_def;
 val res = translate simpleSexpParseTheory.print_space_separated_def;

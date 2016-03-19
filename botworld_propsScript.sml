@@ -1599,6 +1599,38 @@ val sv_thm = Q.store_thm("sv_thm",
   \\ first_x_assum match_mp_tac
   \\ simp[]);
 
+(* TODO:
+
+Benja:  "let's say you have a program P which calls the inner HOL kernel through the module interface. if you initialize the inner HOL kernel with a context ctxt, and then do arbitrary stuff, and then end up with a thm value whose conclusion is X, such that X is syntactically valid in ctxt, then ctxt |- X"
+hm
+or:
+ me:  some extension of ctxt
+oh
+you had the "syntactically valid" bit - sorry
+hmm, we have not proved conservativity though
+ Benja:  "then there is some definitional extension ctxt' of ctxt such that ctxt |- X"
+hm
+ me:  yes, that is easier
+(ctxt' though)
+ Benja:  right
+ me:  we have conservativity at the semantic level
+just not syntactically (like what your first version implied)
+ Benja:  ah, good I think. can you say what the theorem about conservativity is?
+like, ctxt' |= X ==> ctxt |= X?
+ me:  yes
+provided X is good in ctxt
+ Benja:  right
+ me:  and ctxt' extends ctxt
+ Benja:  that should be enough
+yep
+ me:  so, this theorem you've described sounds like a good way to encapsulate this
+it's a subproject of its own to prove that
+but it's plausible that something like it is true, based on our work so far
+ Benja:  right
+ me:  indeed stating the theorem as we need it for our project could be a good way of setting a target for what the CakeML/Candle project needs to achieve
+ Benja:  agree!
+ *)
+
 (*
 val set_policy_def = Define`
   set_policy r i ps =
