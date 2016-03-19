@@ -118,6 +118,43 @@ val sexpaction_def = Define`
 val sexpoutput_def = Define`
   sexpoutput = sexppair sexpcommand (sexplist sexptop)`;
 
+val sexpitemCache_def = Define`
+  sexpitemCache s = do (com,pos) <- sexppair (sexplist sexpitem) (sexplist sexpitem) s
+                       return <| components := com ; possessions := pos |>
+                    od
+`;
+
+val sexpprivateData_def = Define`
+  sexpprivateData s = do (nm,args) <- dstrip_sexp s;
+                         guard (nm = "pInvalid" ∧ args = [])
+                               (return pInvalid) ++
+                         guard (nm = "pNothing" ∧ args = [])
+                               (return pNothing) ++
+                         guard (nm = "pInspected" ∧ LENGTH args = 2)
+                               (lift2 pInspected (sexpnum (EL 0 args))
+                                                 (sexplist sexptop (EL 1 args)))
+                      od
+`;
+
+val sexpevent_def = Define`
+sexpevent s = do (ras,unt,drop,fall) <- sexppair (sexplist (sexppair sexprobot sexpaction))
+                 (sexppair (sexplist sexpitem)
+                           (sexppair (sexplist sexpitem)
+                                     (sexplist sexpitemCache))) s ;
+                  return <| robotActions := ras; untouchedItems := unt; droppedItems := drop; fallenItems := fall |> 
+              od
+`;
+
+val sexpobservation_def = Define`
+  sexpobservation = sexppair sexpnum (sexppair sexpevent sexpprivateData)
+`;
+
+val decode_observation_def = Define`
+  decode_observation (bytes:word8 list) = do
+    s <- parse_sexp (MAP (CHR o w2n) bytes);
+    sexpobservation s
+  od`;
+
 val decode_def = Define`
   decode (bytes:word8 list) = do
     s <- parse_sexp (MAP (CHR o w2n) bytes);

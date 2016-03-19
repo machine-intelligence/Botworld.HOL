@@ -305,38 +305,10 @@ val level_to_deep = Define`
 val term_to_deep = Define`
   term_to_deep (t:term) = (ARB:exp) (* TODO *)`;
 
-(* preamble declarations *)
-
-(* List.length should be obtained from translator *)
-
-val ByteArrayFromList_dec_def = Define`
-  ByteArrayFromList_dec =
-    Dlet(Pvar"fromList")
-      (Fun "ls"
-         (Let (SOME "a") (App Aw8alloc [App Opapp [Var(Long"List""length");Var(Short"ls")]])
-            (Letrec [("f","ls",Fun "i" (Mat (Var(Short"ls"))
-              [(Pcon(SOME(Short"nil"))[],Var(Short"a"))
-              ;(Pcon(SOME(Short"::"))[Pvar"h";Pvar"t"],
-                  Let NONE (App Aw8update [Var(Short"a");Var(Short"i");Var(Short"h")])
-                    (App Opapp [App Opapp [Var(Short"f");Var(Short"t")];
-                                App (Opn Plus) [Var(Short"i");Lit(IntLit 1)]]))]))]
-              (App Opapp [App Opapp [Var(Short"f");Var(Short"ls")];Lit(IntLit 0)]))))`;
-
-(* encode_output_dec obtained by translating botworld_serialiseTheory.encode_output_def *)
-
-val write_output_dec_def = Define`
-  write_output_dec =
-    Dlet(Pvar"write_output")
-      (Fun "x"
-        (App (FFI 2)
-          [App Opapp
-             [Var(Long"ByteArray""fromList");
-              App Opapp [Var(Long"Botworld""encode_output");Var(Short"x")]]]))`;
-
 (* -- *)
 
 val sv_def = Define`
-  sv l Stm utm π σ =
+  sv l Stm utm π σ 
     (* assumes preamble gets run by botworld, defining all the requisite types *)
     (* preamble also includes helper functions:
        Botworld.read_observation : unit -> observation
