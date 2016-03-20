@@ -1117,7 +1117,10 @@ val steph_focal_clock = Q.store_thm("steph_focal_clock",
   `wf_state_with_hole s ∧
    steph c s = SOME (obs,s') ⇒
    (get_focal_robot s).processor = (get_focal_robot s').processor`,
-  cheat);
+  rw[steph_def]
+  \\ split_pair_tac \\ fs[]
+  \\ rw[get_focal_robot_def]
+  \\ cheat);
 
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
@@ -1125,7 +1128,6 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
    run_policy p (get_focal_robot s).processor obs = (c',p')
    ⇒
    step (fill (with_policy c p) s) = fill (with_policy c' p') s'`,
-
   rw[wf_state_with_hole_def,fill_def,get_focal_robot_def,step_def,steph_def] >>
   `Abbrev(sq = s.state ' s.focal_coordinate)` by (
     fs[FLOOKUP_DEF,markerTheory.Abbrev_def] ) >> simp[] >>
@@ -1240,28 +1242,75 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
     \\ qpat_abbrev_tac `ir = EL _ (FILTER _ _)` \\ PairCases_on `ir`
     \\ pop_assum mp_tac \\ simp[markerTheory.Abbrev_def] \\ disch_then (assume_tac o SYM)
     \\ simp[Abbr`f`, prepare_def]
-    \\ rw[] 
+    \\ reverse(rw[])
     >- (
-      rw[runMachine_def]
-      \\ rpt(rator_x_assum`run_policy`mp_tac)
-      \\ `ir1.focal` 
-      by (
-        qpat_assum `FLOOKUP _ coord = _` mp_tac 
-        \\ simp[FLOOKUP_o_f] \\ rw[]
-        \\ qpat_assum `_.focal` mp_tac \\ simp[computeSquare_def]
-        \\ fs[MEM_MAP,PULL_EXISTS] \\ simp[EL_MAP] \\ fs[prepare_def])
-      \\ simp[if_focal_def, robot_component_equality]
-      \\ fs[prepare_def] \\ rveq \\ fs[]
-
-      \\ `EL ir0 ras = (ir1,ir2) /\ ir0 < LENGTH ras` by (
-          `MEM (ir0,ir1,ir2) (FILTER P ls)` by (metis_tac[MEM_EL])
-          \\ fs[Abbr`ls`, MEM_FILTER, MEM_EL] \\ rfs[EL_GENLIST])
-      \\ cheat
-    )
+      AP_TERM_TAC \\ simp[]
+      \\ simp[if_focal_def]
+      \\ IF_CASES_TAC \\ fs[]
+      >- (
+        first_x_assum drule
+        \\ simp[]
+        \\ qpat_assum`FLOOKUP (_ o_f _) _ = _`mp_tac
+        \\ simp[FLOOKUP_o_f]
+        \\ strip_tac \\ rveq
+        \\ simp[computeSquare_def]
+        \\ simp[EL_MAP]
+        \\ simp[MEM_MAP]
+        \\ disch_then drule
+        \\ simp[] )
+      \\ simp[event_component_equality]
+      \\ simp[MAP_EQ_ID]
+      \\ simp[FORALL_PROD]
+      \\ conj_asm1_tac >- cheat
+      \\ AP_TERM_TAC
+      \\ fsrw_tac[DNF_ss][]
+      \\ match_mp_tac EQ_SYM
+      \\ first_x_assum match_mp_tac
+      \\ `MEM (ir0,ir1,ir2) (FILTER P ls)` by metis_tac[MEM_EL]
+      \\ fs[MEM_FILTER,Abbr`ls`,MEM_GENLIST]
+      \\ fs[MEM_EL]
+      \\ metis_tac[] )
+    \\ rw[runMachine_def]
+    \\ split_pair_tac \\ fs[]
+    \\ rpt(rator_x_assum`run_policy`mp_tac)
+    \\ `ir1.focal`
+    by (
+      qpat_assum `FLOOKUP _ coord = _` mp_tac
+      \\ simp[FLOOKUP_o_f] \\ rw[]
+      \\ qpat_assum `_.focal` mp_tac \\ simp[computeSquare_def]
+      \\ fs[MEM_MAP,PULL_EXISTS] \\ simp[EL_MAP] \\ fs[prepare_def])
+    \\ simp[if_focal_def, robot_component_equality]
+    \\ fs[prepare_def] \\ rveq \\ fs[]
+    \\ `EL ir0 ras = (ir1,ir2) /\ ir0 < LENGTH ras` by (
+        `MEM (ir0,ir1,ir2) (FILTER P ls)` by (metis_tac[MEM_EL])
+        \\ fs[Abbr`ls`, MEM_FILTER, MEM_EL] \\ rfs[EL_GENLIST])
     \\ cheat)
   \\ simp[computeSquare_def]
-  \\ cheat);
-
+  \\ qpat_abbrev_tac`m = MAP (_ ## _)`
+  \\ `m x.robotActions = x.robotActions`
+   by (
+     simp[Abbr`m`,MAP_EQ_ID,FORALL_PROD,FORALL_PROD,FORALL_PROD,FORALL_PROD]
+     \\ qx_genl_tac[`r`,`a`] \\ strip_tac
+     \\ simp[if_focal_def]
+     \\ IF_CASES_TAC \\ simp[]
+     >- (
+       `∃r'. MEM r' (computeSquare x).robots ∧ r'.focal`
+       by (
+         qpat_assum`MEM _ _`mp_tac
+         \\ simp[Once MEM_EL]
+         \\ simp[computeSquare_def,MEM_MAP,MEM_FILTER,MEM_GENLIST,EXISTS_PROD]
+         \\ strip_tac
+         \\ simp[PULL_EXISTS]
+         \\ CONV_TAC(STRIP_QUANT_CONV(lift_conjunct_conv(is_eq)))
+         \\ asm_exists_tac \\ simp[]
+         \\ cheat )
+       \\ first_x_assum(qspec_then`k`mp_tac o CONV_RULE(RESORT_FORALL_CONV(sort_vars["c"])))
+       \\ simp[FLOOKUP_o_f]
+       \\ fs[MEM_EL]
+       \\ metis_tac[] )
+     \\ cheat )
+  \\ `x with robotActions updated_by m = x` by ( simp[event_component_equality] )
+  \\ simp[]);
 
 (* sv theorem *)
 
