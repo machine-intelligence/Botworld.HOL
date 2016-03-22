@@ -20,6 +20,47 @@ val _ = std_preludeLib.std_prelude();
       translator sees mlstring.
 *)
 
+val _ = Datatype `
+  mlsexp = sx_cons mlsexp mlsexp
+         | sx_sym mlstring
+         | sx_num num
+         | sx_str mlstring
+`
+
+val sexp_of_mls_def = Define `
+  sexp_of_mls (sx_cons s1 s2) = SX_CONS (sexp_of_mls s1) (sexp_of_mls s2) ∧
+  sexp_of_mls (sx_sym (strlit s)) = SX_SYM s ∧
+  sexp_of_mls (sx_num n) = SX_NUM n ∧
+  sexp_of_mls (sx_str (strlit s)) = SX_STR s
+`
+
+val mls_of_sexp_def = Define `
+  mls_of_sexp (SX_CONS s1 s2) = sx_cons (mls_of_sexp s1) (mls_of_sexp s2) ∧
+  mls_of_sexp (SX_SYM s) = sx_sym (strlit s) ∧
+  mls_of_sexp (SX_NUM n) = sx_num n ∧
+  mls_of_sexp (SX_STR s) = sx_str (strlit s)
+`
+
+val mls_sexp_inv = Q.prove(
+  `!s. mls_of_sexp (sexp_of_mls s) = s`,
+  rpt Induct >> rw[mls_of_sexp_def,sexp_of_mls_def]
+)
+
+val sexp_mls_inv = Q.prove(
+  `!s. sexp_of_mls (mls_of_sexp s) = s`,
+  rpt Induct >> rw[mls_of_sexp_def,sexp_of_mls_def]
+)
+
+val mlsexp_factors = Q.prove(
+  `!f. ?f'. f = f' o mls_of_sexp`,
+  rw[FUN_EQ_THM] >> qexists_tac `f o sexp_of_mls` >> rw[sexp_mls_inv]
+)
+
+val sexp_factors = Q.prove(
+  `!f. ?f'. f = f' o sexp_of_mls`,
+  rw[FUN_EQ_THM] >> qexists_tac `f o mls_of_sexp` >> rw[mls_sexp_inv]
+)
+
 val res = translate simpleSexpTheory.strip_sxcons_def;
 val res = translate simpleSexpParseTheory.print_space_separated_def;
 val res = translate simpleSexpParseTheory.escape_string_def;
