@@ -58,7 +58,7 @@ val unique_index_filter = Q.store_thm("unique_index_filter",
       fs[MEM_EL] >>
       first_x_assum(qspec_then`SUC n'`mp_tac)>>simp[]) >>
     last_x_assum(qspec_then`n`mp_tac)>>simp[]>>
-    discharge_hyps >- (
+    impl_tac >- (
       rw[] >>
       first_x_assum(qspec_then`SUC j`mp_tac)>>simp[])>>
     rw[] >>
@@ -67,7 +67,7 @@ val unique_index_filter = Q.store_thm("unique_index_filter",
     last_x_assum(qspec_then`0`mp_tac)>>simp[]) >>
   Cases_on`i`>>fs[]>>
   last_x_assum drule >>
-  discharge_hyps >- (
+  impl_tac >- (
     rw[] >>
     first_x_assum(qspec_then`SUC j`mp_tac)>>simp[])>>
   rw[]);
@@ -706,7 +706,7 @@ val focal_preserved = Q.store_thm("focal_preserved",
       metis_tac[MEM_EL,MEM_MAP] ) >>
     qispl_then[`l1`,`s.focal_index`](mp_tac o Q.GEN`R`) unique_index_filter >>
     disch_then(qspec_then`λx. (FST(SND x)).focal`mp_tac) >>
-    discharge_hyps >- (
+    impl_tac >- (
       simp[Abbr`P`,UNCURRY] >>
       conj_tac >- (
         qpat_assum`¬_`mp_tac >> fs[Abbr`l1`] ) >>
@@ -967,7 +967,7 @@ val focal_preserved = Q.store_thm("focal_preserved",
     \\ simp[]) >>
   qispl_then[`l1`,`i`](mp_tac o Q.GEN`R`) unique_index_filter >>
   disch_then(qspec_then`λx. (FST(SND x)).focal`mp_tac) >>
-  discharge_hyps >- simp[] >>
+  impl_tac >- simp[] >>
   strip_tac >> rfs[] >>
   asm_exists_tac >> simp[] >>
   simp[Abbr`R`] >>
@@ -1224,7 +1224,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
     \\ simp[Abbr`l1`]
     \\ qpat_abbrev_tac`ls = GENLIST _ _`
     \\ qispl_then[`I ## f`,`P`,`ls`]mp_tac MAP_FILTER
-    \\ discharge_hyps
+    \\ impl_tac
     >- ( simp[Abbr`P`,Abbr`f`,UNCURRY] )
     \\ disch_then(SUBST_ALL_TAC o SYM)
     \\ qpat_abbrev_tac`ll = MAP (I ## f) _`
@@ -1301,7 +1301,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
          \\ simp[computeSquare_def,MEM_MAP,MEM_FILTER,MEM_GENLIST,EXISTS_PROD]
          \\ strip_tac
          \\ simp[PULL_EXISTS]
-         \\ CONV_TAC(STRIP_QUANT_CONV(lift_conjunct_conv(is_eq)))
+         \\ CONV_TAC(STRIP_QUANT_CONV(move_conj_left(is_eq)))
          \\ asm_exists_tac \\ simp[]
          \\ cheat )
        \\ first_x_assum(qspec_then`k`mp_tac o CONV_RULE(RESORT_FORALL_CONV(sort_vars["c"])))
@@ -1547,7 +1547,7 @@ val lemmaB = Q.store_thm("lemmaB",
   \\ simp[realTheory.pow]
   \\ disch_then(qspec_then`discount u pow n`mp_tac)
   \\ simp[GSYM AND_IMP_INTRO,RIGHT_FORALL_IMP_THM]
-  \\ discharge_hyps
+  \\ impl_tac
   >- (
     match_mp_tac realTheory.POW_POS
     \\ match_mp_tac discount_not_negative
