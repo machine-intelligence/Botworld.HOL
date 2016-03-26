@@ -47,25 +47,30 @@ val fled_def = Define`
 
 val inspectAttempts_def = Define`
   inspectAttempts intents i =
-    LENGTH (FILTER (λc. c = Inspect i) intents)`;
+    LENGTH (FILTER ($= (Inspect i)) intents)`;
 
 val inspectShielded_def = Define`
-  inspectShielded robots i ⇔
-    inspectAttempts (MAP robot_command robots) i ≤
-    LENGTH (FILTER isInspectShield (EL i robots).inventory)`;
+  inspectShielded robots r ⇔
+    inspectAttempts (MAP robot_command robots) r.name ≤
+    LENGTH (FILTER isInspectShield r.inventory)`;
 
 val destroyAttempts_def = Define`
   destroyAttempts intents i =
-    LENGTH (FILTER (λc. c = Destroy i) intents)`;
+    LENGTH (FILTER ($= (Destroy i)) intents)`;
 
 val destroyShielded_def = Define`
-  destroyShielded robots i ⇔
-    destroyAttempts (MAP robot_command robots) i ≤
-    LENGTH (FILTER isDestroyShield (EL i robots).inventory)`;
+  destroyShielded robots r ⇔
+    destroyAttempts (MAP robot_command robots) r.name ≤
+    LENGTH (FILTER isDestroyShield r.inventory)`;
+
+val findRobotInSquare_def = Define`
+  findRobotInSquare n ls = case FILTER ($= n o robot_name) ls of
+                            | [] => NONE
+                            | (r::_) => SOME r
+`
 
 val act_def = Define`
-  act sq nb ri = if ri < LENGTH sq.robots then
-    let r = EL ri sq.robots in
+  act sq nb r =
     case r.command of
     | Move dir =>
       if dir < LENGTH nb then
@@ -82,21 +87,21 @@ val act_def = Define`
         Dropped i
       else Invalid
     | Inspect i =>
-      if i < LENGTH sq.robots then
-        if ¬fled nb (EL i sq.robots).command then
-          if ¬inspectShielded sq.robots i then
-            Inspected i (EL i sq.robots)
-          else InspectBlocked i
-        else InspectTargetFled i
-      else Invalid
+      case findRobotInSquare i sq.robots of
+          NONE => Invalid
+       |  SOME r' => if ¬fled nb r'.command then
+                       if ¬inspectShielded sq.robots r' then
+                         Inspected r'
+                       else InspectBlocked i
+                     else InspectTargetFled i
     | Destroy i =>
-      if i < LENGTH sq.robots then
-        if ¬fled nb (EL i sq.robots).command then
-          if ¬destroyShielded sq.robots i then
-            Destroyed i
-          else DestroyBlocked i
-        else DestroyTargetFled i
-      else Invalid
+      case findRobotInSquare i sq.robots of
+          NONE   => Invalid
+       | SOME r' => if ¬fled nb r'.command then
+                        if ¬destroyShielded sq.robots r' then
+                            Destroyed i
+                        else DestroyBlocked i
+                    else DestroyTargetFled i
     | Build is m =>
       if EVERY (λi. i < LENGTH sq.items) is then
         if ¬EXISTS (contested sq) is then
@@ -105,12 +110,11 @@ val act_def = Define`
           | SOME r => Built is r
         else BuildInterrupted is
       else Invalid
-    | Pass => Passed
-  else Invalid`;
-
+    | Pass => Passed`;
+  
 val localActions_def = Define`
   localActions sq nb =
-    GENLIST (act sq nb) (LENGTH sq.robots)`;
+    MAP (act sq nb) sq.robots`;
 
 val defend_def = Define`
   defend intents i =
@@ -118,14 +122,13 @@ val defend_def = Define`
     dropN (inspectAttempts intents i) isInspectShield`;
 
 val updateInventory_def = Define`
-  updateInventory sq i a =
-    let r = EL i sq.robots in
+  updateInventory sq r a =
     let intents = MAP robot_command sq.robots in
     case a of
     | MovedOut _ => r
-    | Lifted n => r with inventory := (EL n sq.items)::(defend intents i r.inventory)
-    | Dropped n => r with inventory := (defend intents i (remove_indices ($= n) 0 r.inventory))
-    | _ => r with inventory := defend intents i r.inventory`;
+    | Lifted n => r with inventory := (EL n sq.items)::(defend intents r.name r.inventory)
+    | Dropped n => r with inventory := (defend intents r.name (remove_indices ($= n) 0 r.inventory))
+    | _ => r with inventory := defend intents r.name r.inventory`;
 
 val incomingFrom_def = Define`
   (incomingFrom dir NONE = []) ∧
@@ -134,13 +137,12 @@ val incomingFrom_def = Define`
 
 val event_def = Define`
   event sq nb =
-    let actions = localActions sq nb in
-    let veterans = GENLIST (λi. updateInventory sq i (EL i actions)) (LENGTH sq.robots) in
-    let fallen = FLAT (GENLIST (λi. if MEM (Destroyed i) actions then
-                                      [<|components := shatter (EL i veterans)
-                                        ;possessions := (EL i veterans).inventory|>]
-                                    else [])
-                       (LENGTH veterans)) in
+    let actions = localActions sq nb
+    let veterans = MAP (UNCURRY (updateInventory sq)) (ZIP(sq.robots,actions)) in
+    let fallen = FLAT (MAP (λr. if MEM (Destroyed r.name) actions then
+                                      [<|components := shatter r
+                                        ;possessions := r.inventory|>]
+                                    else []) veterans) in
     <| robotActions :=
        let immigrations = FLAT (GENLIST (λi. incomingFrom i (EL i nb)) (LENGTH nb)) in
        let children = FLAT (MAP (λa. case a of Built _ r => [r] | _ => []) actions) in
@@ -173,9 +175,6 @@ val ffi_from_observation_def = Define`
     initial_ffi_state botworld_oracle
       (botworld_initial_state obs)`;
 
-val prepare_def = Define`
-  prepare ev (i,r,a) = ((i, ev, private a), r)`;
-
 val run_policy_def = Define`
   run_policy policy clock obs =
     let ffi = ffi_from_observation obs in
@@ -188,14 +187,17 @@ val runMachine_def = Define`
     let (command,prog) = run_policy r.memory r.processor obs in
     r with <| command := command; memory := prog |>`;
 
+val prepare_def = Define`
+  prepare ev (r,a) = ((r.name, ev, private a), r)
+`
+
 val computeSquare_def = Define`
   computeSquare ev =
     <| items :=
          ev.untouchedItems ++ ev.droppedItems ++
          FLAT (MAP (λc. c.components ++ c.possessions) ev.fallenItems)
      ; robots :=
-         let ls = GENLIST (λi. (i,EL i ev.robotActions)) (LENGTH ev.robotActions) in
-         let ls = FILTER (λ(i,r,a). ¬isMovedOut a ∧ ¬MEM (Destroyed i) (MAP SND ev.robotActions)) ls in
+         let ls = FILTER (λ(r,a). ¬isMovedOut a ∧ ¬MEM (Destroyed r.name) (MAP SND ev.robotActions)) ev.robotActions in
            MAP (runMachine o prepare ev) ls
      |>`;
 
@@ -205,61 +207,73 @@ val computeEvents_def = Define`
   computeEvents (g:grid) =
     FMAP_MAP2 (λ(c,sq). event sq (neighbours g c)) g`;
 
+val nameSquare_def = Define`
+  nameSquare num rs = FOLDR (λ r (num,rs). if r.name = 0 then (num + 1, (r with name := num) :: rs) else (num,r::rs)) (num,[]) rs
+`
+
+val robotNames_def = Define`
+  robotNames sq = MAP robot_name o square_robots
+`
+
+val allNames_def = Define`
+  allNames = FLAT o MAP robotNames o SET_TO_LIST o FRANGE
+`
+
+val maxList_def = Define`
+  maxList = FOLDL MAX 0
+`
+
+val mapRobotsInSquare_def = Define`
+  mapRobotsInSquare f sq = sq with robots updated_by MAP f
+`
+
+val mapRobots_def = Define`
+  mapRobots f = FMAP_MAP2 (mapRobotsInSquare f o SND) 
+`
+
+val mkNames_def = Define`
+  mkNames g = let nextName = 1 + maxList (allNames g)) in
+              SND (ITSET (λ c (n,m). let sq = g ' c in
+                                     let (n',r') = nameSquare n sq.robots in
+                                     (n', m |+ (c,sq with robots := r')))
+                         (FDOM g) (nextName,FEMPTY))
+`
+
 val step_def = Define`
-  step g = computeSquare o_f (computeEvents g)`;
+  step g = mkNames (computeSquare o_f (computeEvents g))`;
+
+val wf_state_def = Define`
+  wf_state g ⇔ ALL_DISTINCT (allNames g) ∧ EVERY ($< 0) (allNames g)
+`
 
 val _ = Datatype`
   state_with_hole = <| state : grid
-                     ; focal_coordinate : coordinate
-                     ; focal_index : num
+                     ; focal_name : num
                      |>`;
 
 val wf_state_with_hole_def = Define`
   wf_state_with_hole s ⇔
-    (∃sq.
-      FLOOKUP s.state s.focal_coordinate = SOME sq ∧
-      s.focal_index < LENGTH sq.robots ∧
-      (EL (s.focal_index) sq.robots).focal) ∧
-    (∀sq c i.
-       FLOOKUP s.state c = SOME sq ∧
-       i < LENGTH sq.robots ∧
-       (c,i) ≠ (s.focal_coordinate,s.focal_index)
-       ⇒ ¬(EL i sq.robots).focal)`;
-
-val square_update_robot_def = Define`
-  square_update_robot f idx sq =
-    sq with robots updated_by
-      LUPDATE (f (EL idx sq.robots)) idx`;
+    wf_state s.state ∧ MEM s.focal_name (allNames s.state)
+`
 
 val fill_def = Define`
-  fill f s =
-    s.state |+
-    (s.focal_coordinate,
-     square_update_robot f s.focal_index (s.state ' s.focal_coordinate))`;
+  fill f s = mapRobots (λr. if r.name = s.focal_name then f r else r) s.state
+`;
 
 val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
 
-val find_focal_def = Define`
-  find_focal g =
-    @p. ∃c i sq. p = (c,i) ∧ FLOOKUP g c = SOME sq ∧ i < LENGTH sq.robots ∧ (EL i sq.robots).focal`;
-
 val steph_def = Define`
-  steph command s =
-    let events = computeEvents (fill (robot_command_fupd (K command)) s) in
-    let ev = events ' s.focal_coordinate in
-    if EXISTS (λa. a = Destroyed s.focal_index ∨
-                   ∃r. a = Inspected s.focal_index r)
-              (MAP SND ev.robotActions)
-    then NONE else
-    let a = SND (EL s.focal_index ev.robotActions) in
-    let s' = computeSquare o_f events in
-    let (c,i) = find_focal s' in
-    SOME
-      ((s.focal_index, ev, private a),
-       <| state := s'
-        ; focal_coordinate := c
-        ; focal_index := i
-        |>)`;
+  steph command s = 
+    let s' = fill (robot_command_fupd (K command)) s in
+    let events = computeEvents s' in
+    if FEVERY (λ (_,ev).
+               EVERY (λa. a ≠ Destroyed s.focal_name ∧
+                      ∀r. r.name = s.focal_name ⇒ a ≠ Inspected r)
+              (MAP SND ev.robotActions)) events
+    then SOME (s with state := step s')
+    else NONE
+`;
+
 
 (* histories *)
 

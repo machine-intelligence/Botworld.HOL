@@ -47,7 +47,7 @@ val _ = Datatype`
    ; inventory : item list
    ; memory : prog
    ; command : command
-   ; focal : bool
+   ; name : num
    |>`;
 
 val empty_robot_def = Define`
@@ -57,14 +57,15 @@ val empty_robot_def = Define`
        inventory := [];
        memory := [];
        command := Pass;
-       focal := F |>`;
+       name := 0
+     |>`;
 
 val construct_def = Define`
   construct ls m =
   case ls of
   | [FramePart f;ProcessorPart p] =>
      SOME <| frame := f; processor := p; memory := m;
-             inventory := []; command := Pass; focal := F |>
+             inventory := []; command := Pass; name := 0 |>
   | _ => NONE`;
 
 val shatter_def = Define`
@@ -87,7 +88,7 @@ val _ = Datatype`
   | Dropped num
   | InspectTargetFled num
   | InspectBlocked num
-  | Inspected num robot
+  | Inspected robot
   | DestroyTargetFled num
   | DestroyBlocked num
   | Destroyed num
