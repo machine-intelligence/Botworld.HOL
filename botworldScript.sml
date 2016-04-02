@@ -87,21 +87,21 @@ val act_def = Define`
         Dropped i
       else Invalid
     | Inspect i =>
-      case findRobotInSquare i sq.robots of
+      (case findRobotInSquare i sq.robots of
           NONE => Invalid
-       |  SOME r' => if ¬fled nb r'.command then
+        | SOME r' => if ¬fled nb r'.command then
                        if ¬inspectShielded sq.robots r' then
                          Inspected r'
                        else InspectBlocked i
-                     else InspectTargetFled i
+                     else InspectTargetFled i)
     | Destroy i =>
-      case findRobotInSquare i sq.robots of
-          NONE   => Invalid
-       | SOME r' => if ¬fled nb r'.command then
-                        if ¬destroyShielded sq.robots r' then
-                            Destroyed i
-                        else DestroyBlocked i
-                    else DestroyTargetFled i
+      (case findRobotInSquare i sq.robots of
+          NONE    => Invalid
+        | SOME r' => if ¬fled nb r'.command then
+                         if ¬destroyShielded sq.robots r' then
+                             Destroyed i
+                         else DestroyBlocked i
+                     else DestroyTargetFled i)
     | Build is m =>
       if EVERY (λi. i < LENGTH sq.items) is then
         if ¬EXISTS (contested sq) is then
@@ -111,7 +111,7 @@ val act_def = Define`
         else BuildInterrupted is
       else Invalid
     | Pass => Passed`;
-  
+
 val localActions_def = Define`
   localActions sq nb =
     MAP (act sq nb) sq.robots`;
@@ -137,7 +137,7 @@ val incomingFrom_def = Define`
 
 val event_def = Define`
   event sq nb =
-    let actions = localActions sq nb
+    let actions = localActions sq nb in
     let veterans = MAP (UNCURRY (updateInventory sq)) (ZIP(sq.robots,actions)) in
     let fallen = FLAT (MAP (λr. if MEM (Destroyed r.name) actions then
                                       [<|components := shatter r
@@ -166,7 +166,7 @@ val event_def = Define`
 (* computation phase *)
 
 val private_def = Define`
-  (private (Inspected _ r) = pInspected r.processor r.memory) ∧
+  (private (Inspected r) = pInspected r.processor r.memory) ∧
   (private Invalid = pInvalid) ∧
   (private _ = pNothing)`;
 
@@ -208,11 +208,12 @@ val computeEvents_def = Define`
     FMAP_MAP2 (λ(c,sq). event sq (neighbours g c)) g`;
 
 val nameSquare_def = Define`
-  nameSquare num rs = FOLDR (λ r (num,rs). if r.name = 0 then (num + 1, (r with name := num) :: rs) else (num,r::rs)) (num,[]) rs
-`
+  nameSquare num rs =
+     FOLDR (λr (num,rs). if r.name = 0 then (num + 1, (r with name := num) :: rs) else (num,r::rs))
+       (num,[]) rs`
 
 val robotNames_def = Define`
-  robotNames sq = MAP robot_name o square_robots
+  robotNames = MAP robot_name o square_robots
 `
 
 val allNames_def = Define`
@@ -228,14 +229,14 @@ val mapRobotsInSquare_def = Define`
 `
 
 val mapRobots_def = Define`
-  mapRobots f = FMAP_MAP2 (mapRobotsInSquare f o SND) 
+  mapRobots f = FMAP_MAP2 (mapRobotsInSquare f o SND)
 `
 
 val mkNames_def = Define`
-  mkNames g = let nextName = 1 + maxList (allNames g)) in
-              SND (ITSET (λ c (n,m). let sq = g ' c in
-                                     let (n',r') = nameSquare n sq.robots in
-                                     (n', m |+ (c,sq with robots := r')))
+  mkNames g = let nextName = 1 + maxList (allNames g) in
+              SND (ITSET (λc (n,m). let sq = g ' c in
+                                    let (n',r') = nameSquare n sq.robots in
+                                    (n', m |+ (c,sq with robots := r')))
                          (FDOM g) (nextName,FEMPTY))
 `
 
@@ -263,7 +264,7 @@ val fill_def = Define`
 val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
 
 val steph_def = Define`
-  steph command s = 
+  steph command s =
     let s' = fill (robot_command_fupd (K command)) s in
     let events = computeEvents s' in
     if FEVERY (λ (_,ev).
@@ -273,7 +274,6 @@ val steph_def = Define`
     then SOME (s with state := step s')
     else NONE
 `;
-
 
 (* histories *)
 
