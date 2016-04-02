@@ -97,10 +97,8 @@ val sexpaction_def = Define`
             (lift InspectTargetFled (sexpnum (EL 0 args))) ++
       guard (nm = "InspectBlocked" ∧ LENGTH args = 1)
             (lift InspectBlocked (sexpnum (EL 0 args))) ++
-      guard (nm = "Inspected" ∧ LENGTH args = 1)
-            (lift2 Inspected
-                   (sexpnum (EL 0 args))
-                   (return empty_robot)) ++
+      guard (nm = "Inspected" ∧ LENGTH args = 0)
+            (lift Inspected (return empty_robot)) ++
       guard (nm = "DestroyTargetFled" ∧ LENGTH args = 1)
             (lift DestroyTargetFled (sexpnum (EL 0 args))) ++
       guard (nm = "DestroyBlocked" ∧ LENGTH args = 1)
@@ -201,7 +199,7 @@ val actionsexp_def = Define`
   (actionsexp (Dropped num) = listsexp [SX_SYM "Dropped"; SX_NUM num]) ∧
   (actionsexp (InspectTargetFled num) = listsexp [SX_SYM "InspectTargetFled"; SX_NUM num]) ∧
   (actionsexp (InspectBlocked num) = listsexp [SX_SYM "InspectBlocked"; SX_NUM num]) ∧
-  (actionsexp (Inspected num _) = listsexp [SX_SYM "Inspected"; SX_NUM num]) ∧
+  (actionsexp (Inspected _) = listsexp [SX_SYM "Inspected"]) ∧
   (actionsexp (DestroyTargetFled num) = listsexp [SX_SYM "DestroyTargetFled"; SX_NUM num]) ∧
   (actionsexp (DestroyBlocked num) = listsexp [SX_SYM "DestroyBlocked"; SX_NUM num]) ∧
   (actionsexp (Destroyed num) = listsexp [SX_SYM "Destroyed"; SX_NUM num]) ∧
