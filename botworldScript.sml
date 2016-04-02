@@ -271,7 +271,9 @@ val steph_def = Define`
                EVERY (λa. a ≠ Destroyed s.focal_name ∧
                       ∀r. r.name = s.focal_name ⇒ a ≠ Inspected r)
               (MAP SND ev.robotActions)) events
-    then SOME (s with state := step s')
+    then
+      let (ev,a) = CHOICE { (ev,a) | ∃r. MEM (r,a) ev.robotActions ∧ r.name = s.focal_name ∧ ev ∈ FRANGE events } in
+      SOME ((s.focal_name, ev, private a), s with state := step s')
     else NONE
 `;
 
