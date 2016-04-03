@@ -10,6 +10,11 @@ val FLOOKUP_FMAP_MAP2 = Q.store_thm("FLOOKUP_FMAP_MAP2",
    OPTION_MAP (CURRY f x) (FLOOKUP m x) `,
   rw[FLOOKUP_DEF,FMAP_MAP2_THM])
 
+val FMAP_MAP2_SND_compose = Q.store_thm("FMAP_MAP2_SND_compose",
+  `FMAP_MAP2 (f o SND) (FMAP_MAP2 (g o SND) x) = FMAP_MAP2 (f o g o SND) x`,
+  rw[fmap_eq_flookup,FLOOKUP_FMAP_MAP2]
+  \\ Cases_on`FLOOKUP x k` \\ simp[])
+
 val FILTER_INDICES = Q.store_thm("FILTER_INDICES",
   `∃f.
      (∀i. i < LENGTH (FILTER P ls) ⇒ EL i (FILTER P ls) = EL (f i) ls) ∧
@@ -80,6 +85,10 @@ val LENGTH_FILTER_EQ = Q.store_thm("LENGTH_FILTER_EQ",
   \\ gen_tac \\ Cases \\ simp[]
   \\ metis_tac[LESS_MONO_EQ,EL_restricted,HD,prim_recTheory.LESS_0,LENGTH]);
 
+val APPEND_EQ_suff =
+  DISCH_ALL(#2(EQ_IMP_RULE(UNDISCH(SPEC_ALL(CONJUNCT1 (SPEC_ALL APPEND_11_LENGTH))))))
+  |> SIMP_RULE(pure_ss)[AND_IMP_INTRO]
+
 (* -- *)
 
 val incomingFrom_MovedIn = Q.store_thm("incomingFrom_MovedIn",
@@ -92,31 +101,10 @@ val LENGTH_localActions = Q.store_thm("LENGTH_localActions[simp]",
   `LENGTH (localActions sq nb) = LENGTH sq.robots`,
   EVAL_TAC >> simp[])
 
-val square_update_robot_o = Q.store_thm("square_update_robot_o",
-  `square_update_robot (f o g) i = square_update_robot f i o square_update_robot g i`,
-  rw[square_update_robot_def,FUN_EQ_THM,square_component_equality] >>
-  simp[LIST_EQ_REWRITE,EL_LUPDATE])
-
-val wf_state_with_hole_find_focal = Q.store_thm("wf_state_with_hole_find_focal",
-  `wf_state_with_hole s ⇒
-    find_focal s.state = (s.focal_coordinate,s.focal_index)`,
-  rw[wf_state_with_hole_def,find_focal_def] >>
-  SELECT_ELIM_TAC >> metis_tac[])
-
-val map_robotActions_def = Define
-  `map_robotActions f (ra:(robot#action) list) = ZIP(MAP (f o FST) ra,MAP SND ra)`;
-
-val if_focal_def = Define`
-  if_focal f r = if r.focal then f r else r`;
-
 val map_inspected_def = Define`
-  (map_inspected f (Inspected j r) = Inspected j (f r)) ∧
+  (map_inspected f (Inspected r) = Inspected (f r)) ∧
   (map_inspected _ a = a)`;
 val _ = export_rewrites["map_inspected_def"];
-
-val LENGTH_square_update_robot = Q.store_thm("LENGTH_square_update_robot[simp]",
-  `LENGTH (square_update_robot f i sq).robots = LENGTH sq.robots`,
-  rw[square_update_robot_def]);
 
 val LENGTH_FILTER_memory = Q.prove(
   `(∀r p. P r ⇔ P (r with memory := p)) ⇒
@@ -138,52 +126,8 @@ val contested_ignores_policy = Q.store_thm("contested_ignores_policy[simp]",
   match_mp_tac (MP_CANON LENGTH_FILTER_memory) >>
   simp[canLift_def])
 
-val inspectShielded_ignores_policy = Q.store_thm("inspectShielded_ignores_policy[simp]",
-  `i < LENGTH ls ∧ n < LENGTH ls ⇒
-   (inspectShielded (LUPDATE (EL i ls with memory := p) i ls) n ⇔
-    inspectShielded ls n)`,
-  rw[inspectShielded_def] >>
-  simp[EL_LUPDATE] >>
-  simp[inspectAttempts_def,FILTER_MAP] >>
-  simp[LENGTH_FILTER_memory] >> rw[])
-
-val destroyShielded_ignores_policy = Q.store_thm("destroyShielded_ignores_policy[simp]",
-  `i < LENGTH ls ∧ n < LENGTH ls ⇒
-   (destroyShielded (LUPDATE (EL i ls with memory := p) i ls) n ⇔
-    destroyShielded ls n)`,
-  rw[destroyShielded_def] >>
-  simp[EL_LUPDATE] >>
-  simp[destroyAttempts_def,FILTER_MAP] >>
-  simp[LENGTH_FILTER_memory] >> rw[])
-
-val MAP_robot_command_square_update_robot_memory_fupd = Q.store_thm("MAP_robot_command_square_update_robot_memory_fupd[simp]",
-  `MAP robot_command (square_update_robot (memory_fupd f) x sq).robots =
-   MAP robot_command sq.robots`,
-  rw[square_update_robot_def] >>
-  rw[LIST_EQ_REWRITE,EL_MAP,EL_LUPDATE] >>
-  rw[]);
-
-val updateInventory_ignores_policy = Q.store_thm("updateInventory_ignores_policy",
-  `i < LENGTH sq.robots ∧
-   (∀z. (z < LENGTH sq.robots ∧ (EL z sq.robots).focal) ⇔ z = fi)
-   ⇒
-   updateInventory (square_update_robot (memory_fupd (K p)) fi sq) i a =
-   if_focal (memory_fupd (K p)) (updateInventory sq i a)`,
-  rw[] >>
-  `fi < LENGTH sq.robots` by metis_tac[] >>
-  rw[updateInventory_def] >>
-  Cases_on`a`>>simp[if_focal_def] >>
-  unabbrev_all_tac >> fs[] >>
-  fs[square_update_robot_def,EL_LUPDATE] >>
-  (Cases_on`(EL i sq.robots).focal` >|[
-     `i = fi` by metis_tac[],
-     `i ≠ fi` by metis_tac[]
-     ]) >>
-  simp[]);
-
 val updateInventory_const = Q.store_thm("updateInventory_const[simp]",
-  `(updateInventory sq i a).memory = (EL i sq.robots).memory ∧
-   (updateInventory sq i a).focal = (EL i sq.robots).focal`,
+  `(updateInventory sq r a).memory = r.memory`,
   rw[updateInventory_def] >>
   BasicProvers.CASE_TAC >> rw[])
 
@@ -191,271 +135,228 @@ val updateInventory_map_inspected = Q.store_thm("updateInventory_map_inspected[s
   `updateInventory sq i (map_inspected f a) = updateInventory sq i a`,
   Cases_on`a`>>simp[updateInventory_def]);
 
-val MEM_Built_localActions_not_focal = Q.store_thm("MEM_Built_localActions_not_focal",
-  `MEM (Built x r) (localActions a b) ⇒ ¬r.focal`,
-  rw[localActions_def,MEM_GENLIST,act_def,LET_THM] >>
-  pop_assum mp_tac >> CASE_TAC >> fs[] >>
-  every_case_tac >> fs[] >>
-  fs[construct_def] >>
-  every_case_tac >> fs[] >> rw[]);
-
 val Destroyed_eq_map_inspected = Q.store_thm("Destroyed_eq_map_inspected[simp]",
   `Destroyed x = map_inspected f a ⇔ Destroyed x = a`,
   Cases_on`a`>>simp[]);
-
-val shatter_if_focal_memory_fupd = Q.store_thm("shatter_if_focal_memory_fupd[simp]",
-  `shatter (if_focal (memory_fupd x) r) = shatter r`,
-  rw[if_focal_def,shatter_def]);
-
-val if_focal_memory_fupd_inventory = Q.store_thm("if_focal_memory_fupd_inventory[simp]",
-  `(if_focal (memory_fupd x) r).inventory = r.inventory`,
-  rw[if_focal_def]);
 
 val less8 = Q.prove(
   `x < 8n ⇔ (x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4 ∨ x = 5 ∨ x = 6 ∨ x = 7)`,
   rw[EQ_IMP_THM] >> simp[])
 
-val updateInventory_ignores_policy2 = Q.store_thm("updateInventory_ignores_policy2",
-  `¬(EL i sq.robots).focal ⇒
-   if_focal (memory_fupd x) (updateInventory sq i a) = updateInventory sq i a`,
-  rw[updateInventory_def] >>
-  rw[if_focal_def] >>
-  CASE_TAC >> fs[]);
+val if_name_def = Define`
+  if_name n f r = if r.name = n then f r else r`;
 
-val computeEvents_with_focal_policy = Q.store_thm("computeEvents_with_focal_policy",
-  `wf_state_with_hole s
-   ⇒
-   computeEvents (fill (memory_fupd (K p)) s) =
-   (λev. ev with robotActions updated_by MAP (if_focal (memory_fupd (K p)) ## map_inspected (if_focal (memory_fupd (K p)))))
-     o_f computeEvents s.state`,
-  rw[fmap_eq_flookup,FLOOKUP_o_f,computeEvents_def,FLOOKUP_FMAP_MAP2,FLOOKUP_UPDATE,fill_def] >>
-  qpat_abbrev_tac`f = memory_fupd _` >>
-  rw[] >- (
-    fs[wf_state_with_hole_def] >>
-    `Abbrev(sq = s.state ' s.focal_coordinate)` by (
-      metis_tac[flookup_thm,markerTheory.Abbrev_def] ) >>
-    fs[] >>
-    Cases_on`s.focal_coordinate` >>
-    simp[neighbours_def,neighbour_coords_def,FLOOKUP_UPDATE] >>
-    rpt(IF_CASES_TAC >- (`F` suffices_by rw[] >> intLib.COOPER_TAC)) >>
-    simp[] >>
-    ntac 7 (pop_assum kall_tac) >>
-    qpat_abbrev_tac`nb = _::_` >>
-    `∀sq. MEM (SOME sq) nb ⇒ EVERY ($~ o robot_focal) sq.robots` by (
-      simp[Abbr`nb`,EVERY_MEM,MEM_EL,PULL_EXISTS] >> rw[] >>
-      first_x_assum(match_mp_tac o MP_CANON) >>
-      qpat_assum`SOME _ = _`(assume_tac o SYM) >>
-      asm_exists_tac >> simp[] >>
-      intLib.COOPER_TAC ) >>
-    qpat_assum`Abbrev (nb = _)` kall_tac >>
-    srw_tac[][event_def] >>
-    `∀f g. MAP (if_focal f ## map_inspected g) immigrations = immigrations` by (
-      unabbrev_all_tac >> simp[MAP_EQ_ID] >>
-      simp[MEM_FLAT,MEM_GENLIST,PULL_EXISTS] >> rw[] >>
-      imp_res_tac incomingFrom_MovedIn >>
-      Cases_on`x`>>fs[]>>
-      rw[if_focal_def] >>
-      Cases_on`EL i nb`>>
-      fs[incomingFrom_def] >>
-      fs[MEM_FLAT,MEM_MAP,PULL_EXISTS] >>
-      every_case_tac >> fs[] >>
-      fs[MEM_EL,EVERY_MEM,PULL_EXISTS] >>
-      metis_tac[] ) >>
-    `actions = MAP (map_inspected (if_focal f)) actions'` by (
-      unabbrev_all_tac >>
-      simp[localActions_def,MAP_GENLIST] >>
-      rpt(AP_THM_TAC ORELSE AP_TERM_TAC) >>
-      simp[FUN_EQ_THM,act_def] >>
-      rw[square_update_robot_def] >>
-      simp[EL_LUPDATE] >> rw[] >>
-      CASE_TAC >> fs[] >>
-      simp[EVERY_MEM,EXISTS_MEM] >>
-      simp[canLift_def] >> rw[] >>
-      rw[if_focal_def] >>
-      BasicProvers.FULL_CASE_TAC >> fs[] >>
-      metis_tac[] ) >>
-    map_every qunabbrev_tac[`actions`,`actions'`] >> fs[] >>
-    pop_assum kall_tac >>
-    `children = children'` by (
-      match_mp_tac EQ_SYM >>
-      unabbrev_all_tac >> simp[] >>
-      AP_TERM_TAC >>
-      simp[MAP_MAP_o,MAP_EQ_f] >>
-      rw[] >>
-      CASE_TAC >> simp[] ) >>
-    map_every qunabbrev_tac[`children`] >> fs[] >>
-    pop_assum kall_tac >>
-    `veterans = MAP (if_focal f) veterans'` by (
-      unabbrev_all_tac >>
-      simp[MAP_GENLIST] >>
-      simp[GENLIST_FUN_EQ,EL_MAP] >>
-      gen_tac >> strip_tac >>
-      qmatch_assum_abbrev_tac`i < LENGTH sq.robots` >>
-      `∀z. z < LENGTH sq.robots ∧ (EL z sq.robots).focal ⇔ z = s.focal_index` by (
-        metis_tac[] ) >>
-      simp[updateInventory_ignores_policy] ) >>
-    qunabbrev_tac`veterans`>>fs[] >>
-    pop_assum kall_tac >>
-    conj_tac >- (
-      `LENGTH veterans' = LENGTH sq.robots` by simp[Abbr`veterans'`] >>
-      simp[ZIP_MAP_PAIR] >>
-      simp[GSYM ZIP_MAP_PAIR,LENGTH_REPLICATE] >>
-      AP_TERM_TAC >> simp[] >>
-      simp[REPLICATE_GENLIST,MAP_GENLIST] >>
-      simp[Abbr`children'`] >>
-      simp[MAP_FLAT,MAP_MAP_o,o_DEF] >>
-      AP_TERM_TAC >>
-      simp[MAP_EQ_f] >>
-      rw[] >> Cases_on`a`>>simp[] >>
-      imp_res_tac MEM_Built_localActions_not_focal >>
-      simp[if_focal_def] ) >>
-    conj_tac >- (
-      `(square_update_robot f s.focal_index sq).items = sq.items` by (
-        simp[Abbr`f`,square_update_robot_def] ) >> simp[] >>
-      rpt AP_THM_TAC >> AP_TERM_TAC >>
-      simp[FUN_EQ_THM] >>
-      simp[EXISTS_MAP] >>
-      simp[EXISTS_MEM] >> rw[] >>
-      EQ_TAC >> rw[] >>
-      asm_exists_tac >>
-      (Cases_on`x` ORELSE Cases_on`a`) >> fs[] ) >>
-    conj_tac >- (
-      AP_TERM_TAC >>
-      simp[LIST_EQ_REWRITE,EL_MAP,EL_ZIP] >>
-      qx_gen_tac`n` >>
-      Cases_on`EL n (localActions sq nb)`>>simp[] >>
-      simp[square_update_robot_def,EL_LUPDATE] >>
-      simp[Abbr`f`] >> rw[] ) >>
-    unabbrev_all_tac >>
-    AP_TERM_TAC >>
-    simp[LIST_EQ_REWRITE,EL_GENLIST,MEM_MAP,PULL_EXISTS,MAP_GENLIST]) >>
-  Cases_on`FLOOKUP s.state k`>>fs[]>>
-  qpat_abbrev_tac`nb = neighbours (_ |+ _) _` >>
-  `LENGTH nb = LENGTH (neighbours s.state k)` by (
-    simp[Abbr`nb`] >>
-    Cases_on`k`>>simp[neighbours_def,neighbour_coords_def] ) >>
-  `∀n. n < LENGTH nb ⇒ (IS_SOME (EL n nb) ⇔ IS_SOME (EL n (neighbours s.state k)))` by (
-    simp[Abbr`nb`] >>
-    Cases_on`k`>>simp[neighbours_def,neighbour_coords_def] >>
-    simp[less8] >>
-    gen_tac >> strip_tac >> simp[FLOOKUP_UPDATE] >>
-    rw[] >> fs[wf_state_with_hole_def] ) >>
-  `∀g. ∀n. n < LENGTH nb ⇒ (incomingFrom n (EL n nb)) = MAP (if_focal f ## map_inspected g) (incomingFrom n (EL n (neighbours s.state k)))` by (
-    rpt gen_tac >> strip_tac >>
-    Cases_on`EL n nb` >>
-    first_x_assum(qspec_then`n`mp_tac)>>simp[incomingFrom_def]>>
-    simp[IS_SOME_EXISTS] >> strip_tac >>
-    simp[incomingFrom_def] >>
-    simp[MAP_FLAT,MAP_MAP_o] >>
-    simp[o_DEF] >>
-    AP_TERM_TAC >>
-    simp[Once LIST_EQ_REWRITE] >>
-    conj_asm1_tac >- (
-      fs[Abbr`nb`] >>
-      Cases_on`k`>>fs[neighbours_def,neighbour_coords_def] >>
-      fs[less8,FLOOKUP_UPDATE] >> rfs[] >>
-      every_case_tac >> fs[] >> rveq >>
-      simp[square_update_robot_def] >>
-      fs[FLOOKUP_DEF] ) >>
-    simp[EL_MAP] >>
-    gen_tac >> strip_tac >>
-    fs[Abbr`nb`] >>
-    Cases_on`k`>>fs[neighbours_def,neighbour_coords_def,if_focal_def] >>
-    fs[less8,FLOOKUP_UPDATE] >> rfs[if_focal_def] >>
-    every_case_tac >> fs[] >> rveq >>
-    fs[square_update_robot_def,EL_LUPDATE,Abbr`f`] >>
-    rw[] >> rfs[] >> fs[FLOOKUP_DEF,if_focal_def] >> rveq >> fs[] >>
-    every_case_tac >> fs[] >>
-    fs[wf_state_with_hole_def,FLOOKUP_DEF] >>
-    metis_tac[]) >>
-  srw_tac[][event_def] >>
-  `∀g. MAP (if_focal f ## map_inspected g) immigrations' = immigrations` by (
-    gen_tac >>
-    map_every qunabbrev_tac[`immigrations'`,`immigrations`] >>
-    simp[MAP_FLAT] >>
-    AP_TERM_TAC >>
-    simp[MAP_GENLIST] >>
-    simp[LIST_EQ_REWRITE,EL_MAP] >>
-    first_x_assum(qspec_then`g`mp_tac) >>
-    simp[] >> rw[] >> simp[EL_MAP]) >>
-  `actions = MAP (map_inspected (if_focal f)) actions'` by (
-    unabbrev_all_tac >>
-    simp[localActions_def,MAP_GENLIST] >>
-    rpt(AP_THM_TAC ORELSE AP_TERM_TAC) >>
-    simp[FUN_EQ_THM,act_def] >>
-    qpat_abbrev_tac`f1 = fled (_ _)` >>
-    qpat_abbrev_tac`f2 = fled _` >>
-    `∀m. f1 m ⇔ f2 m` by (
-      unabbrev_all_tac >>
-      Cases >> simp[fled_def] >> rfs[] >>
-      metis_tac[] ) >>
-    rw[square_update_robot_def] >>
-    simp[EL_LUPDATE] >> rw[] >>
-    CASE_TAC >> fs[] >>
-    simp[EVERY_MEM,EXISTS_MEM] >>
-    simp[canLift_def] >> rw[] >>
-    rw[if_focal_def] >>
-    TRY BasicProvers.FULL_CASE_TAC >> fs[] >>
-    fs[wf_state_with_hole_def] >>
-    metis_tac[] ) >>
-  map_every qunabbrev_tac[`actions`,`actions'`] >> fs[] >>
-  pop_assum kall_tac >>
-  `veterans = MAP (if_focal f) veterans'` by (
-    unabbrev_all_tac >>
-    simp[MAP_GENLIST] >>
-    simp[GENLIST_FUN_EQ,EL_MAP] >>
-    gen_tac >> strip_tac >>
-    qmatch_assum_abbrev_tac`i < LENGTH sq.robots` >>
-    `¬(EL i sq.robots).focal` by (
-      fs[wf_state_with_hole_def] >> metis_tac[] ) >>
-    simp[updateInventory_ignores_policy2] ) >>
-  qunabbrev_tac`veterans`>>fs[] >>
-  pop_assum kall_tac >>
-  conj_tac >- (
-    `LENGTH veterans' = LENGTH x.robots` by simp[Abbr`veterans'`] >>
-    simp[ZIP_MAP_PAIR] >>
-    simp[GSYM ZIP_MAP_PAIR,LENGTH_REPLICATE] >>
-    AP_TERM_TAC >> simp[] >>
-    simp[REPLICATE_GENLIST,MAP_GENLIST] >>
-    simp[Abbr`children'`] >>
-    simp[MAP_FLAT,MAP_MAP_o,o_DEF] >>
-    conj_asm1_tac >- (
-      simp[Abbr`children`] >>
-      AP_TERM_TAC >>
-      simp[LIST_EQ_REWRITE,EL_MAP] >>
-      qx_gen_tac`n` >>
-      Cases_on`EL n (localActions x (neighbours s.state k))`>>simp[] >>
-      simp[if_focal_def] >> rw[] >>
-      metis_tac[MEM_Built_localActions_not_focal,LENGTH_localActions,MEM_EL]) >>
-    simp[] >>
-    AP_TERM_TAC >>
-    simp[LENGTH_FLAT] >>
-    AP_TERM_TAC >>
-    simp[MAP_MAP_o,MAP_EQ_f] ) >>
-  conj_tac >- (
-    AP_THM_TAC >>
-    simp[EXISTS_MAP] >>
-    rpt AP_THM_TAC >> AP_TERM_TAC >>
-    simp[FUN_EQ_THM] >>
-    simp[EXISTS_MEM] >> rw[] >>
-    EQ_TAC >> rw[] >> asm_exists_tac >>
-    (Cases_on`x'` ORELSE Cases_on`a`) >> fs[] ) >>
-  conj_tac >- (
-    AP_TERM_TAC >>
-    simp[LIST_EQ_REWRITE,EL_MAP,EL_ZIP] >>
-    qx_gen_tac`n` >>
-    Cases_on`EL n (localActions x (neighbours s.state k))`>>simp[]) >>
-  unabbrev_all_tac >>
-  AP_TERM_TAC >>
-  simp[LIST_EQ_REWRITE,EL_GENLIST,MEM_MAP,PULL_EXISTS,MAP_GENLIST]);
+val if_name_with_memory_const = Q.store_thm("if_name_with_memory_const[simp]",
+  `(if_name n (with_memory p) r).command = r.command ∧
+   (if_name n (with_memory p) r).inventory = r.inventory ∧
+   (if_name n (with_memory p) r).frame = r.frame ∧
+   (if_name n (with_memory p) r).name = r.name ∧
+   (if_name n (with_memory p) r).processor = r.processor`,
+  EVAL_TAC \\ rw[]);
 
-val runMachine_focal = Q.store_thm("runMachine_focal[simp]",
-  `(runMachine x).focal ⇔ (SND x).focal`,
-  Cases_on`x`>>srw_tac[][runMachine_def]>>rw[]);
+val canLift_with_memory = Q.store_thm("canLift_with_memory[simp]",
+  `canLift (if_name n (with_memory p) r) = canLift r`,
+  rw[FUN_EQ_THM,canLift_def]);
 
-val prepare_focal = Q.store_thm("prepare_focal[simp]",
-  `(SND (prepare x y)).focal ⇔ (FST(SND y)).focal`,
-  PairCases_on`y`>>rw[prepare_def]);
+val contested_with_memory = Q.store_thm("contested_with_memory[simp]",
+  `contested (sq with robots updated_by MAP (if_name n (with_memory p))) = contested sq`,
+  rw[FUN_EQ_THM,contested_def,FILTER_MAP,o_DEF]);
+
+val findRobotInSquare_with_memory = Q.store_thm("findRobotInSquare_with_memory[simp]",
+  `findRobotInSquare i (MAP (if_name n (with_memory p)) sq.robots) =
+   OPTION_MAP (if_name n (with_memory p)) (findRobotInSquare i sq.robots)`,
+  rw[findRobotInSquare_def,FILTER_MAP,o_DEF]
+  \\ match_mp_tac EQ_SYM
+  \\ BasicProvers.CASE_TAC \\ fs[]);
+
+val inspectShielded_with_memory = Q.store_thm("inspectShielded_with_memory[simp]",
+  `inspectShielded (MAP (if_name n (with_memory p)) sq.robots) =
+   inspectShielded sq.robots`,
+  rw[FUN_EQ_THM,inspectShielded_def,MAP_MAP_o,o_DEF]
+  \\ rpt (AP_TERM_TAC ORELSE AP_THM_TAC)
+  \\ rw[FUN_EQ_THM])
+
+val inspectShielded_with_memory2 = Q.store_thm("inspectShielded_with_memory2[simp]",
+  `inspectShielded rs (if_name n (with_memory p) r) =
+   inspectShielded rs r`,
+  rw[inspectShielded_def])
+
+val destroyShielded_with_memory = Q.store_thm("destroyShielded_with_memory[simp]",
+  `destroyShielded (MAP (if_name n (with_memory p)) sq.robots) =
+   destroyShielded sq.robots`,
+  rw[FUN_EQ_THM,destroyShielded_def,MAP_MAP_o,o_DEF]
+  \\ rpt (AP_TERM_TAC ORELSE AP_THM_TAC)
+  \\ rw[FUN_EQ_THM])
+
+val destroyShielded_with_memory2 = Q.store_thm("destroyShielded_with_memory2[simp]",
+  `destroyShielded rs (if_name n (with_memory p) r) =
+   destroyShielded rs r`,
+  rw[destroyShielded_def])
+
+val FLOOKUP_fill =
+  ``FLOOKUP (fill f s) x``
+  |> SIMP_CONV(srw_ss()++ETA_ss)[FLOOKUP_FMAP_MAP2,fill_def,mapRobots_def,GSYM if_name_def]
+
+val neighbours_fill = Q.store_thm("neighbours_fill",
+  `neighbours (fill f s) k =
+   MAP (OPTION_MAP (mapRobotsInSquare (if_name s.focal_name f))) (neighbours s.state k)`,
+  rw[neighbours_def,MAP_MAP_o,MAP_EQ_f,FLOOKUP_fill]
+  \\ Cases_on`FLOOKUP s.state e` \\ fs[])
+
+val localActions_with_memory = Q.store_thm("localActions_with_memory",
+  `localActions (mapRobotsInSquare (if_name n (with_memory p)) sq) nb =
+   MAP (map_inspected (if_name n (with_memory p))) (localActions sq nb)`,
+  rw[localActions_def,MAP_MAP_o,mapRobotsInSquare_def,MAP_EQ_f]
+  \\ rw[act_def]
+  \\ BasicProvers.CASE_TAC \\ fs[]
+  \\ rw[] \\ fs[]
+  \\ match_mp_tac EQ_SYM
+  \\ BasicProvers.CASE_TAC \\ fs[]
+  \\ rw[]);
+
+val fled_with_memory = Q.store_thm("fled_with_memory[simp]",
+  `fled (MAP (OPTION_MAP (mapRobotsInSquare (if_name n (with_memory p)))) nb) =
+   fled nb`,
+  simp[FUN_EQ_THM]
+  \\ Cases \\ rw[fled_def,EQ_IMP_THM]
+  \\ rfs[EL_MAP,IS_SOME_EXISTS]);
+
+val localActions_with_memory2 = Q.store_thm("localActions_with_memory2[simp]",
+  `localActions sq (MAP (OPTION_MAP (mapRobotsInSquare (if_name n (with_memory p)))) nb) =
+   localActions sq nb`,
+  rw[localActions_def,MAP_MAP_o,mapRobotsInSquare_def,MAP_EQ_f]
+  \\ rw[act_def]
+  \\ BasicProvers.CASE_TAC \\ fs[]
+  \\ simp[EL_MAP]
+  \\ rw[] \\ fs[] \\ rfs[]);
+
+val MAP_robot_command_with_memory = Q.store_thm("MAP_robot_command_with_memory[simp]",
+  `MAP robot_command (mapRobotsInSquare (if_name n (with_memory p)) sq).robots =
+   MAP robot_command sq.robots`,
+  rw[mapRobotsInSquare_def,MAP_MAP_o,MAP_EQ_f]);
+
+val updateInventory_with_memory = Q.store_thm("updateInventory_with_memory[simp]",
+  `updateInventory (mapRobotsInSquare (if_name n (with_memory p)) sq) =
+   updateInventory sq`,
+  rw[updateInventory_def,FUN_EQ_THM]
+  \\ BasicProvers.CASE_TAC \\ fs[]
+  \\ rw[robot_component_equality]
+  \\ rw[mapRobotsInSquare_def]);
+
+val updateInventory_with_memory2 = Q.store_thm("updateInventory_with_memory2[simp]",
+  `updateInventory sq (if_name n (with_memory p) x) a =
+   if_name n (with_memory p) (updateInventory sq x a)`,
+  rw[FUN_EQ_THM,updateInventory_def]
+  \\ BasicProvers.CASE_TAC \\ fs[]
+  \\ rw[robot_component_equality]
+  \\ rw[if_name_def]);
+
+val incomingFrom_with_memory = Q.store_thm("incomingFrom_with_memory[simp]",
+  `incomingFrom x (OPTION_MAP (mapRobotsInSquare (if_name n (with_memory p))) sq) =
+   MAP (if_name n (with_memory p) ## I) (incomingFrom x sq)`,
+  Cases_on`sq`\\rw[incomingFrom_def]
+  \\ rw[mapRobotsInSquare_def,MAP_MAP_o,o_DEF]
+  \\ rw[MAP_FLAT,MAP_MAP_o,o_DEF]
+  \\ AP_TERM_TAC
+  \\ simp[MAP_EQ_f]
+  \\ rw[])
+
+val LENGTH_mapRobotsInSquare = Q.store_thm("LENGTH_mapRobotsInSquare[simp]",
+  `LENGTH (mapRobotsInSquare f sq).robots = LENGTH sq.robots`,
+  rw[mapRobotsInSquare_def]);
+
+val MEM_Built_localActions_name = Q.store_thm("MEM_Built_localActions_name",
+  `MEM (Built x r) (localActions sq nb) ⇒ r.name = 0`,
+  simp[localActions_def,MEM_MAP,act_def,PULL_EXISTS]
+  \\ gen_tac
+  \\ BasicProvers.CASE_TAC \\ simp[]
+  \\ rw[]
+  \\ every_case_tac \\ fs[] \\ rw[]
+  \\ fs[construct_def]
+  \\ every_case_tac \\ fs[] \\ rw[]);
+
+val computeEvents_fill_with_memory = Q.store_thm("computeEvents_fill_with_memory",
+  `s.focal_name ≠ 0 ⇒
+   computeEvents (fill (with_memory p) s) =
+   (λev. ev with robotActions updated_by
+     MAP (              (if_name s.focal_name (with_memory p)) ##
+          map_inspected (if_name s.focal_name (with_memory p))))
+     o_f (computeEvents s.state)`,
+  rw[fmap_eq_flookup,computeEvents_def,FLOOKUP_FMAP_MAP2,FLOOKUP_o_f,FLOOKUP_fill]
+  \\ Cases_on`FLOOKUP s.state k` \\ fs[neighbours_fill]
+  \\ qpat_abbrev_tac`nb = neighbours _ _`
+  \\ rw[event_def,localActions_with_memory]
+  >- (
+    qmatch_goalsub_abbrev_tac`FLAT (MAP f _)`
+    \\ rw[MAP_MAP_o]
+    \\ qmatch_goalsub_abbrev_tac`f o g`
+    \\ `f o g = f`
+    by (
+      simp[FUN_EQ_THM,Abbr`f`,Abbr`g`]
+      \\ Cases \\ simp[] )
+    \\ fs[]
+    \\ match_mp_tac APPEND_EQ_suff
+    \\ simp[LENGTH_ZIP]
+    \\ conj_tac
+    >- (
+      simp[LENGTH_FLAT]
+      \\ AP_TERM_TAC
+      \\ simp[MAP_GENLIST,o_DEF]
+      \\ simp[Once LIST_EQ_REWRITE,EL_MAP] )
+    \\ conj_tac
+    >- (
+      match_mp_tac APPEND_EQ_suff
+      \\ simp[]
+      \\ conj_tac
+      >- (
+        simp[ZIP_MAP,UNCURRY,LAMBDA_PROD,MAP_MAP_o,o_DEF]
+        \\ simp[mapRobotsInSquare_def]
+        \\ simp[ZIP_MAP,MAP_MAP_o,o_DEF]
+        \\ simp[MAP_EQ_f,FORALL_PROD,Abbr`g`] )
+      \\ simp[MAP_FLAT,MAP_GENLIST]
+      \\ AP_TERM_TAC
+      \\ simp[o_DEF]
+      \\ simp[Once LIST_EQ_REWRITE]
+      \\ simp[EL_MAP]
+      \\ simp[MAP_EQ_f,FORALL_PROD]
+      \\ rw[]
+      \\ imp_res_tac incomingFrom_MovedIn
+      \\ fs[Abbr`g`] )
+    \\ simp[MAP_EQ_ID,REPLICATE_GENLIST,FORALL_PROD,MEM_ZIP,PULL_EXISTS,Abbr`g`]
+    \\ simp[GSYM(SIMP_RULE(srw_ss())[MEM_EL,PULL_EXISTS]MAP_EQ_ID)]
+    \\ simp[MAP_FLAT,MAP_MAP_o,o_DEF]
+    \\ AP_TERM_TAC
+    \\ srw_tac[ETA_ss][]
+    \\ simp[MAP_EQ_f]
+    \\ Cases \\ simp[Abbr`f`]
+    \\ rw[if_name_def]
+    \\ imp_res_tac MEM_Built_localActions_name
+    \\ fs[])
+  >- (
+    simp[Once mapRobotsInSquare_def]
+    \\ rpt (AP_THM_TAC ORELSE AP_TERM_TAC)
+    \\ simp[FUN_EQ_THM]
+    \\ rw[EXISTS_MAP]
+    \\ rpt (AP_THM_TAC ORELSE AP_TERM_TAC)
+    \\ simp[FUN_EQ_THM]
+    \\ Cases \\ simp[] )
+  >- (
+    AP_TERM_TAC
+    \\ simp[Once LIST_EQ_REWRITE]
+    \\ simp[EL_MAP,EL_ZIP]
+    \\ rw[]
+    \\ match_mp_tac EQ_SYM
+    \\ BasicProvers.CASE_TAC \\ fs[]
+    \\ simp[mapRobotsInSquare_def,EL_MAP] )
+  >- (
+    AP_TERM_TAC
+    \\ simp[MEM_MAP]
+    \\ simp[MAP_MAP_o]
+    \\ simp[Once LIST_EQ_REWRITE]
+    \\ simp[EL_MAP,EL_ZIP]
+    \\ simp[mapRobotsInSquare_def,EL_MAP]
+    \\ rw[]
+    \\ rw[shatter_def]))
 
 val LENGTH_neighbour_coords = Q.store_thm("LENGTH_neighbour_coords[simp]",
   `LENGTH (neighbour_coords x) = 8`,
@@ -624,6 +525,7 @@ val immigration_sources = Q.store_thm("immigration_sources",
   \\ strip_tac
   \\ simp[EL_MAP]);
 
+(*
 val focal_preserved = Q.store_thm("focal_preserved",
   `wf_state_with_hole s ∧
    events = computeEvents s.state ∧
@@ -1104,10 +1006,11 @@ val focal_preserved = Q.store_thm("focal_preserved",
   \\ fs[] \\ rveq
   \\ fs[] \\ rveq
   \\ metis_tac[neighbour_coords_opposite_imp]);
+*)
 
 val get_focal_robot_def = Define`
   get_focal_robot s =
-    EL s.focal_index (s.state ' s.focal_coordinate).robots`;
+    CHOICE { r | ∃sq. r.name = s.focal_name ∧ MEM r sq.robots ∧ sq ∈ FRANGE s.state }`
 
 val isMovedOut_map_inspected = Q.store_thm("isMovedOut_map_inspected[simp]",
   `isMovedOut (map_inspected f x) = isMovedOut x`,
@@ -1118,9 +1021,33 @@ val steph_focal_clock = Q.store_thm("steph_focal_clock",
    steph c s = SOME (obs,s') ⇒
    (get_focal_robot s).processor = (get_focal_robot s').processor`,
   rw[steph_def]
-  \\ split_pair_tac \\ fs[]
+  \\ pairarg_tac \\ fs[]
   \\ rw[get_focal_robot_def]
   \\ cheat);
+
+val mapRobotsInSquare_compose = Q.store_thm("mapRobotsInSquare_compose",
+  `mapRobotsInSquare (f o g) = mapRobotsInSquare f o mapRobotsInSquare g`,
+  rw[FUN_EQ_THM,mapRobotsInSquare_def]
+  \\ rpt (AP_THM_TAC ORELSE AP_TERM_TAC)
+  \\ rw[FUN_EQ_THM,MAP_MAP_o])
+
+val mapRobots_compose = Q.store_thm("mapRobots_compose",
+  `mapRobots f (mapRobots g x) = mapRobots (f o g) x`,
+  rw[mapRobots_def,FMAP_MAP2_SND_compose,mapRobotsInSquare_compose])
+
+val fill_with_policy_split = Q.store_thm("fill_with_policy_split",
+  `fill (with_policy c p) s =
+   fill (memory_fupd (K p))
+   (s with state := fill (command_fupd (K c)) s)`,
+  rw[fill_def,mapRobots_compose]
+  \\ AP_THM_TAC \\ AP_TERM_TAC
+  \\ simp[FUN_EQ_THM]
+  \\ rw[] \\ fs[])
+
+val wf_state_with_hole_focal_name_nonzero = Q.store_thm("wf_state_with_hole_focal_name_nonzero",
+  `wf_state_with_hole s ⇒ s.focal_name ≠ 0`,
+  rw[wf_state_with_hole_def,wf_state_def,EVERY_MEM]
+  \\ res_tac \\ fs[]);
 
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
@@ -1128,7 +1055,18 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
    run_policy p (get_focal_robot s).processor obs = (c',p')
    ⇒
    step (fill (with_policy c p) s) = fill (with_policy c' p') s'`,
-  rw[wf_state_with_hole_def,fill_def,get_focal_robot_def,step_def,steph_def] >>
+  rw[steph_def]
+  \\ imp_res_tac wf_state_with_hole_focal_name_nonzero
+  \\ pairarg_tac \\ fs[]
+  \\ rveq \\ fs[]
+  \\ simp[fill_with_policy_split,SimpLHS]
+  \\ simp[step_def]
+  \\ simp[computeEvents_fill_with_memory]
+  \\ simp[o_DEF]
+  \\ qpat_abbrev_tac`events = computeEvents _`
+  \\ cheat)
+
+(*
   `Abbrev(sq = s.state ' s.focal_coordinate)` by (
     fs[FLOOKUP_DEF,markerTheory.Abbrev_def] ) >> simp[] >>
   fs[LET_THM] >>
@@ -1311,6 +1249,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
      \\ cheat )
   \\ `x with robotActions updated_by m = x` by ( simp[event_component_equality] )
   \\ simp[]);
+*)
 
 (* sv theorem *)
 

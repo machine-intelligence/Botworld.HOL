@@ -262,6 +262,8 @@ val fill_def = Define`
 `;
 
 val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
+val _ = overload_on("with_memory", ``λp. memory_fupd (K p)``)
+val _ = overload_on("with_command", ``λc. command_fupd (K c)``)
 
 val steph_def = Define`
   steph command s =
