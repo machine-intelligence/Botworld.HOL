@@ -19,6 +19,28 @@ val PERM_SNOC = Q.store_thm("PERM_SNOC",
   \\ rw[PERM_FUN_SWAP_AT_FRONT]
   \\ metis_tac[PERM_CONS_IFF,PERM_TRANS,PERM_SYM]);
 
+val ALL_DISTINCT_FLAT = Q.store_thm("ALL_DISTINCT_FLAT",
+  `∀lss. ALL_DISTINCT (FLAT lss) ⇔
+         ALL_DISTINCT (FILTER ($<> []) lss) ∧
+         (∀ls. MEM ls lss ⇒ ALL_DISTINCT ls) ∧
+         (∀l1 l2. MEM l1 lss ∧ MEM l2 lss ∧ l1 ≠ l2 ⇒ DISJOINT (set l1) (set l2))`,
+  Induct \\ rw[]
+  \\ rw[ALL_DISTINCT_APPEND]
+  \\ rw[EQ_IMP_THM] \\ fs[]
+  >- (
+    fs[MEM_FILTER,MEM_FLAT]
+    \\ Cases_on`h`\\fs[]
+    \\ metis_tac[MEM] )
+  >- (
+    fs[IN_DISJOINT,MEM_FLAT]
+    \\ metis_tac[] )
+  >- (
+    fs[IN_DISJOINT,MEM_FLAT]
+    \\ metis_tac[] )
+  \\ fs[MEM_FILTER] \\ rw[] \\ fs[]
+  \\ fs[IN_DISJOINT,MEM_FLAT]
+  \\ metis_tac[]);
+
 (*
 val QSORT_any_pivot = Q.store_thm("QSORT_any_pivot",
   `∀R ls x. MEM x ls ⇒
@@ -1116,9 +1138,58 @@ val focal_preserved = Q.store_thm("focal_preserved",
   \\ metis_tac[neighbour_coords_opposite_imp]);
 *)
 
+val focal_robots_def = Define`
+  focal_robots s = { r | ∃sq. r.name = s.focal_name ∧ MEM r sq.robots ∧ sq ∈ FRANGE s.state }`;
+
 val get_focal_robot_def = Define`
-  get_focal_robot s =
-    CHOICE { r | ∃sq. r.name = s.focal_name ∧ MEM r sq.robots ∧ sq ∈ FRANGE s.state }`
+  get_focal_robot = CHOICE o focal_robots`
+
+val focal_robots_sing = Q.store_thm("focal_robots_sing",
+  `wf_state_with_hole s ⇒
+   ∃r. focal_robots s = {r}`,
+  rw[wf_state_with_hole_def,allNames_def,MEM_FLAT,MEM_MAP,wf_state_def]
+  \\ fs[robotNames_def,MEM_MAP]
+  \\ qmatch_assum_rename_tac`MEM r _.robots`
+  \\ qexists_tac`r`
+  \\ rw[focal_robots_def,EXTENSION]
+  \\ reverse(rw[EQ_IMP_THM])
+  >- (
+    asm_exists_tac
+    \\ rw[IN_FRANGE]
+    \\ fs[allCoords_def,QSORT_MEM]
+    \\ asm_exists_tac \\ fs[] )
+  \\ fs[ALL_DISTINCT_FLAT]
+  \\ fs[MEM_MAP,PULL_EXISTS,IN_FRANGE] \\ rw[]
+  \\ qmatch_rename_tac`r1 = r2`
+  \\ qmatch_assum_rename_tac`MEM r1 (s.state ' k1).robots`
+  \\ qmatch_assum_rename_tac`MEM r2 (s.state ' k2).robots`
+  \\ `MEM k1 (allCoords s.state)` by ( simp[allCoords_def,QSORT_MEM] )
+  \\ Cases_on`k1 = k2` \\ fs[] \\ rw[]
+  >- (
+    last_x_assum(qspec_then`k1`mp_tac)
+    \\ rw[]
+    \\ imp_res_tac ALL_DISTINCT_MAP
+    \\ fs[MEM_EL]
+    \\ fs[EL_ALL_DISTINCT_EL_EQ]
+    \\ fs[EL_MAP]
+    \\ metis_tac[] )
+  \\ Cases_on `MAP robot_name (s.state ' k1).robots =
+               MAP robot_name (s.state ' k2).robots`
+  >- (
+    drule ALL_DISTINCT_FILTER_EL_IMP
+    \\ simp[]
+    \\ fs[MEM_EL]
+    \\ qmatch_assum_rename_tac`k2 = EL n2 _`
+    \\ qmatch_assum_rename_tac`k1 = EL n1 _`
+    \\ disch_then(qspecl_then[`n1`,`n2`]mp_tac)
+    \\ simp[EL_MAP] \\ rfs[]
+    \\ impl_tac >- metis_tac[MEM_EL,MEM]
+    \\ disch_then SUBST_ALL_TAC \\ fs[] )
+  \\ first_x_assum drule
+  \\ qpat_assum`MEM k2 _`assume_tac
+  \\ disch_then drule \\ simp[]
+  \\ simp[IN_DISJOINT,MEM_MAP]
+  \\ metis_tac[]);
 
 val isMovedOut_map_inspected = Q.store_thm("isMovedOut_map_inspected[simp]",
   `isMovedOut (map_inspected f x) = isMovedOut x`,
