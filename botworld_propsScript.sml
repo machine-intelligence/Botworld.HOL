@@ -5,6 +5,56 @@ val _ = new_theory"botworld_props";
 
 (* TODO: move *)
 
+val PERM_FLAT = Q.store_thm("PERM_FLAT",
+  `∀l1 l2. PERM l1 l2 ⇒ PERM (FLAT l1) (FLAT l2)`,
+  ho_match_mp_tac PERM_IND
+  \\ simp[]
+  \\ conj_tac >- ( simp[PERM_APPEND_IFF] )
+  \\ conj_tac >- ( simp[PERM_SWAP_L_AT_FRONT] )
+  \\ metis_tac[PERM_TRANS]);
+
+val PERM_SNOC = Q.store_thm("PERM_SNOC",
+  `∀l1 x l2. PERM (SNOC x l1) l2 ⇔ PERM (x::l1) l2`,
+  Induct \\ rw[]
+  \\ rw[PERM_FUN_SWAP_AT_FRONT]
+  \\ metis_tac[PERM_CONS_IFF,PERM_TRANS,PERM_SYM]);
+
+(*
+val QSORT_any_pivot = Q.store_thm("QSORT_any_pivot",
+  `∀R ls x. MEM x ls ⇒
+   (QSORT R ls =
+    QSORT R (FILTER (λy. y ≠ x ∧ R x y) ls) ++ (FILTER ($= x) ls) ++
+    QSORT R (FILTER (λy. y ≠ x ∧ R y x) ls))`,
+  ho_match_mp_tac QSORT_IND
+  \\ simp[]
+  \\ rpt gen_tac
+  \\ strip_tac
+  \\ gen_tac
+  \\ strip_tac
+  >- (
+    rveq \\ fs[]
+    \\ simp[Once QSORT_DEF]
+    \\ pairarg_tac \\ fs[]
+
+val QSORT_SET_TO_LIST_INSERT = Q.store_thm("QSORT_SET_TO_LIST_INSERT",
+  `∀s. FINITE s ⇒
+   ∀x. x ∈ s ⇒
+     QSORT R (SET_TO_LIST s) =
+     QSORT R (SET_TO_LIST { y | y ∈ s ∧ y ≠ x ∧ R y x } ) ++ [x] ++
+     QSORT R (SET_TO_LIST { y | y ∈ s ∧ y ≠ x ∧ R x y } )`,
+  \\ ho_match_mp_tac SET_TO_LIST_IND
+  \\ rw[] \\ fs[]
+  \\ Cases_on`s = ∅` \\ fs[]
+  \\ simp[Once SET_TO_LIST_THM]
+  \\ simp[Once QSORT_DEF]
+  \\ pairarg_tac \\ fs[]
+
+*)
+
+val ALL_DISTINCT_QSORT = Q.store_thm("ALL_DISTINCT_QSORT",
+  `ALL_DISTINCT (QSORT R ls) ⇔ ALL_DISTINCT ls`,
+  metis_tac[QSORT_PERM,ALL_DISTINCT_PERM])
+
 val FLOOKUP_FMAP_MAP2 = Q.store_thm("FLOOKUP_FMAP_MAP2",
   `FLOOKUP (FMAP_MAP2 f m) x =
    OPTION_MAP (CURRY f x) (FLOOKUP m x) `,
@@ -525,9 +575,67 @@ val immigration_sources = Q.store_thm("immigration_sources",
   \\ strip_tac
   \\ simp[EL_MAP]);
 
+val computeEvents_FEMPTY = Q.store_thm("computeEvents_FEMPTY[simp]",
+  `computeEvents FEMPTY = FEMPTY`,
+  rw[computeEvents_def,fmap_eq_flookup,FLOOKUP_FMAP_MAP2]);
+
+val step_FEMPTY = Q.store_thm("step_FEMPTY[simp]",
+  `step FEMPTY = FEMPTY`,
+  rw[step_def,mkNames_def,allNames_def,ITSET_EMPTY]);
+
+val allCoords_FEMPTY = Q.store_thm("allCoords_FEMPTY[simp]",
+  `allCoords FEMPTY = []`, rw[allCoords_def,QSORT_DEF]);
+
+val allNames_FEMPTY = Q.store_thm("allNames_FEMPTY[simp]",
+  `allNames FEMPTY = []`, rw[allNames_def]);
+
 (*
+val PERM_allNames_FUPDATE = Q.store_thm("PERM_allNames_FUPDATE",
+  `∀s x y. PERM (allNames (s |+ (x,y))) (allNames (s \\ x) ++ robotNames y)`,
+  rw[allNames_def,allCoords_def]
+  \\ rw[GSYM FLAT_SNOC]
+  \\ match_mp_tac PERM_FLAT
+  \\ match_mp_tac (PERM_SYM |> SPEC_ALL |> EQ_IMP_RULE |> #1)
+  \\ simp[PERM_SNOC]
+  \\ simp[PERM_CONS_EQ_APPEND]
+  \\ qexists_tac`PARTITION
+
+  ho_match_mp_tac fmap_INDUCT \\ rw[]
+  >- ( rw[allNames_def,allCoords_def] \\ EVAL_TAC \\ rw[] )
+  >- (
+    rw[allNames_def,allCoords_def,FAPPLY_FUPDATE_THM]
+    \\ rw[GSYM FLAT_SNOC]
+    \\ match_mp_tac PERM_FLAT
+    \\ cheat )
+
+val ALL_DISTINCT_allNames_FUPDATE = Q.store_thm("ALL_DISTINCT_allNames_FUPDATE",
+  `ALL_DISTINCT (allNames (s |+ (x,y))) ⇔
+   ALL_DISTINCT (allNames (s \\ x) ++ robotNames y)`,
+  rw[allNames_def,ALL_DISTINCT_APPEND,MEM_FLAT,MEM_MAP,PULL_EXISTS]
+  ALL_DISTINCT_FLAT
+  rw[allNames_def,ALL_DISTINCT_QSORT,ALL_DISTINCT_APPEND,QSORT_MEM,MEM_FLAT,PULL_EXISTS,MEM_MAP]
+  \\ qpat_abbrev_tac`lsy = FLAT (MAP _ _)`
+  \\ qpat_abbrev_tac`ls = FLAT _`
+  \\ `PERM lsy (ls ++ robotNames y)`
+  by (
+    unabbrev_all_tac
+
+val wf_state_preserved = Q.store_thm("wf_state_preserved",
+  `∀s. wf_state s ⇒ wf_state (step s)`,
+  ho_match_mp_tac fmap_INDUCT
+  \\ conj_tac >- ( rw[wf_state_def] )
+  \\ rw[]
+  step_def
+  wf_state_def
+  allNames_def
+    ,allNames_def,step_def,computeEvents_def,mkNames_def,FMAP_MAP2_THM]
+  rw[wf_state_def,step_def,allNames_def]
+
 val focal_preserved = Q.store_thm("focal_preserved",
-  `wf_state_with_hole s ∧
+  `∀s. wf_state_with_hole s ⇒
+   wf_state_with_hole (s with state := step s.state)`,
+  ho_match_mp_tac fmap_INDUCT
+
    events = computeEvents s.state ∧
    ev = events ' s.focal_coordinate ∧
    ¬EXISTS(λa. a = Destroyed s.focal_index ∨ ∃r. a = Inspected s.focal_index r)(MAP SND ev.robotActions) ∧
@@ -1023,17 +1131,18 @@ val steph_focal_clock = Q.store_thm("steph_focal_clock",
   rw[steph_def]
   \\ pairarg_tac \\ fs[]
   \\ rw[get_focal_robot_def]
+  \\ fs[step_def,IN_FRANGE_FLOOKUP]
   \\ cheat);
 
 val mapRobotsInSquare_compose = Q.store_thm("mapRobotsInSquare_compose",
   `mapRobotsInSquare (f o g) = mapRobotsInSquare f o mapRobotsInSquare g`,
   rw[FUN_EQ_THM,mapRobotsInSquare_def]
   \\ rpt (AP_THM_TAC ORELSE AP_TERM_TAC)
-  \\ rw[FUN_EQ_THM,MAP_MAP_o])
+  \\ rw[FUN_EQ_THM,MAP_MAP_o]);
 
 val mapRobots_compose = Q.store_thm("mapRobots_compose",
   `mapRobots f (mapRobots g x) = mapRobots (f o g) x`,
-  rw[mapRobots_def,FMAP_MAP2_SND_compose,mapRobotsInSquare_compose])
+  rw[mapRobots_def,FMAP_MAP2_SND_compose,mapRobotsInSquare_compose]);
 
 val fill_with_policy_split = Q.store_thm("fill_with_policy_split",
   `fill (with_policy c p) s =

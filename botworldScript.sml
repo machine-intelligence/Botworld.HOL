@@ -216,9 +216,11 @@ val robotNames_def = Define`
   robotNames = MAP robot_name o square_robots
 `
 
+val allCoords_def = Define`
+  allCoords (f:coordinate |-> α) = QSORT ($< LEX $<) (SET_TO_LIST (FDOM f))`
+
 val allNames_def = Define`
-  allNames = FLAT o MAP robotNames o SET_TO_LIST o FRANGE
-`
+  allNames f = FLAT (MAP (robotNames o FAPPLY f) (allCoords f))`
 
 val maxList_def = Define`
   maxList = FOLDL MAX 0
