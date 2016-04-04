@@ -101,6 +101,11 @@ val isMovedOut_def = Define`
   (isMovedOut _ ⇔ F)`;
 val _ = export_rewrites["isMovedOut_def"];
 
+val isMovedIn_def = Define`
+  (isMovedIn (MovedIn _) ⇔ T) ∧
+  (isMovedIn _ ⇔ F)`;
+val _ = export_rewrites["isMovedIn_def"];
+
 val _ = Datatype`
   itemCache =
   <| components: item list
