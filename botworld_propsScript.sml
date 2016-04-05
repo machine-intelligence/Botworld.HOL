@@ -1693,6 +1693,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
 *)
 
 (* sv theorem *)
+open botworld_svTheory
 
 val next_def = Define`
   (next MP = MP) ∧
@@ -1704,58 +1705,7 @@ val canupdateh_def = Define`
 val updateh_def = Define`
   updateh S c o' s' ⇔ ∃s. s ∈ S ∧ steph c s = SOME (o',s')`;
 
-val _ = overload_on("fill_with",
-  ``λp. fill (UNCURRY with_policy p)``);
-
 val _ = Parse.hide"S";
-
-val discount_exists_def = Define`
-  discount_exists (u:utilityfn) ⇔
-    (∃h1 h2. u h1 ≠ u h2) ∧
-    (∃z. ∀s h1 h2. u h1 ≠ u h2 ⇒ (u (s:::h2) − u (s:::h1)) / (u h2 − u h1) < z)`;
-
-val discount_not_negative = Q.store_thm("discount_not_negative",
-  `utilityfn u ∧ discount_exists u ⇒ 0 ≤ discount u`,
-  rw[utilityfn_def,discount_def,discount_exists_def]
-  \\ qmatch_goalsub_abbrev_tac`sup P`
-  \\ `∃x. P x` by ( simp[Abbr`P`,UNCURRY] \\ simp[EXISTS_PROD] \\ metis_tac[])
-  \\ `∃z. ∀x. P x ⇒ x < z`
-  by (
-    simp[Abbr`P`,UNCURRY] \\ simp[EXISTS_PROD]
-    \\ simp[PULL_EXISTS] \\ metis_tac[] )
-  \\ `∃x. P x ∧ 0 ≤ x` suffices_by metis_tac[realTheory.REAL_SUP_UBOUND,realTheory.REAL_LE_TRANS]
-  \\ simp[Abbr`P`,UNCURRY,EXISTS_PROD]
-  \\ simp[PULL_EXISTS]
-  \\ asm_exists_tac \\ simp[]
-  \\ Cases_on`u h2 ≤ u h1`
-  >- (
-    last_x_assum drule
-    \\ disch_then(qspec_then`s`strip_assume_tac)
-    \\ qexists_tac`s`
-    \\ match_mp_tac realTheory.REAL_LE_DIV
-    \\ simp[realTheory.REAL_SUB_LE] )
-  \\ pop_assum mp_tac
-  \\ simp[realTheory.REAL_NOT_LE,realTheory.REAL_LT_LE]
-  \\ strip_tac
-  \\ last_x_assum drule
-  \\ disch_then(qspec_then`s`strip_assume_tac)
-  \\ qexists_tac`s`
-  \\ ONCE_REWRITE_TAC [GSYM realTheory.REAL_NEG_LE0]
-  \\ ONCE_REWRITE_TAC [realTheory.neg_rat]
-  \\ IF_CASES_TAC >- metis_tac[realTheory.REAL_SUB_0]
-  \\ simp[realTheory.REAL_NEG_SUB]
-  \\ qmatch_abbrev_tac`a / b ≤ 0`
-  \\ `0 ≤ a / -b`
-  suffices_by (
-    REWRITE_TAC[realTheory.neg_rat]
-    \\ IF_CASES_TAC >- metis_tac[realTheory.REAL_SUB_0]
-    \\ ONCE_REWRITE_TAC[GSYM realTheory.REAL_NEG_LE0]
-    \\ REWRITE_TAC[realTheory.neg_rat]
-    \\ IF_CASES_TAC >- metis_tac[realTheory.REAL_SUB_0]
-    \\ simp[] )
-  \\ simp[realTheory.REAL_NEG_SUB,Abbr`a`,Abbr`b`]
-  \\ match_mp_tac realTheory.REAL_LE_DIV
-  \\ simp[realTheory.REAL_SUB_LE] );
 
 val lemmaA = Q.store_thm("lemmaA",
   `∀δ l S u c p1 p2.
@@ -1843,25 +1793,6 @@ val lemmaA = Q.store_thm("lemmaA",
   \\ simp[realTheory.real_ge]
   \\ metis_tac[realTheory.REAL_LE_SUB_RADD,realTheory.REAL_ADD_SYM]);
 
-val dominates'_def = Define`
-  (dominates' a (Trust k) g cp cp' = dominates a (Trust (SUC k)) g cp cp') ∧
-  (dominates' (:α) MP (S,u) cp cp' =
-   ∀k. LCA (SUC k) 𝕌(:α) ⇒ ∀s. s ∈ S ⇒
-     u (hist (fill_with cp' s)) ≤ u (hist (fill_with cp s)) + (discount u) pow k)`;
-
-val dominates_refl = Q.store_thm("dominates_refl",
-  `utilityfn u ∧ discount_exists u ⇒ dominates a l (S,u) cp cp`,
-  Cases_on`a`\\Cases_on`l`\\simp[dominates_def]
-  \\ simp[realTheory.REAL_LE_ADDR]
-  \\ metis_tac[discount_not_negative,realTheory.POW_POS]);
-
-val dominates'_refl = Q.store_thm("dominates'_refl",
-  `utilityfn u ∧ discount_exists u ⇒ dominates' a l (S,u) cp cp`,
-  Cases_on`a`\\reverse(Cases_on`l`)\\simp[dominates'_def]
-  >- metis_tac[dominates_refl]
-  \\ simp[realTheory.REAL_LE_ADDR]
-  \\ metis_tac[discount_not_negative,realTheory.POW_POS]);
-
 val wf_game_def = Define`
   wf_game (S,u) ⇔
     (∀s. s ∈ S ⇒ wf_state_with_hole s) ∧
@@ -1946,8 +1877,6 @@ val lemmaB = Q.store_thm("lemmaB",
     \\ metis_tac[steph_focal_clock,IN_DEF] )
   \\ fs[] );
 
-open botworld_quoteTheory basicReflectionLib
-
 val no_ffi_op_def = Define`
   (no_ffi_op (FFI n) ⇔ (n ≠ 2)) ∧
   (no_ffi_op _ ⇔ T)`;
@@ -1975,25 +1904,6 @@ val no_ffi_def = tDefine"no_ffi"`
  \\ rw[] \\ res_tac \\ simp[astTheory.exp_size_def]);
 val no_ffi_def = save_thm("no_ffi_def",no_ffi_def |> REWRITE_RULE[ETA_AX])
 val _ = export_rewrites["no_ffi_def"];
-
-val _ = temp_overload_on("state_with_hole_ty",type_to_deep``:state_with_hole``);
-val _ = temp_overload_on("observation_ty",type_to_deep``:observation``);
-val _ = temp_overload_on("utilityfn_ty",type_to_deep``:utilityfn``);
-val _ = temp_overload_on("dominates_tm",term_to_deep``dominates (:α)``);
-
-val mk_target_concl_def = Define`
-  mk_target_concl obs cp1 cp2 l Stm utm =
-  Comb
-  (Comb
-   (Comb
-    (Comb dominates_tm (FST quote_level l))
-    (FST (quote_prod
-          ((I, Fun state_with_hole_ty Bool), (I, utilityfn_ty)))
-     (Comb Stm (FST quote_observation obs), utm)))
-   (FST (quote_prod (quote_command, quote_prog)) cp1))
-  (FST (quote_prod (quote_command, quote_prog)) cp2)`;
-
-(* TODO: translate mk_target_concl *)
 
 (* TODO: constrain thy to be an extension of the theory set up by the Botworld preamble *)
 

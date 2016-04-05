@@ -273,6 +273,8 @@ val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_comm
 val _ = overload_on("with_memory", ``λp. memory_fupd (K p)``)
 val _ = overload_on("with_command", ``λc. command_fupd (K c)``)
 
+val _ = overload_on("fill_with",``λp. fill (UNCURRY with_policy p)``);
+
 val steph_def = Define`
   steph command s =
     let s' = fill (robot_command_fupd (K command)) s in
@@ -293,83 +295,5 @@ val _ = Parse.type_abbrev("history",``:grid llist``);
 
 val hist_def = Define`
   hist s = LUNFOLD (λs. SOME (step s,s)) s`;
-
-(* utility *)
-
-val _ = Parse.type_abbrev("utilityfn",``:history -> real``);
-
-val utilityfn_def = Define`
-  utilityfn (u:utilityfn) ⇔
-    (∀x. 0 ≤ u x ∧ u x ≤ 1) ∧
-    ∀s h h'. u h ≤ u h' ⇒ u (s ::: h) ≤ u (s ::: h')`;
-
-val discount_def = Define`
-  discount (u:utilityfn) = sup { (u (s ::: h) - u (s ::: h')) / (u h - u h') | (s,h,h') | u h ≠ u h' }`
-
-val weaklyExtensional_def = Define`
-  weaklyExtensional (u:utilityfn) ⇔
-    ∀s p1 p2 h. u (fill p1 s ::: h) = u (fill p2 s ::: h)`;
-
-(* suggester/verifier *)
-
-val dominates_def = Define`
-  (dominates (:α) (Trust k) (S,u) cp cp' ⇔
-     LCA k (UNIV:α set) ⇒
-     ∀s. s ∈ S ⇒
-       u (hist (fill (UNCURRY with_policy cp') s)) ≤
-       u (hist (fill (UNCURRY with_policy cp) s))) ∧
-  (dominates (:α) MP (S,u) cp cp' ⇔
-   ∀k. LCA k (UNIV:α set) ⇒
-       ∀s. s ∈ S ⇒
-         u (hist (fill (UNCURRY with_policy cp') s)) ≤
-         u (hist (fill (UNCURRY with_policy cp) s))
-           + ((discount u) pow k))`;
-
-val level_to_deep = Define`
-  level_to_deep (l:level) = (ARB:exp) (* TODO *)`;
-
-val term_to_deep = Define`
-  term_to_deep (t:term) = (ARB:exp) (* TODO *)`;
-
-(* -- *)
-
-val sv_def = Define`
-  sv l Stm utm π σ =
-    (* assumes preamble gets run by botworld, defining all the requisite types *)
-    (* preamble also includes helper functions:
-       Botworld.read_observation : unit -> observation
-       Botworld.read_output : unit -> command * prog
-       Botworld.check_theorem : thm * level * term * observation * term * (command * prog) * (command * prog) -> bool
-       However, the preamble syntactically contains no FFI-writing (on FFI 2) capability.
-       This is declared separately (by write_output_dec) _after_ the suggester
-       is defined, so it is easy to show that the suggester does not write anything.
-       The write helper has this signature:
-       Botworld_writer.write_output : command * prog -> unit
-    *)
-    (* assume σ is an expression that is closed by the definitions of the
-       preamble and two variables "observation" and "fallback", and it returns
-       a (command * prog * thm) option *)
-    [Tdec(Dlet(Pvar"suggester")(Fun "observation" (Fun "fallback" σ)));
-     Tmod"Botworld_writer"NONE[write_output_dec]] ++
-    π (* this will read the observation and write the fallback *) ++
-    [Tdec(Dlet(Pvar"observation")(App Opapp [Var(Long"Botworld""read_observation");Con NONE []]));
-     Tdec(Dlet(Pvar"fallback")(App Opapp [Var(Long"Botworld""read_output");Con NONE []]));
-     Tdec(Dlet(Pvar"result")
-           (Mat (App Opapp [App Opapp [Var(Short"suggester");Var(Short"observation")];Var(Short"fallback")])
-              [(Pcon(SOME(Short"NONE"))[],Con NONE [])
-              ;(Pcon(SOME(Short"SOME"))[Pcon NONE [Pvar"policy";Pvar"thm"]],
-               If (App Opapp
-                   [Var(Long"Botworld""check_theorem");
-                    Con NONE
-                      [Var(Short"thm")
-                      ;level_to_deep l
-                      ;term_to_deep Stm
-                      ;Var(Short"observation")
-                      ;term_to_deep utm
-                      ;Var(Short"policy")
-                      ;Var(Short"fallback")
-                      ]])
-                   (App Opapp [Var(Long"Botworld""write_output");Var(Short"policy")])
-                   (Con NONE []))]))]`;
 
 val _ = export_theory()
