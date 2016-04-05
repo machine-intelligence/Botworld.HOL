@@ -6,7 +6,15 @@ ifndef HOLREFLDIR
 HOLREFLDIR = $(HOME)/hol-reflection
 endif
 
-INCLUDES = $(HOLDIR)/examples/pattern_matches $(CAKEMLDIR)/semantics $(CAKEMLDIR)/compiler/parsing $(CAKEMLDIR)/translator $(HOLDIR)/examples/formal-languages/context-free $(CAKEMLDIR)/candle/standard/syntax $(CAKEMLDIR)/candle/standard/semantics $(HOLREFLDIR) $(HOLREFLDIR)/lca
+INCLUDES = $(HOLDIR)/examples/pattern_matches\
+					 $(CAKEMLDIR)/semantics\
+					 $(CAKEMLDIR)/compiler/parsing\
+					 $(CAKEMLDIR)/translator\
+					 $(HOLDIR)/examples/formal-languages/context-free\
+					 $(CAKEMLDIR)/candle/standard/syntax\
+					 $(CAKEMLDIR)/candle/standard/semantics\
+					 $(CAKEMLDIR)/candle/standard/monadic\
+					 $(HOLREFLDIR) $(HOLREFLDIR)/lca
 THYFILES = $(patsubst %Script.sml,%Theory.uo,$(wildcard *.sml))
 TARGETS = $(patsubst %.sml,%.uo,$(THYFILES))
 all: $(TARGETS)
@@ -15,7 +23,12 @@ all: $(TARGETS)
 ifdef POLY
 HOLHEAP = heap
 EXTRA_CLEANS = $(HOLHEAP) $(HOLHEAP).o
-BARE_THYS = $(CAKEMLDIR)/preamble $(CAKEMLDIR)/semantics/terminationTheory $(CAKEMLDIR)/compiler/parsing/fromSexpTheory $(CAKEMLDIR)/translator/ml_translatorLib $(HOLREFLDIR)/lca/lcaTheory
+BARE_THYS = $(CAKEMLDIR)/preamble\
+						$(CAKEMLDIR)/semantics/terminationTheory\
+						$(CAKEMLDIR)/compiler/parsing/fromSexpTheory\
+						$(CAKEMLDIR)/translator/ml_translatorLib\
+						$(CAKEMLDIR)/candle/standard/monadic/holKernelTheory\
+						$(HOLREFLDIR)/lca/lcaTheory
 DEPS = $(patsubst %,%.uo,$(BARE_THYS))
 $(HOLHEAP): $(DEPS)
 	$(protect $(HOLDIR)/bin/buildheap) -o $(HOLHEAP) $(BARE_THYS)
