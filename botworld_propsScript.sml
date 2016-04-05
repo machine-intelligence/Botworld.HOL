@@ -41,6 +41,13 @@ val ALL_DISTINCT_FLAT = Q.store_thm("ALL_DISTINCT_FLAT",
   \\ fs[IN_DISJOINT,MEM_FLAT]
   \\ metis_tac[]);
 
+val PERM_FILTER_SPLIT = Q.store_thm("PERM_FILTER_SPLIT",
+  `∀P ls. PERM ls (FILTER P ls ++ FILTER ($~ o P) ls)`,
+  gen_tac \\ Induct \\ simp[] \\ rw[]
+  \\ rw[PERM_CONS_EQ_APPEND]
+  \\ ONCE_REWRITE_TAC[CONJ_COMM]
+  \\ asm_exists_tac \\ rw[]);
+
 (*
 val QSORT_any_pivot = Q.store_thm("QSORT_any_pivot",
   `∀R ls x. MEM x ls ⇒
@@ -624,11 +631,98 @@ val eventNewRobotNames_def = Define`
                        ¬MEM (Destroyed r.name) (MAP SND ev.robotActions))
               ev.robotActions)`;
 
+val eventMovedRobotNames_def = Define`
+  eventMovedRobotNames ev =
+    MAP (robot_name o FST)
+      (FILTER (λ(r,a). ¬isMovedOut a ∧
+                       ¬MEM (Destroyed r.name) (MAP SND ev.robotActions) ∧
+                       a ≠ Created)
+              ev.robotActions)`;
+
 val eventAllNames_def = Define`
   eventAllNames f = FLAT (MAP (eventOldRobotNames o $' f) (allCoords f))`;
 
 val eventAllNewNames_def = Define`
   eventAllNewNames f = FLAT (MAP (eventNewRobotNames o $' f) (allCoords f))`;
+
+val updateInventory_name = Q.store_thm("updateInventory_name[simp]",
+  `(updateInventory sq r a).name = r.name`,
+  rw[updateInventory_def]
+  \\ CASE_TAC \\ fs[]);
+
+val FILTER_0_eventMovedRobotNames = Q.store_thm("FILTER_0_eventMovedRobotNames",
+  `EVERY ($<> 0) (robotNames sq) ∧ EVERY (OPTION_EVERY (EVERY ($<> 0) o robotNames)) nb ⇒
+   FILTER ($<> 0) (eventNewRobotNames (event sq nb)) = eventMovedRobotNames (event sq nb)`,
+  rw[eventMovedRobotNames_def,eventNewRobotNames_def,event_def]
+  \\ qmatch_goalsub_abbrev_tac`FLAT (MAP f (localActions _ _))`
+  \\ qmatch_goalsub_abbrev_tac`FILTER P (veterans ++ immigrations ++ children)`
+  \\ simp[FILTER_MAP,FILTER_FILTER]
+  \\ qmatch_goalsub_abbrev_tac`FILTER P1 _`
+  \\ qmatch_goalsub_abbrev_tac`_ = MAP _ (FILTER P2 _)`
+  \\ AP_TERM_TAC
+  \\ simp[FILTER_APPEND]
+  \\ match_mp_tac APPEND_EQ_suff
+  \\ ONCE_REWRITE_TAC[CONJ_COMM]
+  \\ `FILTER P1 veterans = FILTER P2 veterans`
+  by (
+    simp[FILTER_EQ]
+    \\ simp[Abbr`P1`,Abbr`P2`,Abbr`P`]
+    \\ simp[FORALL_PROD]
+    \\ rpt gen_tac \\ strip_tac
+    \\ EQ_TAC \\ fs[] \\ strip_tac
+    \\ qpat_assum`MEM _ _`mp_tac
+    \\ simp[Abbr`veterans`,MEM_ZIP]
+    \\ strip_tac \\ rveq
+    \\ simp[localActions_def,EL_MAP,EL_ZIP]
+    \\ simp[act_def]
+    >- ( rpt(CASE_TAC \\ simp[]) )
+    \\ fs[EVERY_MEM,MEM_EL,robotNames_def]
+    \\ metis_tac[EL_MAP])
+  \\ fs[]
+  \\ reverse conj_asm1_tac \\ fs[]
+  \\ fs[Abbr`P`]
+  \\ conj_tac
+  >- (
+    simp[FILTER_EQ]
+    \\ simp[Abbr`P1`,Abbr`P2`,FORALL_PROD]
+    \\ rpt gen_tac \\ strip_tac
+    \\ EQ_TAC \\ fs[] \\ strip_tac
+    \\ qpat_assum`MEM _ _`mp_tac
+    \\ simp[Abbr`immigrations`,MEM_FLAT,MEM_GENLIST,PULL_EXISTS]
+    \\ rw[]
+    \\ imp_res_tac incomingFrom_MovedIn
+    \\ fs[]
+    \\ Cases_on`EL i nb` \\ fs[incomingFrom_def]
+    \\ fs[MEM_FLAT,MEM_MAP,EVERY_MEM]
+    \\ rw[]
+    \\ qpat_assum`MEM _ _`mp_tac
+    \\ rw[]
+    \\ fs[MEM_EL,PULL_EXISTS]
+    \\ first_x_assum drule
+    \\ simp[EVERY_MEM,MEM_EL,robotNames_def]
+    \\ metis_tac[EL_MAP] )
+  \\ simp[FILTER_EQ]
+  \\ simp[Abbr`children`,REPLICATE_GENLIST,localActions_def]
+  \\ rw[]
+  \\ imp_res_tac MEM_ZIP_MEM_MAP \\ fs[]
+  \\ fs[MEM_GENLIST,MEM_FLAT,MEM_MAP] \\ rw[]
+  \\ qpat_assum`MEM _ _`mp_tac
+  \\ simp[act_def]
+  \\ simp[Abbr`f`]
+  \\ CASE_TAC \\ simp[]
+  \\ CASE_TAC \\ simp[]
+  \\ CASE_TAC \\ simp[]
+  \\ CASE_TAC \\ simp[]
+  \\ rator_x_assum`construct`mp_tac
+  \\ simp[construct_def]
+  \\ BasicProvers.TOP_CASE_TAC \\ simp[]
+  \\ BasicProvers.TOP_CASE_TAC \\ simp[]
+  \\ BasicProvers.TOP_CASE_TAC \\ simp[]
+  \\ BasicProvers.TOP_CASE_TAC \\ simp[]
+  \\ BasicProvers.TOP_CASE_TAC \\ simp[]
+  \\ rw[]
+  \\ Cases_on`x` \\ fs[]
+  \\ rw[Abbr`P1`,Abbr`P2`]);
 
 val allCoords_computeEvents = Q.store_thm("allCoords_computeEvents[simp]",
   `allCoords (computeEvents g) = allCoords g`,
@@ -687,11 +781,95 @@ val computeEvents_names = Q.store_thm("computeEvents_names",
   \\ simp[MAP_MAP_o,robot_name_o_UNCURRY_updateInventory]
   \\ simp[MAP_ZIP]);
 
+val MEM_allNames_robotNames = Q.store_thm("MEM_allNames_robotNames",
+  `x ∈ FDOM g ⇒ set (robotNames (g ' x)) ⊆  set (allNames g)`,
+  rw[SUBSET_DEF,allNames_def,robotNames_def,MEM_FLAT,MEM_MAP,PULL_EXISTS]
+  \\ rw[allCoords_def,QSORT_MEM]
+  \\ metis_tac[]);
+
+val MEM_allNames_neighbours = Q.store_thm("MEM_allNames_neighbours",
+  `x ∈ FDOM g ∧ MEM (SOME sq) (neighbours g x) ⇒
+   set (robotNames sq) ⊆ set (allNames g)`,
+  rw[SUBSET_DEF,allNames_def,robotNames_def,neighbours_def,MEM_FLAT,MEM_MAP,PULL_EXISTS]
+  \\ rw[allCoords_def,QSORT_MEM]
+  \\ fs[FLOOKUP_DEF]
+  \\ metis_tac[]);
+
+val eventJustMovedNames_def = Define`
+  eventJustMovedNames = MAP (robot_name o FST) o (FILTER (isMovedIn o SND)) o event_robotActions`;
+
+val eventJustLeftNames_def = Define`
+  eventJustLeftNames = MAP (robot_name o FST) o (FILTER (isMovedOut o SND)) o event_robotActions`;
+
+val eventStationaryNames_def = Define`
+  eventStationaryNames = MAP (robot_name o FST)
+    o (FILTER ((λa. ¬isMovedIn a ∧ ¬isMovedOut a ∧ a ≠ Created) o SND))
+    o event_robotActions`;
+
+val eventDeadNames_def = Define`
+  eventDeadNames ev = MAP (robot_name o FST)
+    (FILTER (λ(r,a). MEM (Destroyed r.name) (MAP SND ev.robotActions)) ev.robotActions)`;
+
+val eventOldRobotNames_thm = Q.store_thm("eventOldRobotNames_thm",
+  `PERM (eventOldRobotNames ev) (eventStationaryNames ev ++ eventJustLeftNames ev)`,
+  rw[eventOldRobotNames_def,eventStationaryNames_def,eventJustLeftNames_def]
+  \\ REWRITE_TAC[GSYM MAP_APPEND]
+  \\ match_mp_tac PERM_MAP
+  \\ qmatch_abbrev_tac`PERM l1 (l2 ++ l3)`
+  \\ `l2 = FILTER ($~ o isMovedOut o SND) l1`
+  by (
+    simp[Abbr`l2`,Abbr`l1`,FILTER_FILTER,o_DEF]
+    \\ AP_THM_TAC \\ AP_TERM_TAC
+    \\ rw[FUN_EQ_THM,EQ_IMP_THM] )
+  \\ `l3 = FILTER ($~ o ($~ o isMovedOut o SND)) l1`
+  by (
+    simp[Abbr`l3`,Abbr`l1`,FILTER_FILTER,o_DEF]
+    \\ AP_THM_TAC \\ AP_TERM_TAC
+    \\ rw[FUN_EQ_THM,EQ_IMP_THM]
+    \\ Cases_on`SND x` \\ fs[] )
+  \\ metis_tac[PERM_FILTER_SPLIT]);
+
 (*
+val eventMovedRobotNames_thm = Q.store_thm("eventMovedRobotNames_thm",
+  `PERM (eventNewRobotNames ev) (eventStationaryNames`,
+  eventMovedRobotNames_def
+
+val ALL_DISTINCT_eventAllNames_imp_new = Q.store_thm("ALL_DISTINCT_eventAllNames_imp_new",
+  `wf_state g ∧
+   ALL_DISTINCT (eventAllNames (computeEvents g)) ⇒
+   ALL_DISTINCT (FILTER ($<> 0) (eventAllNewNames (computeEvents g)))`,
+  rw[eventAllNames_def,eventAllNewNames_def,ALL_DISTINCT_FLAT,wf_state_def]
+  \\ rw[FILTER_FLAT]
+  \\ simp[ALL_DISTINCT_FLAT]
+  \\ simp[MAP_MAP_o,o_DEF]
+  \\ qpat_abbrev_tac`ls = MAP _ (allCoords g)`
+  \\ `ls = MAP (eventMovedRobotNames o FAPPLY (computeEvents g)) (allCoords g)`
+  by (
+    simp[Abbr`ls`,MAP_EQ_f]
+    \\ rpt strip_tac
+    \\ `x ∈ FDOM g` by fs[allCoords_def,QSORT_MEM]
+    \\ simp[computeEvents_def,FMAP_MAP2_THM]
+    \\ match_mp_tac FILTER_0_eventMovedRobotNames
+    \\ conj_tac
+    >- (
+      imp_res_tac MEM_allNames_robotNames
+      \\ fs[EVERY_MEM,SUBSET_DEF]
+      \\ metis_tac[prim_recTheory.LESS_REFL] )
+    \\ imp_res_tac MEM_allNames_neighbours
+    \\ fs[EVERY_MEM]
+    \\ Cases \\ fs[]
+    \\ strip_tac \\ res_tac
+    \\ fs[SUBSET_DEF,EVERY_MEM]
+    \\ metis_tac[prim_recTheory.LESS_REFL] )
+  \\ fs[Abbr`ls`]
+  \\ pop_assum kall_tac
+
+
 val eventAllNames_move = Q.store_thm("eventAllNames_move",
   `∃P. PERM (FILTER ($<> 0) (eventAllNewNames f)) (FILTER P (eventAllNames f))`,
   rw[eventAllNewNames_def,eventAllNames_def]
   \\ rw[eventNewRobotNames_def,eventOldRobotNames_def]
+  PERM_ALL_DISTINCT
 *)
 
 (*
