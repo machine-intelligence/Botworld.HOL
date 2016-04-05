@@ -33,6 +33,7 @@ val sexp_of_mls_def = Define `
   sexp_of_mls (sx_num n) = SX_NUM n ∧
   sexp_of_mls (sx_str (strlit s)) = SX_STR s
 `
+val _ = export_rewrites["sexp_of_mls_def"];
 
 val mls_of_sexp_def = Define `
   mls_of_sexp (SX_CONS s1 s2) = sx_cons (mls_of_sexp s1) (mls_of_sexp s2) ∧
@@ -40,6 +41,7 @@ val mls_of_sexp_def = Define `
   mls_of_sexp (SX_NUM n) = sx_num n ∧
   mls_of_sexp (SX_STR s) = sx_str (strlit s)
 `
+val _ = export_rewrites["mls_of_sexp_def"];
 
 val mls_sexp_inv = Q.prove(
   `!s. mls_of_sexp (sexp_of_mls s) = s`,
@@ -60,6 +62,43 @@ val sexp_factors = Q.prove(
   `!f. ?f'. f = f' o sexp_of_mls`,
   rw[FUN_EQ_THM] >> qexists_tac `f o mls_of_sexp` >> rw[mls_sexp_inv]
 )
+
+val case_sexp_of_mls = Q.store_thm("case_sexp_of_mls",
+  `(case sexp_of_mls x of
+    | SX_CONS h t => f1 h t
+    | SX_SYM s => f2 s
+    | SX_NUM n => f3 n
+    | SX_STR s => f4 s)
+   =
+   (case x of
+    | sx_cons h t => f (sexp_of_mls h) (sexp_of_mls t)
+    | sx_sym (strlit s) => f2 s
+    | sx_num n => f3 n
+    | sx_str (strlit s) => f4 s)`,
+  match_mp_tac EQ_SYM
+  \\ BasicProvers.TOP_CASE_TAC \\ simp[]
+  \\ BasicProvers.TOP_CASE_TAC \\ simp[]);
+
+val ml_strip_sxcons_def = Define`
+  ml_strip_sxcons = OPTION_MAP (MAP mls_of_sexp) o strip_sxcons o sexp_of_mls`;
+
+val compose_mlsexp_CASE = Q.store_thm("compose_mlsexp_CASE",
+  `g (mlsexp_CASE m f f1 f2 f3) =
+   mlsexp_CASE m (($o g) o f) (g o f1) (g o f2) (g o f3)`,
+  Cases_on`m`\\EVAL_TAC);
+
+(*
+val OPTION_MAP_cases = Q.store_thm("OPTION_MAP_cases",
+  `OPTION_MAP f x = case x of NONE => NONE | SOME y => SOME (f y)`,
+  CASE_TAC \\ EVAL_TAC)
+
+``ml_strip_sxcons s``
+|> SIMP_CONV std_ss [
+    ml_strip_sxcons_def,combinTheory.o_DEF,
+    Once simpleSexpTheory.strip_sxcons_def,case_sexp_of_mls,
+    compose_mlsexp_CASE,optionTheory.OPTION_MAP_COMPOSE,
+    listTheory.MAP,mls_sexp_inv]
+*)
 
 val res = translate simpleSexpTheory.strip_sxcons_def;
 val res = translate simpleSexpParseTheory.print_space_separated_def;
