@@ -175,10 +175,16 @@ val ffi_from_observation_def = Define`
     initial_ffi_state botworld_oracle
       (botworld_initial_state obs)`;
 
+(* TODO:
+  define this in botworld_preambleTheory, as the environment produced by
+  the translator (plus extra definitions as necessary) *)
+val preamble_env_def = Define`
+  preamble_env (ffi:'ffi ffi_state) = ARB:('ffi state # v environment)`;
+
 val run_policy_def = Define`
   run_policy policy clock obs =
     let ffi = ffi_from_observation obs in
-    let (st,env) = THE (prim_sem_env ffi) in
+    let (st,env) = preamble_env ffi in
     let (st',c,res) = evaluate_prog (st with clock := clock) env policy in
     st'.ffi.ffi_state.bot_output`;
 

@@ -1,6 +1,7 @@
 open HolKernel boolLib bossLib ml_translatorLib
      holSyntaxTheory
-     botworld_dataTheory botworld_serialiseTheory
+     botworld_dataTheory
+     botworld_serialiseTheory
 local open std_preludeLib in end
 
 val _ = new_theory"botworld_preamble";
@@ -138,9 +139,30 @@ val res = translate (
   |> SIMP_RULE std_ss [FUN_EQ_THM,combinTheory.o_DEF]
   );
 
-open patternMatchesLib
+val res = translate (
+  fromSexpTheory.sexppair_def
+)
 
-(* TODO: these don't work...
+val res = translate fromSexpTheory.odestSXNUM_def;
+
+val res = translate optionTheory.OPTION_BIND_def;
+
+(* TODO: parse_sexp needs to be translated;
+   look to CakeML v1 for how to translate the parser on wfGs
+   e.g., see how coreloop_total is used to get rid of the side condition on WHILE etc.
+*)
+
+(*
+requires parse_sexp
+val res = translate (
+  decode_observation_def
+  |> SIMP_RULE std_ss [FUN_EQ_THM,combinTheory.o_DEF]
+  );
+*)
+
+(* TODO: not sure what's going on here...
+
+open patternMatchesLib
 
 val res = translate (
   fromSexpTheory.sexppair_def
