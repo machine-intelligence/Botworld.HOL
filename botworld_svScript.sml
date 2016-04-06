@@ -106,12 +106,12 @@ val dominates'_refl = Q.store_thm("dominates'_refl",
   \\ simp[realTheory.REAL_LE_ADDR]
   \\ metis_tac[discount_not_negative,realTheory.POW_POS]);
 
-val level_to_deep_def = Define`
-  level_to_deep (l:level) = (ARB:exp) (* TODO *)`;
+val level_to_ml_def = Define`
+  level_to_ml (l:level) = (ARB:exp) (* TODO *)`;
 
-val term_to_deep_def = Define`
-  (* term_to_deep (Var s ty) = App Opapp [Var(Long"Botworld""mk_var"); Con NONE [Lit (StrLit (explode s)); type_to_deep ty]] ∧ *)
-  term_to_deep (t:term) = (ARB:exp) (* TODO *)`;
+val term_to_ml_def = Define`
+  (* term_to_ml (Var s ty) = App Opapp [Var(Long"Botworld""mk_var"); Con NONE [Lit (StrLit (explode s)); type_to_ml ty]] ∧ *)
+  term_to_ml (t:term) = (ARB:exp) (* TODO *)`;
 
 (* -- *)
 
@@ -205,10 +205,10 @@ val sv_def = Define`
                    [Var(Long"Botworld""check_theorem");
                     Con NONE
                       [Var(Short"thm")
-                      ;level_to_deep l
-                      ;term_to_deep Stm
+                      ;level_to_ml l
+                      ;term_to_ml Stm
                       ;Var(Short"observation")
-                      ;term_to_deep utm
+                      ;term_to_ml utm
                       ;Var(Short"policy")
                       ;Var(Short"fallback")
                       ]])
