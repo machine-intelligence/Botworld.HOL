@@ -227,12 +227,14 @@ val step_def = Define`
 
 val wf_state_def = Define`
   wf_state st ⇔
-    ∀c1 c2 s1 s2.
-      FLOOKUP st.grid c1 = SOME s1 ∧
-      FLOOKUP st.grid c2 = SOME s2 ∧
-      c1 ≠ c2
-      ⇒
-      DISJOINT (set (MAP FST s1.robots)) (set (MAP FST s2.robots))`;
+    (∀c1 c2 s1 s2.
+       FLOOKUP st.grid c1 = SOME s1 ∧
+       FLOOKUP st.grid c2 = SOME s2 ∧
+       c1 ≠ c2
+       ⇒
+       DISJOINT (set (MAP FST s1.robots)) (set (MAP FST s2.robots))) ∧
+    (∀sq nm. sq ∈ FRANGE st.grid ∧ MEM nm (MAP FST sq.robots) ⇒
+             nm.built_step < st.time_step)`;
 
 val _ = Datatype`
   state_with_hole = <| state : state
