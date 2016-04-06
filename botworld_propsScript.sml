@@ -170,6 +170,38 @@ val APPEND_EQ_suff =
 
 (* -- *)
 
+val grid_injective = Q.store_thm("grid_injective",
+  `wf_state s ⇒
+   ∀c1 c2 sq.
+     (FLOOKUP s.grid c1 = SOME sq) ∧
+     (FLOOKUP s.grid c2 = SOME sq) ∧
+     ¬ NULL sq.robots
+     ⇒
+     (c1 = c2)`,
+  rw[wf_state_def,listTheory.NULL_EQ,pred_setTheory.IN_DISJOINT,listTheory.MEM_MAP]
+  \\ metis_tac[listTheory.MEM,listTheory.list_CASES])
+
+val same_name_same_square = Q.store_thm("same_name_same_square",
+  `wf_state s ⇒
+   ∀s1 s2 nm.
+     s1 ∈ FRANGE s.grid ∧
+     s2 ∈ FRANGE s.grid ∧
+     MEM nm (MAP FST s1.robots) ∧
+     MEM nm (MAP FST s2.robots)
+     ⇒ s1 = s2`,
+  rw[wf_state_def,finite_mapTheory.IN_FRANGE_FLOOKUP,pred_setTheory.IN_DISJOINT]
+  \\ metis_tac[optionTheory.SOME_11]);
+
+val focal_robot_unique = Q.store_thm("focal_robot_unique",
+  `wf_state_with_hole s ⇒
+   ∀s1 s2.
+     s1 ∈ FRANGE s.state.grid ∧ s2 ∈ FRANGE s.state.grid ∧
+     MEM s.focal_name (MAP FST s1.robots) ∧
+     MEM s.focal_name (MAP FST s2.robots)
+     ⇒
+     s1 = s2`,
+  metis_tac[wf_state_with_hole_def,same_name_same_square]);
+
 val incomingFrom_MovedIn = Q.store_thm("incomingFrom_MovedIn",
   `MEM x (incomingFrom y z) ⇒ ∃i. SND x = MovedIn i`,
   Cases_on`z`>>rw[incomingFrom_def]>>

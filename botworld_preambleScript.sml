@@ -73,7 +73,7 @@ val case_sexp_of_mls = Q.store_thm("case_sexp_of_mls",
     | SX_STR s => f4 s)
    =
    (case x of
-    | sx_cons h t => f (sexp_of_mls h) (sexp_of_mls t)
+    | sx_cons h t => f1 (sexp_of_mls h) (sexp_of_mls t)
     | sx_sym (strlit s) => f2 s
     | sx_num n => f3 n
     | sx_str (strlit s) => f4 s)`,
@@ -125,6 +125,9 @@ val res = translate (
   |> cons litsexp_IntLit_alt
   |> LIST_CONJ
 )
+
+val res = translate intsexp_def;
+val res = translate namesexp_def;
 
 val res = translate fromSexpTheory.patsexp_def;
 val res = translate fromSexpTheory.opsexp_def;

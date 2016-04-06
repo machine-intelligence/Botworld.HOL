@@ -1,5 +1,5 @@
 open preamble
-     botworld_quoteTheory
+     botworldTheory botworld_quoteTheory
      basicReflectionLib
      holKernelTheory
 

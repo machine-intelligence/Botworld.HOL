@@ -20,6 +20,25 @@ val sexpframe_def = Define`
       return <| color:=color; strength:=strength|>
     od`;
 
+val sexpint_def = Define`
+  sexpint s =
+    do
+      (nm, args) <- dstrip_sexp s;
+      guard (nm = "+" ∧ LENGTH args = 1)
+            (lift int_of_num (sexpnum (EL 0 args))) ++
+      guard (nm = "-" ∧ LENGTH args = 1)
+            (lift ($~ o int_of_num) (sexpnum (EL 0 args)))
+    od`;
+
+val _ = Parse.overload_on("sexpcoord",``sexppair sexpint sexpint``);
+
+val sexpname_def = Define`
+  sexpname s =
+    do
+      (built_step,built_coord,id) <- sexppair sexpnum (sexppair sexpcoord sexpnum) s;
+      return <| built_step := built_step; built_coord := built_coord; id := id |>
+    od`;
+
 val sexpcommand_def = Define`
   sexpcommand s =
     do
@@ -31,9 +50,9 @@ val sexpcommand_def = Define`
       guard (nm = "Drop" ∧ LENGTH args = 1)
             (lift Drop (sexpnum (EL 0 args))) ++
       guard (nm = "Inspect" ∧ LENGTH args = 1)
-            (lift Inspect (sexpnum (EL 0 args))) ++
+            (lift Inspect (sexpname (EL 0 args))) ++
       guard (nm = "Destroy" ∧ LENGTH args = 1)
-            (lift Destroy (sexpnum (EL 0 args))) ++
+            (lift Destroy (sexpname (EL 0 args))) ++
       guard (nm = "Build" ∧ LENGTH args = 2)
             (lift2 Build (sexplist sexpnum (EL 0 args))
                          (sexplist sexptop (EL 1 args))) ++
@@ -75,8 +94,6 @@ val sexpaction_def = Define`
   sexpaction s =
     do
       (nm, args) <- dstrip_sexp s;
-      guard (nm = "Created" ∧ args = [])
-            (return Created) ++
       guard (nm = "Passed" ∧ args = [])
             (return Passed) ++
       guard (nm = "MoveBlocked" ∧ LENGTH args = 1)
@@ -94,17 +111,17 @@ val sexpaction_def = Define`
       guard (nm = "Dropped" ∧ LENGTH args = 1)
             (lift Dropped (sexpnum (EL 0 args))) ++
       guard (nm = "InspectTargetFled" ∧ LENGTH args = 1)
-            (lift InspectTargetFled (sexpnum (EL 0 args))) ++
+            (lift InspectTargetFled (sexpname (EL 0 args))) ++
       guard (nm = "InspectBlocked" ∧ LENGTH args = 1)
-            (lift InspectBlocked (sexpnum (EL 0 args))) ++
-      guard (nm = "Inspected" ∧ LENGTH args = 0)
-            (lift Inspected (return empty_robot)) ++
+            (lift InspectBlocked (sexpname (EL 0 args))) ++
+      guard (nm = "Inspected" ∧ LENGTH args = 1)
+            (lift2 Inspected (sexpname (EL 0 args)) (return empty_robot)) ++
       guard (nm = "DestroyTargetFled" ∧ LENGTH args = 1)
-            (lift DestroyTargetFled (sexpnum (EL 0 args))) ++
+            (lift DestroyTargetFled (sexpname (EL 0 args))) ++
       guard (nm = "DestroyBlocked" ∧ LENGTH args = 1)
-            (lift DestroyBlocked (sexpnum (EL 0 args))) ++
+            (lift DestroyBlocked (sexpname (EL 0 args))) ++
       guard (nm = "Destroyed" ∧ LENGTH args = 1)
-            (lift Destroyed (sexpnum (EL 0 args))) ++
+            (lift Destroyed (sexpname (EL 0 args))) ++
       guard (nm = "BuildInterrupted" ∧ LENGTH args = 1)
             (lift BuildInterrupted (sexplist sexpnum (EL 0 args))) ++
       guard (nm = "Built" ∧ LENGTH args = 1)
@@ -133,11 +150,18 @@ val sexpprivateData_def = Define`
                       od`;
 
 val sexpevent_def = Define`
-sexpevent s = do (ras,unt,drop,fall) <- sexppair (sexplist (sexppair sexprobot sexpaction))
-                 (sexppair (sexplist sexpitem)
+sexpevent s = do (ras,crs,unt,drop,fall) <-
+                 sexppair
+                 (sexplist (sexppair sexpname (sexppair sexprobot sexpaction)))
+                 (sexppair (sexplist sexprobot)
                            (sexppair (sexplist sexpitem)
-                                     (sexplist sexpitemCache))) s ;
-                  return <| robotActions := ras; untouchedItems := unt; droppedItems := drop; fallenItems := fall |>
+                                     (sexppair (sexplist sexpitem)
+                                               (sexplist sexpitemCache)))) s ;
+                  return <| robotActions := ras;
+                            createdRobots := crs;
+                            untouchedItems := unt;
+                            droppedItems := drop;
+                            fallenItems := fall |>
               od
 `;
 
@@ -174,12 +198,22 @@ val itemsexp_def = Define`
   (itemsexp (InspectShield) = listsexp [SX_SYM "InspectShield"]) ∧
   (itemsexp (DestroyShield) = listsexp [SX_SYM "DestroyShield"])`;
 
+val intsexp_def = Define`
+  intsexp i =
+    listsexp [SX_SYM (if i < 0i then "-" else "+");
+              SX_NUM (Num(ABS i))]`;
+
+val _ = Parse.overload_on("coordsexp",``λ(i,j). SX_CONS (intsexp i) (intsexp j)``);
+
+val namesexp_def = Define`
+  namesexp nm = SX_CONS (SX_NUM nm.built_step) (SX_CONS (coordsexp nm.built_coord) (SX_NUM nm.id))`;
+
 val commandsexp_def = Define`
   (commandsexp (Move num) = listsexp [SX_SYM "Move"; SX_NUM num]) ∧
   (commandsexp (Lift num) = listsexp [SX_SYM "Lift"; SX_NUM num]) ∧
   (commandsexp (Drop num) = listsexp [SX_SYM "Drop"; SX_NUM num]) ∧
-  (commandsexp (Inspect num) = listsexp [SX_SYM "Inspect"; SX_NUM num]) ∧
-  (commandsexp (Destroy num) = listsexp [SX_SYM "Destroy"; SX_NUM num]) ∧
+  (commandsexp (Inspect nm) = listsexp [SX_SYM "Inspect"; namesexp nm]) ∧
+  (commandsexp (Destroy nm) = listsexp [SX_SYM "Destroy"; namesexp nm]) ∧
   (commandsexp (Build ns prog) = listsexp [SX_SYM "Build"; listsexp (MAP SX_NUM ns); listsexp (MAP topsexp prog)]) ∧
   (commandsexp (Pass) = listsexp [SX_SYM "Pass"])`;
 
@@ -188,7 +222,6 @@ val robotsexp_def = Define`
     SX_CONS (framesexp r.frame) (listsexp (MAP itemsexp r.inventory))`;
 
 val actionsexp_def = Define`
-  (actionsexp (Created) = listsexp [SX_SYM "Created"]) ∧
   (actionsexp (Passed) = listsexp [SX_SYM "Passed"]) ∧
   (actionsexp (MoveBlocked num) = listsexp [SX_SYM "MoveBlocked"; SX_NUM num]) ∧
   (actionsexp (MovedOut num) = listsexp [SX_SYM "MovedOut"; SX_NUM num]) ∧
@@ -197,12 +230,12 @@ val actionsexp_def = Define`
   (actionsexp (GrappledOver num) = listsexp [SX_SYM "GrappledOver"; SX_NUM num]) ∧
   (actionsexp (Lifted num) = listsexp [SX_SYM "Lifted"; SX_NUM num]) ∧
   (actionsexp (Dropped num) = listsexp [SX_SYM "Dropped"; SX_NUM num]) ∧
-  (actionsexp (InspectTargetFled num) = listsexp [SX_SYM "InspectTargetFled"; SX_NUM num]) ∧
-  (actionsexp (InspectBlocked num) = listsexp [SX_SYM "InspectBlocked"; SX_NUM num]) ∧
-  (actionsexp (Inspected _) = listsexp [SX_SYM "Inspected"]) ∧
-  (actionsexp (DestroyTargetFled num) = listsexp [SX_SYM "DestroyTargetFled"; SX_NUM num]) ∧
-  (actionsexp (DestroyBlocked num) = listsexp [SX_SYM "DestroyBlocked"; SX_NUM num]) ∧
-  (actionsexp (Destroyed num) = listsexp [SX_SYM "Destroyed"; SX_NUM num]) ∧
+  (actionsexp (InspectTargetFled nm) = listsexp [SX_SYM "InspectTargetFled"; namesexp nm]) ∧
+  (actionsexp (InspectBlocked nm) = listsexp [SX_SYM "InspectBlocked"; namesexp nm]) ∧
+  (actionsexp (Inspected nm _) = listsexp [SX_SYM "Inspected"; namesexp nm]) ∧
+  (actionsexp (DestroyTargetFled nm) = listsexp [SX_SYM "DestroyTargetFled"; namesexp nm]) ∧
+  (actionsexp (DestroyBlocked nm) = listsexp [SX_SYM "DestroyBlocked"; namesexp nm]) ∧
+  (actionsexp (Destroyed nm) = listsexp [SX_SYM "Destroyed"; namesexp nm]) ∧
   (actionsexp (BuildInterrupted ns) = listsexp [SX_SYM "BuildInterrupted"; listsexp (MAP SX_NUM ns)]) ∧
   (actionsexp (Built ns _) = listsexp [SX_SYM "Built"; listsexp (MAP SX_NUM ns)]) ∧
   (actionsexp (Invalid) = listsexp [SX_SYM "Passed"])`;
@@ -214,10 +247,11 @@ val itemCachesexp_def = Define`
 
 val eventsexp_def = Define`
   eventsexp e =
-    SX_CONS (listsexp (MAP (UNCURRY SX_CONS o (robotsexp ## actionsexp)) e.robotActions))
-      (SX_CONS (listsexp (MAP itemsexp e.untouchedItems))
-        (SX_CONS (listsexp (MAP itemsexp e.droppedItems))
-          (listsexp (MAP itemCachesexp e.fallenItems))))`;
+    SX_CONS (listsexp (MAP (λ(nm,(r,a)). SX_CONS (namesexp nm) (SX_CONS (robotsexp r) (actionsexp a))) e.robotActions))
+      (SX_CONS (listsexp (MAP robotsexp e.createdRobots))
+        (SX_CONS (listsexp (MAP itemsexp e.untouchedItems))
+          (SX_CONS (listsexp (MAP itemsexp e.droppedItems))
+            (listsexp (MAP itemCachesexp e.fallenItems)))))`;
 
 val privateDatasexp_def = Define`
   (privateDatasexp pInvalid = listsexp [SX_SYM "pInvalid"]) ∧
@@ -228,8 +262,8 @@ val privateDatasexp_def = Define`
              listsexp (MAP topsexp prog)])`;
 
 val observationsexp_def = Define`
-  observationsexp ((i,e,p):observation) =
-    SX_CONS (SX_NUM i)
+  observationsexp ((nm,e,p):observation) =
+    SX_CONS (namesexp nm)
       (SX_CONS (eventsexp e) (privateDatasexp p))`;
 
 val outputsexp_def = Define`

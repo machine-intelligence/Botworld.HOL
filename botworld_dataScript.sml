@@ -30,13 +30,22 @@ val weight_def = Define`
   weight (FramePart _) = 100 ∧
   weight _ = 1`;
 
+val _ = Parse.type_abbrev("coordinate",``:int # int``);
+
+val _ = Datatype`
+  name = <|
+    built_step  : num;
+    built_coord : coordinate;
+    id          : num
+  |>`;
+
 val _ = Datatype`
   command =
     Move num
   | Lift num
   | Drop num
-  | Inspect num
-  | Destroy num
+  | Inspect name
+  | Destroy name
   | Build (num list) prog
   | Pass`;
 
@@ -47,7 +56,6 @@ val _ = Datatype`
    ; inventory : item list
    ; memory : prog
    ; command : command
-   ; name : num
    |>`;
 
 val empty_robot_def = Define`
@@ -56,8 +64,7 @@ val empty_robot_def = Define`
        processor := 0;
        inventory := [];
        memory := [];
-       command := Pass;
-       name := 0
+       command := Pass
      |>`;
 
 val construct_def = Define`
@@ -65,7 +72,7 @@ val construct_def = Define`
   case ls of
   | [FramePart f;ProcessorPart p] =>
      SOME <| frame := f; processor := p; memory := m;
-             inventory := []; command := Pass; name := 0 |>
+             inventory := []; command := Pass |>
   | _ => NONE`;
 
 val shatter_def = Define`
@@ -77,8 +84,7 @@ val canLift_def = Define`
 
 val _ = Datatype`
   action =
-    Created
-  | Passed
+    Passed
   | MoveBlocked num
   | MovedOut num
   | MovedIn num
@@ -86,12 +92,12 @@ val _ = Datatype`
   | GrappledOver num
   | Lifted num
   | Dropped num
-  | InspectTargetFled num
-  | InspectBlocked num
-  | Inspected robot
-  | DestroyTargetFled num
-  | DestroyBlocked num
-  | Destroyed num
+  | InspectTargetFled name
+  | InspectBlocked name
+  | Inspected name robot
+  | DestroyTargetFled name
+  | DestroyBlocked name
+  | Destroyed name
   | BuildInterrupted (num list)
   | Built (num list) robot
   | Invalid`;
@@ -106,6 +112,24 @@ val isMovedIn_def = Define`
   (isMovedIn _ ⇔ F)`;
 val _ = export_rewrites["isMovedIn_def"];
 
+val isBuilt_def = Define`
+  (isBuilt (Built _ _) ⇔ T) ∧
+  (isBuilt _ ⇔ F)`;
+val _ = export_rewrites["isBuilt_def"];
+
+val destBuilt_def = Define`
+  destBuilt (Built is r) = (is,r)`;
+val _ = export_rewrites["destBuilt_def"];
+
+val isDropped_def = Define`
+  (isDropped (Dropped _) ⇔ T) ∧
+  (isDropped _ ⇔ F)`;
+val _ = export_rewrites["isDropped_def"];
+
+val destDropped_def = Define`
+  destDropped (Dropped i) = i`;
+val _ = export_rewrites["destDropped_def"];
+
 val _ = Datatype`
   itemCache =
   <| components: item list
@@ -114,21 +138,24 @@ val _ = Datatype`
 
 val _ = Datatype`
   event = <|
-    robotActions: (robot # action) list
+    robotActions  : (name, robot # action) alist
+  ; createdRobots : robot list
   ; untouchedItems: item list
-  ; droppedItems: item list
-  ; fallenItems: itemCache list|>`;
+  ; droppedItems  : item list
+  ; fallenItems   : itemCache list|>`;
 
 val _ = Datatype`
   privateData = pInvalid | pNothing | pInspected num prog`;
 
-val _ = Parse.type_abbrev("observation",``:num # event # privateData``);
+val _ = Parse.type_abbrev("observation",``:name # event # privateData``);
 
 val _ = Datatype`
-  square = <| robots: robot list; items: item list |>`;
+  square = <| robots: (name,robot) alist; items: item list |>`;
 
-val _ = Parse.type_abbrev("coordinate",``:int # int``);
 val _ = Parse.type_abbrev("grid",``:coordinate |-> square``)
+
+val _ = Datatype`
+  state = <| grid : grid; time_step : num |>`;
 
 val _ = Datatype`level = MP | Trust num`;
 

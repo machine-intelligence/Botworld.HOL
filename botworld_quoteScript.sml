@@ -148,6 +148,8 @@ val _ = overload_on("quote_decs",``quote_list quote_dec``)
 
 val (quote_top_aux_def,quote_top_def) = mk_quote NONE ``:top``
 
+val (quote_name_aux_def,quote_name_def) = mk_quote NONE ``:name``
+
 val (quote_command_aux_def,quote_command_def) = mk_quote NONE ``:command``
 
 val _ = overload_on("quote_prog",``quote_list quote_top``);
