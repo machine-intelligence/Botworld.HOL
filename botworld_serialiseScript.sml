@@ -259,18 +259,6 @@ val botworld_get_input_length_def = Define`
     else
       Oracle_return st (MAP (n2w o ORD) s ++ GENLIST (K 0w) (LENGTH bytes - LENGTH s))`;
 
-val botworld_read_def = Define`
-  botworld_read st bytes =
-    let bytes' = encode_observation st.bot_input in
-    if LENGTH bytes < LENGTH bytes' then Oracle_fail else
-      Oracle_return st (bytes' ++ (GENLIST (K 0w) (LENGTH bytes - LENGTH bytes')))`;
-
-val botworld_write_def = Define`
-  botworld_write st bytes =
-    case decode_output bytes of
-    | SOME output => Oracle_return (st with bot_output := output) bytes
-    | NONE => Oracle_return st bytes`;
-
 val botworld_get_output_length_def = Define`
   botworld_get_output_length st bytes =
     let n = LENGTH (encode_output st.bot_output) in
@@ -280,11 +268,23 @@ val botworld_get_output_length_def = Define`
     else
       Oracle_return st (MAP (n2w o ORD) s ++ GENLIST (K 0w) (LENGTH bytes - LENGTH s))`;
 
+val botworld_read_def = Define`
+  botworld_read st bytes =
+    let bytes' = encode_observation st.bot_input in
+    if LENGTH bytes < LENGTH bytes' then Oracle_fail else
+      Oracle_return st (bytes' ++ (GENLIST (K 0w) (LENGTH bytes - LENGTH bytes')))`;
+
 val botworld_read_output_def = Define`
   botworld_read_output st bytes =
     let bytes' = encode_output st.bot_output in
     if LENGTH bytes < LENGTH bytes' then Oracle_fail else
       Oracle_return st (bytes' ++ (GENLIST (K 0w) (LENGTH bytes - LENGTH bytes')))`;
+
+val botworld_write_def = Define`
+  botworld_write st bytes =
+    case decode_output bytes of
+    | SOME output => Oracle_return (st with bot_output := output) bytes
+    | NONE => Oracle_return st bytes`;
 
 val botworld_oracle_def = Define`
   botworld_oracle n =
@@ -297,5 +297,111 @@ val botworld_oracle_def = Define`
 val botworld_initial_state_def = Define`
   botworld_initial_state obs =
     <| bot_input := obs ; bot_output := (Pass, []) |>`;
+
+(* CakeML declarations of helper functions for interfacing with the Botworld FFI *)
+open astTheory semanticPrimitivesTheory terminationTheory
+
+val ByteArrayFromList_dec_def = Define`
+  ByteArrayFromList_dec =
+    Dlet(Pvar"fromList")
+      (Fun "ls"
+         (Let (SOME "a") (App Aw8alloc [App Opapp [Var(Long"Botworld""length");Var(Short"ls")]])
+            (Letrec [("f","ls",Fun "i" (Mat (Var(Short"ls"))
+              [(Pcon(SOME(Short"nil"))[],Var(Short"a"))
+              ;(Pcon(SOME(Short"::"))[Pvar"h";Pvar"t"],
+                  Let NONE (App Aw8update [Var(Short"a");Var(Short"i");Var(Short"h")])
+                    (App Opapp [App Opapp [Var(Short"f");Var(Short"t")];
+                                App (Opn Plus) [Var(Short"i");Lit(IntLit 1)]]))]))]
+              (App Opapp [App Opapp [Var(Short"f");Var(Short"ls")];Lit(IntLit 0)]))))`;
+
+val ByteArrayToList_dec_def = Define`
+  ByteArrayToList_dec =
+    Dlet(Pvar"toList")
+      (Fun "a"
+        (Letrec [("f","ls",Fun "i"
+          (If (App Equality [Var(Short"i"); Lit(IntLit 0)])
+              (Var(Short"ls"))
+              (App Opapp
+                [App Opapp [Var(Short"f");
+                            Con (SOME(Short"::"))
+                              [App Aw8sub [Var(Short"a"); Var(Short"i")];
+                               Var(Short"ls")]];
+                 App (Opn Minus) [Var(Short"i"); Lit(IntLit 1)]])))]
+          (App Opapp [App Opapp [Var (Short"f"); Con (SOME(Short"nil")) []];
+                      App Aw8length [Var(Short"a")]])))`;
+
+val write_output_dec_def = Define`
+  write_output_dec =
+    Dlet(Pvar"write_output")
+      (Fun "x"
+        (App (FFI 2)
+          [App Opapp
+             [Var(Long"ByteArray""fromList");
+              App Opapp [Var(Long"Botworld""encode_output");Var(Short"x")]]]))`;
+
+val length_rec_def = Define`
+    length_rec bs n =
+      if EVERY (λb. b = 0w) bs
+      then INL (2 * n)
+      else INR (OPTION_BIND (parse_sexp (MAP (CHR o w2n) bs)) odestSXNUM)`;
+
+val get_input_length_body_def = Define`
+  get_input_length_body =
+    (Letrec [("f","n",
+                (Let (SOME "bs") (App Aw8alloc [Var(Short"n")])
+                (Let NONE (App (FFI 0) [Var(Short"bs")])
+                (Mat (App Opapp [App Opapp [Var(Long "Botworld" "length_rec"); Var(Short"bs")]; Var(Short "n")])
+                     [(Pcon (SOME(Short "inl")) [Pvar "n"], App Opapp [Var(Short"f"); Var(Short"n")] )
+                     ;(Pcon (SOME(Short "inr")) [Pcon (SOME(Short "some")) [Pvar "len"]], Var(Short"len"))
+                     ]))))] (App Opapp [Var(Short "f") ; Lit(IntLit 1)]))`;
+
+val get_input_length_dec_def = Define`
+  get_input_length_dec = Dlet(Pvar "get_input_length") (Fun "x" get_input_length_body)`
+
+val get_output_length_body_def = Define`
+  get_output_length_body =
+  (Letrec [("f","n",
+                (Let (SOME "bs") (App Aw8alloc [Var(Short"n")])
+                (Let NONE (App (FFI 3) [Var(Short"bs")])
+                (Mat (App Opapp [App Opapp [Var(Long "Botworld" "length_rec"); Var(Short"bs")]; Var(Short "n")])
+                     [(Pcon (SOME(Short "inl")) [Pvar "n"], App Opapp [Var(Short"f"); Var(Short"n")] )
+                     ;(Pcon (SOME(Short "inr")) [Pcon (SOME(Short "some")) [Pvar "len"]], Var(Short"len"))
+                     ]))))] (App Opapp [Var(Short "f") ; Lit(IntLit 1)]))`;
+
+val get_output_length_dec_def = Define`
+  get_output_length_dec = Dlet (Pvar "get_output_length") (Fun "x" get_output_length_body)`;
+
+val read_observation_dec_def = Define`
+  read_observation_dec =
+    Dlet (Pvar "read_observation")
+      (Fun "unit"
+           (Let (SOME "bs") (App Aw8alloc [App Opapp [Var(Short"get_input_length"); Var(Short"unit")]])
+           (Let NONE (App (FFI 1) [Var(Short"bs")])
+           (App Opapp [Var(Long "Botworld" "decode_observation"); App Opapp [Var(Long "ByteArray" "toList") ; Var(Short"bs")]]))))`;
+
+val read_output_dec_def = Define`
+    read_output_dec =
+    Dlet (Pvar "read_output")
+      (Fun "unit"
+           (Let (SOME "bs") (App Aw8alloc [App Opapp [Var(Short"get_output_length"); Var(Short"unit")]])
+           (Let NONE (App (FFI 4) [Var(Short"bs")])
+           (App Opapp [Var(Long "Botworld" "decode_output"); App Opapp [Var(Long "ByteArray" "toList") ; Var(Short"bs")]]))))`;
+
+(*
+val get_input_length_thm = Q.store_thm("get_input_length_thm",
+  `lookup_var_id (Long"Botworld""get_input_length") env = SOME (Closure env0 "x" get_input_length_body) ∧
+   s.ffi.oracle = botworld_oracle ∧
+   evaluate s env [u] = (s,Rval[Conv NONE []]) ∧
+   evaluate s env [App Opapp [Var(Long"Botworld""get_input_length"); u]] = (s', res) ∧
+   res ≠ Rerr(Rabort Rtimeout_error)
+   ⇒
+   ∃ck bs.
+     s' = s with <| refs := W8array bs::s.refs;
+                    clock := s.clock - ck |>
+     ∧ res = Rval[Litv(IntLit (&(LENGTH (encode_observation st.bot_input))))]`,
+  rw[evaluate_def] \\ rfs[]
+  \\ fs[do_opapp_def]
+  \\ every_case_tac \\ fs[]
+*)
 
 val _ = export_theory()
