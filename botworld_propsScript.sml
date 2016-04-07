@@ -5,14 +5,24 @@ val _ = new_theory"botworld_props";
 
 (* TODO: move *)
 
-val ALL_DISTINCT_INJ_MAP = Q.store_thm("ALL_DISTINCT_INJ_MAP",
+val ALL_DISTINCT_MAP_MEM = Q.store_thm("ALL_DISTINCT_MAP_MEM",
   `∀ls x1 x2. ALL_DISTINCT (MAP f ls) ∧
    MEM x1 ls ∧ MEM x2 ls ∧ f x1 = f x2 ⇒ x1 = x2`,
   Induct \\ rw[MEM_MAP] \\ metis_tac[]);
 
 val ALL_DISTINCT_MAP_FST =
-  ALL_DISTINCT_INJ_MAP |> Q.GEN`f` |> Q.ISPEC`FST`
+  ALL_DISTINCT_MAP_MEM |> Q.GEN`f` |> Q.ISPEC`FST`
   |> SIMP_RULE(srw_ss())[FORALL_PROD]
+
+val ALL_DISTINCT_MAP_FILTER = Q.store_thm("ALL_DISTINCT_MAP_FILTER",
+  `∀ls. ALL_DISTINCT (MAP f ls) ⇒ ALL_DISTINCT (MAP f (FILTER P ls))`,
+  Induct \\ rw[] \\ fs[MEM_MAP,MEM_FILTER] \\ metis_tac[]);
+
+val ALL_DISTINCT_FILTER_GENLIST = Q.store_thm("ALL_DISTINCT_FILTER_GENLIST",
+  `ALL_DISTINCT (FILTER P (GENLIST f n)) ⇔
+   ∀m1 m2. m1 < n ∧ m2 < n ∧ f m1 = f m2 ∧ P (f m1) ⇒ m1 = m2`,
+  Induct_on`n` \\ rw[GENLIST,FILTER_SNOC,ALL_DISTINCT_SNOC,MEM_FILTER,MEM_GENLIST]
+  \\ metis_tac[LESS_ANTISYM,LESS_CASES,LESS_OR_EQ,NOT_LESS,prim_recTheory.LESS_THM]);
 
 val MAP2_MAP = Q.store_thm("MAP2_MAP",
   `(∀l1 l2. LENGTH l1 = LENGTH l2 ⇒
@@ -254,6 +264,10 @@ val LENGTH_neighbour_coords = Q.store_thm("LENGTH_neighbour_coords",
   `LENGTH (neighbour_coords x) = 8`,
   Cases_on`x`>>simp[neighbour_coords_def]);
 
+val LENGTH_neighbours = Q.store_thm("LENGTH_neighbours",
+  `LENGTH (neighbours x y) = 8`,
+  simp[neighbours_def,LENGTH_neighbour_coords]);
+
 val opposite_less8 = Q.store_thm("opposite_less8[simp]",
   `opposite dir < 8`, rw[opposite_def])
 
@@ -274,6 +288,11 @@ val neighbours_EL_neighbour_coords = Q.store_thm("neighbours_EL_neighbour_coords
   \\ rpt AP_TERM_TAC
   \\ simp[]
   \\ intLib.COOPER_TAC);
+
+val ALL_DISTINCT_neighbour_coords = Q.store_thm("ALL_DISTINCT_neighbour_coords[simp]",
+  `ALL_DISTINCT (neighbour_coords k)`,
+  Cases_on`k` \\ rw[neighbour_coords_def]
+  \\ intLib.COOPER_TAC)
 
 val event_name_in_grid = Q.store_thm("event_name_in_grid",
   `FLOOKUP g c = SOME sq ∧
@@ -410,6 +429,60 @@ val wf_state_step = Q.store_thm("wf_state_step",
     \\ simp[computeSquare_def,MAP_MAP_o,MAP_GENLIST]
     \\ simp[ALL_DISTINCT_APPEND,MEM_GENLIST,ALL_DISTINCT_GENLIST,MEM_MAP,MEM_FILTER,PULL_EXISTS]
     \\ simp[combinTheory.o_DEF,ETA_AX]
+    \\ conj_tac
+    >- (
+      match_mp_tac ALL_DISTINCT_MAP_FILTER
+      \\ fs[computeEvents_def,FLOOKUP_FMAP_MAP2]
+      \\ simp[event_def,MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
+      \\ simp[localActions_def,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
+      \\ fs[PULL_EXISTS]
+      \\ simp[ALL_DISTINCT_APPEND]
+      \\ conj_tac >- metis_tac[]
+      \\ simp[MEM_MAP,MEM_FLAT,MEM_GENLIST,PULL_EXISTS]
+      \\ simp[MAP_FLAT,MAP_GENLIST,o_DEF]
+      \\ conj_tac
+      >- (
+        simp[ALL_DISTINCT_FLAT,MEM_GENLIST,PULL_EXISTS]
+        \\ conj_tac
+        >- (
+          simp[ALL_DISTINCT_FILTER_GENLIST]
+          \\ qx_genl_tac[`d1`,`d2`]
+          \\ qmatch_goalsub_abbrev_tac`incomingFrom _ n1`
+          \\ qmatch_goalsub_abbrev_tac`_ = _ _ (incomingFrom _ n2)`
+          \\ Cases_on`n1` \\ simp[incomingFrom_def,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
+          \\ Cases_on`n2` \\ simp[incomingFrom_def,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
+          \\ rw[]
+          \\ fs[markerTheory.Abbrev_def]
+          \\ rpt(qpat_assum`SOME _ = _`(assume_tac o SYM))
+          \\ rfs[neighbours_def,EL_MAP]
+          \\ Q.ISPEC_THEN`neighbour_coords k`match_mp_tac
+               (Q.GEN`l` (MP_CANON (DISCH_ALL (#1 (EQ_IMP_RULE (UNDISCH_ALL (SPEC_ALL ALL_DISTINCT_EL_IMP)))))))
+          \\ simp[]
+          \\ spose_not_then strip_assume_tac
+          \\ last_x_assum drule
+          \\ rator_x_assum`FLOOKUP`kall_tac
+          \\ disch_then drule
+          \\ disch_then drule
+          \\ simp[IN_DISJOINT]
+          \\ fs[GSYM NULL_EQ,NOT_NULL_MEM]
+          \\ fs[MEM_FILTER]
+          \\ qmatch_assum_abbrev_tac`(l1:'a list) = l2`
+          \\ `MEM (FST e) l1` by (simp[Abbr`l1`,MEM_MAP,MEM_FILTER] \\ metis_tac[])
+          \\ `MEM (FST e) l2` by metis_tac[]
+          \\ fs[Abbr`l1`,Abbr`l2`,MEM_MAP,MEM_FILTER]
+          \\ metis_tac[] )
+        \\ conj_tac
+        >- (
+          rw[]
+          \\ qmatch_goalsub_abbrev_tac`incomingFrom _ nb`
+          \\ Cases_on`nb` \\ simp[incomingFrom_def,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
+          \\ match_mp_tac ALL_DISTINCT_MAP_FILTER
+          \\ fs[markerTheory.Abbrev_def]
+          \\ rpt(qpat_assum`SOME _ = _`(assume_tac o SYM))
+          \\ rfs[neighbours_def,EL_MAP]
+          \\ metis_tac[] )
+        \\ cheat )
+      \\ cheat)
     \\ cheat)
   \\ fs[step_def,FLOOKUP_FMAP_MAP2]
   \\ simp[computeSquare_def,MAP_MAP_o,MAP_GENLIST,o_DEF,ETA_AX]
@@ -802,10 +875,6 @@ val computeEvents_fill_with_memory = Q.store_thm("computeEvents_fill_with_memory
     \\ simp[mapRobotsInSquare_def,EL_MAP]
     \\ rw[]
     \\ rw[shatter_def]))
-
-val LENGTH_neighbours = Q.store_thm("LENGTH_neighbours",
-  `LENGTH (neighbours x y) = 8`,
-  simp[neighbours_def,LENGTH_neighbour_coords]);
 
 val opposite_opposite = Q.store_thm("opposite_opposite[simp]",
   `dir < 8 ⇒ opposite (opposite dir) = dir`,
