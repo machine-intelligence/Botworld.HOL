@@ -294,6 +294,11 @@ val ALL_DISTINCT_neighbour_coords = Q.store_thm("ALL_DISTINCT_neighbour_coords[s
   Cases_on`k` \\ rw[neighbour_coords_def]
   \\ intLib.COOPER_TAC)
 
+val NOT_MEM_neighbour_coords = Q.store_thm("NOT_MEM_neighbour_coords",
+  `¬MEM k (neighbour_coords k)`,
+  Cases_on`k`\\rw[neighbour_coords_def]
+  \\ intLib.COOPER_TAC);
+
 val event_name_in_grid = Q.store_thm("event_name_in_grid",
   `FLOOKUP g c = SOME sq ∧
    MEM nra (event sq (neighbours g c)).robotActions ⇒
@@ -481,9 +486,54 @@ val wf_state_step = Q.store_thm("wf_state_step",
           \\ rpt(qpat_assum`SOME _ = _`(assume_tac o SYM))
           \\ rfs[neighbours_def,EL_MAP]
           \\ metis_tac[] )
-        \\ cheat )
-      \\ cheat)
-    \\ cheat)
+        \\ qx_genl_tac[`d1`,`d2`]
+        \\ qpat_abbrev_tac`nb = neighbours _ _`
+        \\ Cases_on`EL d1 nb` \\ simp[incomingFrom_def]
+        \\ Cases_on`EL d2 nb` \\ simp[incomingFrom_def]
+        \\ simp[MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
+        \\ rw[]
+        \\ fs[Abbr`nb`,neighbours_def,EL_MAP]
+        \\ simp[IN_DISJOINT,MEM_MAP,MEM_FILTER,UNCURRY]
+        \\ spose_not_then strip_assume_tac
+        \\ drule same_name_same_square
+        \\ simp[IN_FRANGE_FLOOKUP,PULL_EXISTS,MEM_MAP]
+        \\ asm_exists_tac \\ simp[]
+        \\ qpat_assum`FLOOKUP _ (EL d1 _) = _`assume_tac
+        \\ asm_exists_tac \\ simp[]
+        \\ asm_exists_tac \\ simp[]
+        \\ rveq
+        \\ asm_exists_tac \\ simp[]
+        \\ spose_not_then strip_assume_tac \\ rveq
+        \\ last_x_assum drule
+        \\ qpat_assum`FLOOKUP _ (EL d2 _) = _`assume_tac
+        \\ disch_then drule
+        \\ simp[GSYM NULL_EQ, NOT_NULL_MEM]
+        \\ reverse conj_tac >- metis_tac[]
+        \\ `d1 ≠ d2` suffices_by metis_tac[ALL_DISTINCT_neighbour_coords,EL_ALL_DISTINCT_EL_EQ]
+        \\ spose_not_then strip_assume_tac \\ fs[])
+      \\ rw[]
+      \\ spose_not_then strip_assume_tac
+      \\ Cases_on`EL dir (neighbours s.grid k)`\\fs[incomingFrom_def]
+      \\ rfs[neighbours_def,EL_MAP]
+      \\ fs[MEM_MAP,MEM_FILTER,UNCURRY]
+      \\ rveq \\ fs[]
+      \\ last_x_assum drule
+      \\ qpat_assum`FLOOKUP _ k = _`assume_tac
+      \\ disch_then drule
+      \\ simp[IN_DISJOINT,MEM_MAP,PULL_EXISTS]
+      \\ metis_tac[NOT_MEM_neighbour_coords,MEM_EL])
+    \\ rw[]
+    \\ spose_not_then strip_assume_tac
+    \\ fs[computeEvents_def,FLOOKUP_FMAP_MAP2]
+    \\ rw[]
+    \\ drule (GEN_ALL event_name_in_grid)
+    \\ disch_then drule
+    \\ simp[]
+    \\ fs[PULL_EXISTS]
+    \\ rw[]
+    \\ spose_not_then strip_assume_tac
+    \\ first_x_assum drule \\ simp[]
+    \\ asm_exists_tac \\ simp[])
   \\ fs[step_def,FLOOKUP_FMAP_MAP2]
   \\ simp[computeSquare_def,MAP_MAP_o,MAP_GENLIST,o_DEF,ETA_AX]
   \\ REWRITE_TAC[CONJ_ASSOC]
