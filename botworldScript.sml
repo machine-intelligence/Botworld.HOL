@@ -233,6 +233,7 @@ val wf_state_def = Define`
        c1 ≠ c2
        ⇒
        DISJOINT (set (MAP FST s1.robots)) (set (MAP FST s2.robots))) ∧
+    (∀sq. sq ∈ FRANGE st.grid ⇒ ALL_DISTINCT (MAP FST sq.robots)) ∧
     (∀sq nm. sq ∈ FRANGE st.grid ∧ MEM nm (MAP FST sq.robots) ⇒
              nm.built_step < st.time_step)`;
 

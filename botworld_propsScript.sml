@@ -5,6 +5,32 @@ val _ = new_theory"botworld_props";
 
 (* TODO: move *)
 
+val ALL_DISTINCT_INJ_MAP = Q.store_thm("ALL_DISTINCT_INJ_MAP",
+  `∀ls x1 x2. ALL_DISTINCT (MAP f ls) ∧
+   MEM x1 ls ∧ MEM x2 ls ∧ f x1 = f x2 ⇒ x1 = x2`,
+  Induct \\ rw[MEM_MAP] \\ metis_tac[]);
+
+val ALL_DISTINCT_MAP_FST =
+  ALL_DISTINCT_INJ_MAP |> Q.GEN`f` |> Q.ISPEC`FST`
+  |> SIMP_RULE(srw_ss())[FORALL_PROD]
+
+val MAP2_MAP = Q.store_thm("MAP2_MAP",
+  `(∀l1 l2. LENGTH l1 = LENGTH l2 ⇒
+            MAP2 f (MAP g l1) l2 = MAP2 (CURRY (UNCURRY f o (g ## I))) l1 l2) ∧
+   (∀l1 l2. LENGTH l1 = LENGTH l2 ⇒
+            MAP2 f l1 (MAP h l2) = MAP2 (CURRY (UNCURRY f o (I ## h))) l1 l2)`,
+  conj_tac
+  \\ Induct \\ simp[]
+  \\ Cases_on`l2` \\ simp[]);
+
+val MAP2_same = Q.store_thm("MAP2_same",
+  `∀l. MAP2 f l l = MAP (W f) l`,
+  Induct \\ simp[]);
+
+val PAIR_MAP_COMPOSE = Q.store_thm("PAIR_MAP_COMPOSE",
+  `(a ## b) o (c ## d) = (a o c ## b o d)`,
+  rw[FUN_EQ_THM,FORALL_PROD]);
+
 val PERM_FLAT = Q.store_thm("PERM_FLAT",
   `∀l1 l2. PERM l1 l2 ⇒ PERM (FLAT l1) (FLAT l2)`,
   ho_match_mp_tac PERM_IND
@@ -202,18 +228,330 @@ val focal_robot_unique = Q.store_thm("focal_robot_unique",
      s1 = s2`,
   metis_tac[wf_state_with_hole_def,same_name_same_square]);
 
+val FST_updateInventory = Q.store_thm("FST_updateInventory[simp]",
+  `FST (updateInventory sq x y) = x`,
+  Cases_on`y`\\rw[updateInventory_def]);
+
+val FST_runMachine = Q.store_thm("FST_runMachine[simp]",
+  `FST (runMachine obsr) = FST(FST obsr)`,
+  Cases_on`obsr`\\rw[runMachine_def,UNCURRY]);
+
+val FST_FST_prepare = Q.store_thm("FST_FST_prepare[simp]",
+  `FST (FST (prepare z x)) = FST x`,
+  PairCases_on`x` \\ simp[prepare_def]);
+
+val NOT_isMovedIn_act = Q.store_thm("NOT_isMovedIn_act[simp]",
+  `¬isMovedIn (act sq nb a)`,
+  rw[act_def]
+  \\ CASE_TAC \\ rw[]
+  \\ CASE_TAC \\ rw[]);
+
+val less8 = Q.prove(
+  `x < 8n ⇔ (x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4 ∨ x = 5 ∨ x = 6 ∨ x = 7)`,
+  rw[EQ_IMP_THM] >> simp[])
+
+val LENGTH_neighbour_coords = Q.store_thm("LENGTH_neighbour_coords",
+  `LENGTH (neighbour_coords x) = 8`,
+  Cases_on`x`>>simp[neighbour_coords_def]);
+
+val opposite_less8 = Q.store_thm("opposite_less8[simp]",
+  `opposite dir < 8`, rw[opposite_def])
+
+val opposite_inj = Q.store_thm("opposite_inj",
+  `i < 8 ∧ j < 8 ∧ opposite i = opposite j ⇒ i = j`,
+  EVAL_TAC \\ rw[less8] \\ fs[]);
+
+val neighbours_EL_neighbour_coords = Q.store_thm("neighbours_EL_neighbour_coords",
+  `dir < 8 ∧ FLOOKUP s i = SOME sq ⇒
+   EL (opposite dir) (neighbours s (EL dir (neighbour_coords i))) = SOME sq`,
+  simp[neighbours_def] >>
+  Cases_on`EL dir (neighbour_coords i)` >>
+  Cases_on`i` >>
+  fs[neighbour_coords_def] >>
+  simp[less8] >>
+  strip_tac >> fs[opposite_def] >> rveq
+  \\ pop_assum (SUBST1_TAC o SYM)
+  \\ rpt AP_TERM_TAC
+  \\ simp[]
+  \\ intLib.COOPER_TAC);
+
+val event_name_in_grid = Q.store_thm("event_name_in_grid",
+  `FLOOKUP g c = SOME sq ∧
+   MEM nra (event sq (neighbours g c)).robotActions ⇒
+   if ¬isMovedIn (SND(SND nra)) then
+     MEM (FST nra) (MAP FST sq.robots)
+   else
+   ∃c' sq'.
+     FLOOKUP g c' = SOME sq' ∧ c ≠ c' ∧
+     MEM (FST nra) (MAP FST sq'.robots)`,
+  simp[event_def]
+  \\  strip_tac
+  >- (
+    fs[MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,MEM_MAP,UNCURRY]
+    \\ fs[localActions_def,MEM_MAP,UNCURRY]
+    \\ metis_tac[] )
+  \\ fs[MEM_FLAT,MEM_GENLIST]
+  \\ rveq
+  \\ Cases_on`EL dir (neighbours g c)` \\ fs[incomingFrom_def]
+  \\ fs[MEM_MAP,MEM_FILTER]
+  \\ pairarg_tac \\ fs[]
+  \\ rw[]
+  \\ fs[neighbours_def]
+  \\ rfs[EL_MAP]
+  \\ asm_exists_tac
+  \\ simp[EXISTS_PROD]
+  \\ reverse conj_tac >- metis_tac[]
+  \\ Cases_on`c` \\ fs[neighbour_coords_def]
+  \\ fs[less8] \\ rw[]
+  \\ intLib.COOPER_TAC);
+
+val wf_state_event_same_name = Q.store_thm("wf_state_event_same_name",
+  `wf_state s ∧
+   MEM (nm,ra1) ev1.robotActions ∧
+   MEM (nm,ra2) ev2.robotActions ∧
+   FLOOKUP (computeEvents s.grid) c1 = SOME ev1 ∧
+   FLOOKUP (computeEvents s.grid) c2 = SOME ev2 ∧
+   c1 ≠ c2
+   ⇒
+   ∃dir. {SND ra1; SND ra2} = {MovedIn dir; MovedOut (opposite dir)}`,
+  rw[computeEvents_def,FLOOKUP_FMAP_MAP2,wf_state_def]
+  \\ fs[event_def,MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,MEM_MAP,UNCURRY,MEM_FLAT,MEM_GENLIST]
+  \\ rw[]
+  \\ rpt (
+    qmatch_asmsub_abbrev_tac`incomingFrom _ nb`
+    \\ Cases_on`nb`
+    \\ qpat_assum`Abbrev _`(strip_assume_tac o SYM o SIMP_RULE std_ss [markerTheory.Abbrev_def])
+    \\ fs[incomingFrom_def])
+  \\ fs[MEM_MAP,MEM_FILTER]
+  \\ fs[localActions_def,MEM_MAP] \\ rw[]
+  \\ TRY pairarg_tac \\ fs[] \\ rw[]
+  \\ TRY pairarg_tac \\ fs[] \\ rw[]
+  \\ fs[IN_DISJOINT,MEM_MAP,EXISTS_PROD]
+  >- metis_tac[]
+  >- (
+    rfs[neighbours_def,EL_MAP]
+    \\ reverse(Cases_on`EL dir (neighbour_coords c2) = c1`)
+    >- metis_tac[]
+    \\ rw[] \\ fs[] \\ rw[]
+    \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS]
+    \\ `r = r'` by metis_tac[ALL_DISTINCT_MAP_FST]
+    \\ simp[act_def]
+    \\ fs[LENGTH_neighbour_coords,GSYM neighbours_def]
+    \\ imp_res_tac neighbours_EL_neighbour_coords \\ fs[]
+    \\ qexists_tac`dir` \\ rw[EXTENSION,EQ_IMP_THM] )
+  >- (
+    rfs[neighbours_def,EL_MAP]
+    \\ reverse(Cases_on`EL dir (neighbour_coords c1) = c2`)
+    >- metis_tac[]
+    \\ rw[] \\ fs[] \\ rw[]
+    \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS]
+    \\ `r = r'` by metis_tac[ALL_DISTINCT_MAP_FST]
+    \\ simp[act_def]
+    \\ fs[LENGTH_neighbour_coords,GSYM neighbours_def]
+    \\ imp_res_tac neighbours_EL_neighbour_coords \\ fs[]
+    \\ qexists_tac`dir` \\ rw[EXTENSION,EQ_IMP_THM] )
+  \\ rfs[neighbours_def,EL_MAP]
+  \\ qmatch_assum_rename_tac`d1 < LENGTH (_ c1)`
+  \\ qmatch_assum_rename_tac`d2 < LENGTH (_ c2)`
+  \\ reverse(Cases_on`EL d1 (neighbour_coords c1) = EL d2 (neighbour_coords c2)`)
+  >- metis_tac[]
+  \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS]
+  \\ `r = r'` by metis_tac[ALL_DISTINCT_MAP_FST]
+  \\ rw[] \\ fs[] \\ rw[]
+  \\ fs[LENGTH_neighbour_coords]
+  \\ `d1 = d2` by metis_tac[opposite_inj]
+  \\ fs[] \\ rw[]
+  \\ Cases_on`c1` \\ Cases_on`c2`
+  \\ `F` suffices_by rw[]
+  \\ pop_assum mp_tac
+  \\ simp[neighbour_coords_def]
+  \\ fs[less8]
+  \\ intLib.COOPER_TAC);
+
+val wf_state_step = Q.store_thm("wf_state_step",
+  `wf_state s ⇒ wf_state (step s)`,
+  strip_tac
+  \\ first_assum mp_tac
+  \\ simp_tac(srw_ss())[wf_state_def]
+  \\ reverse(rpt strip_tac)
+  >- (
+    fs[step_def,IN_FRANGE_FLOOKUP,FLOOKUP_FMAP_MAP2]
+    \\ rw[]
+    \\ pop_assum mp_tac
+    \\ simp[computeSquare_def,MEM_MAP,PULL_EXISTS,MEM_GENLIST,MEM_FILTER]
+    \\ reverse(rw[])
+    \\ TRY pairarg_tac \\ fs[]
+    \\ rw[runMachine_def,prepare_def,UNCURRY]
+    \\ fs[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS]
+    \\ simp[GSYM ADD1]
+    \\ match_mp_tac prim_recTheory.LESS_SUC
+    \\ first_x_assum match_mp_tac
+    \\ rw[]
+    \\ fs[event_def]
+    >- (
+      asm_exists_tac
+      \\ fs[MAP2_MAP,MAP2_same]
+      \\ fs[PAIR_MAP_COMPOSE]
+      \\ fs[MEM_MAP,UNCURRY,EXISTS_PROD]
+      \\ rw[]
+      \\ fs[localActions_def,MEM_MAP,UNCURRY]
+      \\ metis_tac[PAIR])
+    \\ fs[MEM_FLAT,MEM_GENLIST]
+    \\ rw[]
+    \\ Cases_on`EL dir (neighbours s.grid k)` \\ fs[incomingFrom_def]
+    \\ fs[MEM_MAP,MEM_FILTER,UNCURRY]
+    \\ rw[]
+    \\ fs[neighbours_def]
+    \\ rfs[EL_MAP]
+    \\ asm_exists_tac \\ rw[]
+    \\ metis_tac[] )
+  >- (
+    fs[IN_FRANGE_FLOOKUP,step_def,FLOOKUP_FMAP_MAP2]
+    \\ simp[computeSquare_def,MAP_MAP_o,MAP_GENLIST]
+    \\ simp[ALL_DISTINCT_APPEND,MEM_GENLIST,ALL_DISTINCT_GENLIST,MEM_MAP,MEM_FILTER,PULL_EXISTS]
+    \\ simp[combinTheory.o_DEF,ETA_AX]
+    \\ cheat)
+  \\ fs[step_def,FLOOKUP_FMAP_MAP2]
+  \\ simp[computeSquare_def,MAP_MAP_o,MAP_GENLIST,o_DEF,ETA_AX]
+  \\ REWRITE_TAC[CONJ_ASSOC]
+  \\ reverse conj_tac
+  >- (
+    simp[IN_DISJOINT,MEM_GENLIST]
+    \\ spose_not_then strip_assume_tac
+    \\ rw[] \\ fs[name_component_equality] )
+  \\ fs[computeEvents_def,FLOOKUP_FMAP_MAP2]
+  \\ rveq
+  \\ simp[IN_DISJOINT,MEM_GENLIST,MEM_MAP,MEM_FILTER,UNCURRY,PULL_EXISTS]
+  \\ fs[IN_DISJOINT]
+  \\ rw[]
+  \\ spose_not_then strip_assume_tac
+  >- (
+    rw[]
+    \\ drule (GEN_ALL event_name_in_grid)
+    \\ disch_then drule
+    \\ rator_x_assum`FLOOKUP`mp_tac
+    \\ drule (GEN_ALL event_name_in_grid)
+    \\ disch_then drule
+    \\ rw[]
+    >- metis_tac[]
+    >- (
+      spose_not_then strip_assume_tac
+      \\ qmatch_assum_rename_tac`c2 ≠ c3`
+      \\ reverse(Cases_on`c3=c1`) >- metis_tac[]
+      \\ rveq \\ fs[] \\ rveq
+      \\ qmatch_assum_rename_tac`FST ra1 = FST ra2`
+      \\ Cases_on`ra1` \\ Cases_on`ra2` \\ fs[] \\ rveq
+      \\ qmatch_assum_rename_tac`MEM (nm,a1) _`
+      \\ qpat_assum`MEM (nm,a1) _`mp_tac
+      \\ qmatch_assum_rename_tac`MEM (nm,a2) _`
+      \\ strip_tac
+      \\ drule (GEN_ALL wf_state_event_same_name)
+      \\ disch_then drule
+      \\ qpat_assum`MEM (nm,a2) _`assume_tac
+      \\ disch_then drule
+      \\ CONV_TAC(LAND_CONV(SIMP_CONV(srw_ss())[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS,GSYM CONJ_ASSOC]))
+      \\ disch_then drule
+      \\ simp[]
+      \\ qpat_assum`FLOOKUP _ c2 = _`assume_tac
+      \\ asm_exists_tac
+      \\ rw[EXTENSION]
+      \\ qexists_tac`SND a1`
+      \\ simp[]
+      \\ CCONTR_TAC \\ fs[]
+      \\ fs[])
+    >- (
+      spose_not_then strip_assume_tac
+      \\ qmatch_assum_rename_tac`c1 ≠ c3`
+      \\ reverse(Cases_on`c3=c2`) >- metis_tac[]
+      \\ rveq \\ fs[] \\ rveq
+      \\ qmatch_assum_rename_tac`FST ra1 = FST ra2`
+      \\ Cases_on`ra1` \\ Cases_on`ra2` \\ fs[] \\ rveq
+      \\ qmatch_assum_rename_tac`MEM (nm,a1) _`
+      \\ qpat_assum`MEM (nm,a1) _`mp_tac
+      \\ qmatch_assum_rename_tac`MEM (nm,a2) _`
+      \\ strip_tac
+      \\ drule (GEN_ALL wf_state_event_same_name)
+      \\ disch_then drule
+      \\ qpat_assum`MEM (nm,a2) _`assume_tac
+      \\ disch_then drule
+      \\ CONV_TAC(LAND_CONV(SIMP_CONV(srw_ss())[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS,GSYM CONJ_ASSOC]))
+      \\ qpat_assum`FLOOKUP _ c1 = _`assume_tac
+      \\ disch_then drule
+      \\ simp[]
+      \\ qpat_assum`FLOOKUP _ c2 = _`assume_tac
+      \\ asm_exists_tac
+      \\ rw[EXTENSION]
+      \\ qexists_tac`SND a2`
+      \\ simp[]
+      \\ CCONTR_TAC \\ fs[]
+      \\ fs[])
+    >- (
+      spose_not_then strip_assume_tac
+      \\ qmatch_assum_rename_tac`c2 ≠ c3`
+      \\ qmatch_assum_rename_tac`c1 ≠ c4`
+      \\ reverse(Cases_on`c3=c4`) >- metis_tac[]
+      \\ rveq \\ fs[] \\ rveq
+      \\ qmatch_assum_rename_tac`FST ra1 = FST ra2`
+      \\ Cases_on`ra1` \\ Cases_on`ra2` \\ fs[] \\ rveq
+      \\ qmatch_assum_rename_tac`MEM (nm,a1) _`
+      \\ qpat_assum`MEM (nm,a1) _`mp_tac
+      \\ qmatch_assum_rename_tac`MEM (nm,a2) _`
+      \\ strip_tac
+      \\ drule (GEN_ALL wf_state_event_same_name)
+      \\ disch_then drule
+      \\ qpat_assum`MEM (nm,a2) _`assume_tac
+      \\ disch_then drule
+      \\ CONV_TAC(LAND_CONV(SIMP_CONV(srw_ss())[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS,GSYM CONJ_ASSOC]))
+      \\ qpat_assum`FLOOKUP _ c1 = _`assume_tac
+      \\ disch_then drule
+      \\ simp[]
+      \\ qpat_assum`FLOOKUP _ c2 = _`assume_tac
+      \\ asm_exists_tac
+      \\ rw[EXTENSION]
+      \\ qexists_tac`MovedOut (opposite dir)`
+      \\ simp[]
+      \\ CCONTR_TAC \\ fs[]
+      \\ pop_assum(assume_tac o SYM)
+      \\ fs[]))
+  >- (
+    rw[]
+    \\ qpat_assum`FLOOKUP _ c1 = _`assume_tac
+    \\ drule (GEN_ALL event_name_in_grid)
+    \\ disch_then drule
+    \\ rw[]
+    >- (
+      rw[MEM_MAP]
+      \\ spose_not_then strip_assume_tac
+      \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS,MEM_MAP]
+      \\ qpat_assum`_ = FST _`(assume_tac o SYM)
+      \\ res_tac \\ rfs[] )
+    >- (
+      rw[MEM_MAP]
+      \\ spose_not_then strip_assume_tac
+      \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS,MEM_MAP]
+      \\ qpat_assum`_ = FST _`(assume_tac o SYM)
+      \\ res_tac \\ rfs[] ))
+  \\ rw[]
+  \\ drule (GEN_ALL event_name_in_grid)
+  \\ disch_then drule
+  \\ qpat_assum`_ = FST _`(assume_tac o SYM)
+  \\ rw[MEM_MAP]
+  \\ spose_not_then strip_assume_tac \\ fs[]
+  \\ fs[IN_FRANGE_FLOOKUP,MEM_MAP,PULL_EXISTS]
+  \\ qpat_assum`_ = FST _`(assume_tac o SYM)
+  \\ res_tac \\ rfs[]);
+
 val incomingFrom_MovedIn = Q.store_thm("incomingFrom_MovedIn",
-  `MEM x (incomingFrom y z) ⇒ ∃i. SND x = MovedIn i`,
+  `MEM x (incomingFrom y z) ⇒ ∃i. SND (SND x) = MovedIn i`,
   Cases_on`z`>>rw[incomingFrom_def]>>
-  fs[MEM_FLAT,MEM_MAP] >>
-  every_case_tac >> fs[] >> rw[] >> fs[]);
+  fs[MEM_FLAT,MEM_MAP,MEM_FILTER,EXISTS_PROD]);
 
 val LENGTH_localActions = Q.store_thm("LENGTH_localActions[simp]",
   `LENGTH (localActions sq nb) = LENGTH sq.robots`,
   EVAL_TAC >> simp[])
 
 val map_inspected_def = Define`
-  (map_inspected f (Inspected r) = Inspected (f r)) ∧
+  (map_inspected f (Inspected nm r) = Inspected nm (f r)) ∧
   (map_inspected _ a = a)`;
 val _ = export_rewrites["map_inspected_def"];
 
@@ -249,10 +587,6 @@ val updateInventory_map_inspected = Q.store_thm("updateInventory_map_inspected[s
 val Destroyed_eq_map_inspected = Q.store_thm("Destroyed_eq_map_inspected[simp]",
   `Destroyed x = map_inspected f a ⇔ Destroyed x = a`,
   Cases_on`a`>>simp[]);
-
-val less8 = Q.prove(
-  `x < 8n ⇔ (x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4 ∨ x = 5 ∨ x = 6 ∨ x = 7)`,
-  rw[EQ_IMP_THM] >> simp[])
 
 val if_name_def = Define`
   if_name n f r = if r.name = n then f r else r`;
@@ -469,35 +803,13 @@ val computeEvents_fill_with_memory = Q.store_thm("computeEvents_fill_with_memory
     \\ rw[]
     \\ rw[shatter_def]))
 
-val LENGTH_neighbour_coords = Q.store_thm("LENGTH_neighbour_coords",
-  `LENGTH (neighbour_coords x) = 8`,
-  Cases_on`x`>>simp[neighbour_coords_def]);
-
 val LENGTH_neighbours = Q.store_thm("LENGTH_neighbours",
   `LENGTH (neighbours x y) = 8`,
   simp[neighbours_def,LENGTH_neighbour_coords]);
 
-val neighbours_EL_neighbour_coords = Q.store_thm("neighbours_EL_neighbour_coords",
-  `dir < 8 ∧ FLOOKUP s i = SOME sq ⇒
-   EL (opposite dir) (neighbours s (EL dir (neighbour_coords i))) = SOME sq`,
-  simp[neighbours_def] >>
-  Cases_on`EL dir (neighbour_coords i)` >>
-  Cases_on`i` >>
-  fs[neighbour_coords_def] >>
-  simp[less8] >>
-  strip_tac >> fs[opposite_def] >> rveq
-  \\ pop_assum (SUBST1_TAC o SYM)
-  \\ rpt AP_TERM_TAC
-  \\ simp[]
-  \\ intLib.COOPER_TAC);
-
 val opposite_opposite = Q.store_thm("opposite_opposite[simp]",
   `dir < 8 ⇒ opposite (opposite dir) = dir`,
   EVAL_TAC >> rw[less8] >> simp[]);
-
-val opposite_inj = Q.store_thm("opposite_inj",
-  `i < 8 ∧ j < 8 ∧ opposite i = opposite j ⇒ i = j`,
-  EVAL_TAC \\ rw[less8] \\ fs[]);
 
 val neighbour_coords_imp_opposite = Q.store_thm("neighbour_coords_imp_opposite",
   `d1 < 8 ∧ d2 < 8 ∧
