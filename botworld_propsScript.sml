@@ -216,7 +216,8 @@ val LENGTH_FILTER_EQ = Q.store_thm("LENGTH_FILTER_EQ",
 
 val APPEND_EQ_suff =
   DISCH_ALL(#2(EQ_IMP_RULE(UNDISCH(SPEC_ALL(CONJUNCT1 (SPEC_ALL APPEND_11_LENGTH))))))
-  |> SIMP_RULE(pure_ss)[AND_IMP_INTRO]
+  |> SIMP_RULE(pure_ss)[AND_IMP_INTRO,CONJ_ASSOC]
+  |> SIMP_RULE(pure_ss)[PROVE[]``LENGTH a = LENGTH b ∧ a = b ⇔ a = b``]
 
 (* -- *)
 
@@ -1268,6 +1269,14 @@ val computeEvents_update_robots_with_memory = Q.store_thm("computeEvents_update_
   \\ fs[FEVERY_ALL_FLOOKUP,FLOOKUP_FMAP_MAP2,PULL_EXISTS]
   \\ cheat);
 
+val SND_SND_if_focal_I = Q.store_thm("SND_SND_if_focal_I[simp]",
+  `SND (SND (if_focal nm (f ## I) x)) = SND (SND x)`,
+  PairCases_on`x` \\ EVAL_TAC \\ rw[]);
+
+val FST_if_focal = Q.store_thm("FST_if_focal[simp]",
+  `FST (if_focal nm f x) = FST x`,
+  PairCases_on`x` \\ EVAL_TAC);
+
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
    steph c s = SOME (obs,s') ∧
@@ -1307,7 +1316,59 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   \\ disch_then SUBST1_TAC
   \\ simp[FMAP_MAP2_o_f]
   \\ simp[o_f_FMAP_MAP2]
-  \\ cheat);
+  \\ simp[fmap_eq_flookup]
+  \\ simp[FLOOKUP_FMAP_MAP2]
+  \\ gen_tac
+  \\ Cases_on`FLOOKUP events k` \\ simp[]
+  \\ simp[update_robots_def]
+  \\ simp[event_update_robots_def,computeSquare_def]
+  \\ simp[MAP_MAP_o]
+  \\ simp[MEM_MAP]
+  \\ match_mp_tac APPEND_EQ_suff
+  \\ conj_tac
+  >- (
+    \\ simp[FILTER_MAP,o_DEF,MAP_MAP_o]
+    \\ simp[UNCURRY]
+    \\ simp[LAMBDA_PROD]
+    \\ simp[MAP_EQ_f,FORALL_PROD]
+    \\ simp[MEM_FILTER]
+    \\ qx_genl_tac[`nm`,`rr`,`aa`]
+    \\ strip_tac
+    \\ simp[if_focal_def,if_focal_eta,UNCURRY]
+    \\ reverse IF_CASES_TAC \\ fs[]
+    >- (
+      qmatch_goalsub_abbrev_tac`prepare x'`
+      \\ cheat
+      (* need to show that information hiding means changing the memory of
+         robot in an event doesn't affect run_policy *))
+    \\ simp[prepare_def,runMachine_def,UNCURRY,robot_component_equality]
+    \\ drule (GEN_ALL same_name_same_action) \\ simp[]
+    \\ disch_then drule
+    \\ qpat_assum `_ = SOME ev` assume_tac
+    \\ disch_then drule
+    \\ disch_then drule
+    \\ disch_then drule
+    \\ simp[EXTENSION]
+    \\ reverse strip_tac
+    >- (
+      first_x_assum(qspec_then`MovedOut (opposite dir)`mp_tac)
+      \\ simp[] \\ rw[] \\ fs[] )
+    \\ rveq \\ fs[]
+    \\ `r.processor = (get_focal_robot s).processor` by cheat (* focal clock preserved *)
+    \\ fs[]
+    \\ qmatch_goalsub_abbrev_tac`(_,x',_)`
+    \\ `run_policy p r.processor (s.focal_name,x',private a) =
+        run_policy p r.processor (s.focal_name,x,private a)` by cheat (* same info hiding *)
+    \\ rfs[])
+  \\ simp[MAP_GENLIST]
+  \\ simp[GENLIST_FUN_EQ]
+  \\ simp[if_focal_eta,UNCURRY]
+  \\ rpt strip_tac
+  \\ IF_CASES_TAC
+  >- cheat (* wrong time step *)
+  \\ simp[prepare_def]
+  \\ simp[runMachine_def,UNCURRY,robot_component_equality]
+  \\ cheat (* same info hiding *));
 
 (*
 val LENGTH_localActions = Q.store_thm("LENGTH_localActions[simp]",
