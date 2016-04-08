@@ -5,16 +5,6 @@ val _ = new_theory"botworld_props";
 
 (* TODO: move *)
 
-val FMAP_MAP2_o_f = Q.store_thm("FMAP_MAP2_o_f",
-  `FMAP_MAP2 f (g o_f h) = FMAP_MAP2 (f o (I ## g)) h`,
-  rw[fmap_eq_flookup,FLOOKUP_FMAP_MAP2,FLOOKUP_o_f]
-  \\ CASE_TAC \\ fs[]);
-
-val o_f_FMAP_MAP2 = Q.store_thm("o_f_FMAP_MAP2",
-  `f o_f (FMAP_MAP2 g h) = FMAP_MAP2 (f o g) h`,
-  rw[fmap_eq_flookup,FLOOKUP_FMAP_MAP2,FLOOKUP_o_f]
-  \\ CASE_TAC \\ fs[]);
-
 val CHOICE_IMAGE_SING = Q.store_thm("CHOICE_IMAGE_SING",
   `f (CHOICE {x}) = CHOICE (IMAGE f {x})`,
   rw[]);
@@ -138,6 +128,16 @@ val FLOOKUP_FMAP_MAP2 = Q.store_thm("FLOOKUP_FMAP_MAP2",
   `FLOOKUP (FMAP_MAP2 f m) x =
    OPTION_MAP (CURRY f x) (FLOOKUP m x) `,
   rw[FLOOKUP_DEF,FMAP_MAP2_THM])
+
+val FMAP_MAP2_o_f = Q.store_thm("FMAP_MAP2_o_f",
+  `FMAP_MAP2 f (g o_f h) = FMAP_MAP2 (f o (I ## g)) h`,
+  rw[fmap_eq_flookup,FLOOKUP_FMAP_MAP2,FLOOKUP_o_f]
+  \\ CASE_TAC \\ fs[]);
+
+val o_f_FMAP_MAP2 = Q.store_thm("o_f_FMAP_MAP2",
+  `f o_f (FMAP_MAP2 g h) = FMAP_MAP2 (f o g) h`,
+  rw[fmap_eq_flookup,FLOOKUP_FMAP_MAP2,FLOOKUP_o_f]
+  \\ CASE_TAC \\ fs[]);
 
 val FMAP_MAP2_SND_compose = Q.store_thm("FMAP_MAP2_SND_compose",
   `FMAP_MAP2 (f o SND) (FMAP_MAP2 (g o SND) x) = FMAP_MAP2 (f o g o SND) x`,
@@ -1327,7 +1327,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   \\ match_mp_tac APPEND_EQ_suff
   \\ conj_tac
   >- (
-    \\ simp[FILTER_MAP,o_DEF,MAP_MAP_o]
+    simp[FILTER_MAP,o_DEF,MAP_MAP_o]
     \\ simp[UNCURRY]
     \\ simp[LAMBDA_PROD]
     \\ simp[MAP_EQ_f,FORALL_PROD]
@@ -1368,6 +1368,8 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   >- cheat (* wrong time step *)
   \\ simp[prepare_def]
   \\ simp[runMachine_def,UNCURRY,robot_component_equality]
+  \\ qmatch_goalsub_abbrev_tac`(_,x'',_)`
+  \\ qmatch_goalsub_abbrev_tac`(nm,x'',_)`
   \\ cheat (* same info hiding *));
 
 (*
