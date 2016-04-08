@@ -170,6 +170,6 @@ val (quote_action_aux_def,quote_action_def) = mk_quote NONE ``:action``;
 val (quote_event_aux_def,quote_event_def) = mk_quote NONE ``:event``;
 
 val _ = overload_on("quote_observation",
-    ``quote_prod (quote_num,(quote_prod (quote_event,quote_privateData)))``);
+    ``quote_prod (quote_name,(quote_prod (quote_event,quote_privateData)))``);
 
 val _ = export_theory();
