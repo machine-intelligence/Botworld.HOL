@@ -5,6 +5,16 @@ val _ = new_theory"botworld_props";
 
 (* TODO: move *)
 
+val FMAP_MAP2_o_f = Q.store_thm("FMAP_MAP2_o_f",
+  `FMAP_MAP2 f (g o_f h) = FMAP_MAP2 (f o (I ## g)) h`,
+  rw[fmap_eq_flookup,FLOOKUP_FMAP_MAP2,FLOOKUP_o_f]
+  \\ CASE_TAC \\ fs[]);
+
+val o_f_FMAP_MAP2 = Q.store_thm("o_f_FMAP_MAP2",
+  `f o_f (FMAP_MAP2 g h) = FMAP_MAP2 (f o g) h`,
+  rw[fmap_eq_flookup,FLOOKUP_FMAP_MAP2,FLOOKUP_o_f]
+  \\ CASE_TAC \\ fs[]);
+
 val CHOICE_IMAGE_SING = Q.store_thm("CHOICE_IMAGE_SING",
   `f (CHOICE {x}) = CHOICE (IMAGE f {x})`,
   rw[]);
@@ -1207,13 +1217,67 @@ val steph_focal_clock = Q.store_thm("steph_focal_clock",
   \\ imp_res_tac get_focal_robot_sing
   \\ fs[fill_robots_by_name]);
 
+val fill_with_policy_split = Q.store_thm("fill_with_policy_split",
+  `fill (with_policy c p) s =
+   fill (memory_fupd (K p))
+   (s with state := fill (command_fupd (K c)) s)`,
+  rw[fill_def,state_with_hole_component_equality,state_component_equality]
+  \\ AP_THM_TAC \\ AP_TERM_TAC
+  \\ simp[FUN_EQ_THM]
+  \\ rw[square_component_equality,MAP_MAP_o,o_DEF]
+  \\ AP_THM_TAC \\ AP_TERM_TAC
+  \\ rw[FUN_EQ_THM,FORALL_PROD,if_focal_def]);
+
+val step_time_step = Q.store_thm("step_time_step[simp]",
+  `(step s).time_step = s.time_step + 1`,
+  rw[step_def]);
+
+val fill_time_step = Q.store_thm("fill_time_step[simp]",
+  `(fill f s).time_step = s.state.time_step `,
+  EVAL_TAC);
+
+val update_robots_def = Define`
+  update_robots nm f = (square_robots_fupd (MAP (if_focal nm f)))`
+
+val update_robots_intro =
+  Q.ISPEC`update_robots nm f`ETA_AX
+  |> CONV_RULE(LAND_CONV(REWRITE_CONV[update_robots_def]))
+
+val update_robots_split = Q.store_thm("update_robots_split",
+  `update_robots nm (with_policy c p) =
+   update_robots nm (with_memory p) o
+   update_robots nm (with_command c)`,
+  rw[FUN_EQ_THM,update_robots_def,square_component_equality]
+  \\ rw[MAP_MAP_o,MAP_EQ_f,FORALL_PROD,if_focal_def]);
+
+val event_update_robots_def = Define`
+  event_update_robots nm f =
+    event_robotActions_fupd
+      (MAP (if_focal nm (f ## I)))`;
+
+val computeEvents_update_robots_with_memory = Q.store_thm("computeEvents_update_robots_with_memory",
+  `wf_state s ∧
+   FEVERY
+    (λ(_,ev). EVERY (λa. ∀r. a ≠ Inspected nm r) (MAP (SND o SND) ev.robotActions))
+    (computeEvents s.grid)
+   ⇒
+   computeEvents (update_robots nm (with_memory p) o_f s.grid) =
+   event_update_robots nm (with_memory p) o_f (computeEvents s.grid)`,
+  rw[fmap_eq_flookup,FLOOKUP_o_f,computeEvents_def,FLOOKUP_FMAP_MAP2]
+  \\ BasicProvers.TOP_CASE_TAC \\ fs[]
+  \\ fs[FEVERY_ALL_FLOOKUP,FLOOKUP_FMAP_MAP2,PULL_EXISTS]
+  \\ cheat);
+
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
    steph c s = SOME (obs,s') ∧
    run_policy p (get_focal_robot s).processor obs = (c',p')
    ⇒
    step (fill (with_policy c p) s) = fill (with_policy c' p') s'`,
-  rw[steph_def]
+  rw[]
+  \\ imp_res_tac steph_focal_clock
+  \\ pop_assum (assume_tac o SYM)
+  \\ fs[steph_def]
   \\ pairarg_tac \\ fs[]
   \\ fs[wf_state_with_hole_def]
   \\ `wf_state (fill (with_command c) s)` by metis_tac[wf_state_fill]
@@ -1227,17 +1291,28 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   \\ fs[EXTENSION]
   \\ first_x_assum(qspec_then`(c'',ev,a)`mp_tac)
   \\ simp[] \\ strip_tac
+  \\ simp[Once fill_with_policy_split]
+  \\ qmatch_assum_abbrev_tac`FEVERY _ events`
+  \\ qmatch_assum_abbrev_tac`Abbrev(_ = _ s'.grid)`
+  \\ simp[state_component_equality]
+  \\ simp[step_def]
+  \\ simp[fill_def]
+  \\ simp[update_robots_intro]
+  \\ drule (GEN_ALL computeEvents_update_robots_with_memory)
+  \\ disch_then(qspecl_then[`p`,`s.focal_name`]mp_tac)
+  \\ impl_tac
+  >- (
+    fs[FEVERY_ALL_FLOOKUP,EVERY_MEM]
+    \\ metis_tac[] )
+  \\ disch_then SUBST1_TAC
+  \\ simp[FMAP_MAP2_o_f]
+  \\ simp[o_f_FMAP_MAP2]
   \\ cheat);
 
 (*
 val LENGTH_localActions = Q.store_thm("LENGTH_localActions[simp]",
   `LENGTH (localActions sq nb) = LENGTH sq.robots`,
   EVAL_TAC >> simp[])
-
-val map_inspected_def = Define`
-  (map_inspected f (Inspected nm r) = Inspected nm (f r)) ∧
-  (map_inspected _ a = a)`;
-val _ = export_rewrites["map_inspected_def"];
 
 val LENGTH_FILTER_memory = Q.prove(
   `(∀r p. P r ⇔ P (r with memory := p)) ⇒
