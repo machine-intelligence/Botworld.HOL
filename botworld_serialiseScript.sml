@@ -375,19 +375,21 @@ val write_output_dec_def = Define`
 
 val length_rec_def = Define`
     length_rec bs n =
-      if EVERY (λb. b = 0w) bs
-      then INL (2 * n)
+      if EVERY (λb. b = 0w : word8) bs
+      then INL (2n * n)
       else INR (OPTION_BIND (parse_sexp (MAP (CHR o w2n) bs)) odestSXNUM)`;
+
+val get_input_length_loop_body_def = Define`
+ get_input_length_loop_body =
+           (Let (SOME "bs") (App Aw8alloc [Var(Short"n"); Lit(Word8 0w)])
+                (Let NONE (App (FFI 0) [Var(Short"bs")])
+                     (Mat (App Opapp [App Opapp [Var(Long "Botworld" "length_rec"); Var(Short"bs")]; Var(Short "n")])
+                          [(Pcon (SOME(Short "inl")) [Pvar "n"], App Opapp [Var(Short"f"); Var(Short"n")] )
+                          ;(Pcon (SOME(Short "inr")) [Pcon (SOME(Short "some")) [Pvar "len"]], Var(Short"len"))])))`
 
 val get_input_length_body_def = Define`
   get_input_length_body =
-    (Letrec [("f","n",
-                (Let (SOME "bs") (App Aw8alloc [Var(Short"n")])
-                (Let NONE (App (FFI 0) [Var(Short"bs")])
-                (Mat (App Opapp [App Opapp [Var(Long "Botworld" "length_rec"); Var(Short"bs")]; Var(Short "n")])
-                     [(Pcon (SOME(Short "inl")) [Pvar "n"], App Opapp [Var(Short"f"); Var(Short"n")] )
-                     ;(Pcon (SOME(Short "inr")) [Pcon (SOME(Short "some")) [Pvar "len"]], Var(Short"len"))
-                     ]))))] (App Opapp [Var(Short "f") ; Lit(IntLit 1)]))`;
+    (Letrec [("f","n",get_input_length_loop_body)] (App Opapp [Var(Short "f") ; Lit(IntLit 1)]))`;
 
 val get_input_length_dec_def = Define`
   get_input_length_dec = Dlet(Pvar "get_input_length") (Fun "x" get_input_length_body)`
@@ -395,12 +397,12 @@ val get_input_length_dec_def = Define`
 val get_output_length_body_def = Define`
   get_output_length_body =
   (Letrec [("f","n",
-                (Let (SOME "bs") (App Aw8alloc [Var(Short"n")])
-                (Let NONE (App (FFI 3) [Var(Short"bs")])
-                (Mat (App Opapp [App Opapp [Var(Long "Botworld" "length_rec"); Var(Short"bs")]; Var(Short "n")])
-                     [(Pcon (SOME(Short "inl")) [Pvar "n"], App Opapp [Var(Short"f"); Var(Short"n")] )
-                     ;(Pcon (SOME(Short "inr")) [Pcon (SOME(Short "some")) [Pvar "len"]], Var(Short"len"))
-                     ]))))] (App Opapp [Var(Short "f") ; Lit(IntLit 1)]))`;
+            (Let (SOME "bs") (App Aw8alloc [Var(Short"n"); Lit(Word8 0w)])
+                 (Let NONE (App (FFI 3) [Var(Short"bs")])
+                      (Mat (App Opapp [App Opapp [Var(Long "Botworld" "length_rec"); Var(Short"bs")]; Var(Short "n")])
+                           [(Pcon (SOME(Short "inl")) [Pvar "n"], App Opapp [Var(Short"f"); Var(Short"n")] )
+                           ;(Pcon (SOME(Short "inr")) [Pcon (SOME(Short "some")) [Pvar "len"]], Var(Short"len"))]))))] 
+          (App Opapp [Var(Short "f") ; Lit(IntLit 1)]))`;
 
 val get_output_length_dec_def = Define`
   get_output_length_dec = Dlet (Pvar "get_output_length") (Fun "x" get_output_length_body)`;
@@ -422,20 +424,49 @@ val read_output_dec_def = Define`
            (App Opapp [Var(Long "Botworld" "decode_output"); App Opapp [Var(Long "ByteArray" "toList") ; Var(Short"bs")]]))))`;
 
 (*
+val _ = register_type ``:'a + 'b``
+val _ = register_type ``:'a option``
+
+val _ = Globals.max_print_depth := 0;
+val evals = [evaluate_def, do_app_def, do_opapp_def, lookup_var_id_def, evalPropsTheory.build_rec_env_merge, 
+             evalPropsTheory.find_recfun_ALOOKUP, store_alloc_def, store_lookup_def, store_assign_def,
+             libTheory.opt_bind_def, rich_listTheory.EL_LENGTH_APPEND];
+val _ = Globals.max_print_depth := 10;
+
+val get_input_length_rec_thm = Q.store_thm("get_input_length_rec_thm",
+  `∀ m n s st env.
+   s.ffi.oracle = botworld_oracle ∧
+   s.ffi.ffi_state = st ∧
+   m = LENGTH (encode_observation st.bot_input) ∧
+   lookup_var_id (Short "n") env = SOME(Litv(IntLit &n)) ∧
+   lookup_var_id (Short "f") env = SOME(Recclosure env0 [("f","n",get_input_length_loop_body)] "f") ⇒
+   ∃ bs ck s'. 
+   evaluate s env [get_input_length_loop_body] = (s',Rval[Litv(IntLit (&m))]) ∧
+   s' = s with <| refs := MAP W8array bs ++ s.refs;
+                  clock := s.clock - ck |>`,
+   gen_tac \\ completeInduct_on `m` \\ rw[]
+   \\ rw[get_input_length_loop_body_def] \\ rw[evaluate_def, do_app_def] \\ rw evals
+)
 val get_input_length_thm = Q.store_thm("get_input_length_thm",
   `lookup_var_id (Long"Botworld""get_input_length") env = SOME (Closure env0 "x" get_input_length_body) ∧
    s.ffi.oracle = botworld_oracle ∧
-   evaluate s env [u] = (s,Rval[Conv NONE []]) ∧
+   evaluateg s env [u] = (s,Rval[Conv NONE []]) ∧
    evaluate s env [App Opapp [Var(Long"Botworld""get_input_length"); u]] = (s', res) ∧
+   Eval env (Var (Long "Botworld""length_rec")) ((LIST_TYPE WORD8 --> NUM --> SUM_TYPE NUM (OPTION_TYPE NUM)) length_rec) ∧
    res ≠ Rerr(Rabort Rtimeout_error)
    ⇒
    ∃ck bs.
-     s' = s with <| refs := W8array bs::s.refs;
+     s' = s with <| refs := MAP W8array bs ++ s.refs;
                     clock := s.clock - ck |>
      ∧ res = Rval[Litv(IntLit (&(LENGTH (encode_observation st.bot_input))))]`,
   rw[evaluate_def] \\ rfs[]
   \\ fs[do_opapp_def]
   \\ every_case_tac \\ fs[]
+  \\ qhdtm_x_assum `funBigStep$evaluate` mp_tac
+  \\ simp[get_input_length_body_def, evaluate_def, lookup_var_id_def, evalPropsTheory.build_rec_env_merge]
+  \\ simp[do_opapp_def, evalPropsTheory.find_recfun_ALOOKUP]
+  \\ rw[] \\ fs[] \\ pop_assum mp_tac
+  \\ simp[evalPropsTheory.build_rec_env_merge]
 *)
 
 val _ = export_theory()
