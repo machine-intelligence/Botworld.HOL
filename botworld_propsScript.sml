@@ -1060,6 +1060,18 @@ val get_focal_robot_sing = Q.store_thm("get_focal_robot_sing",
   \\ rw[get_focal_robot_def]
   \\ rw[get_robot_by_name_def]);
 
+val get_focal_robot_unique = Q.store_thm("get_focal_robot_unique",
+  `wf_state_with_hole s ∧
+   sq ∈ FRANGE s.state.grid ∧
+   MEM (s.focal_name,r) sq.robots
+   ⇒ r = get_focal_robot s`,
+  rw[]
+  \\ drule get_focal_robot_sing
+  \\ rw[get_focal_robot_def]
+  \\ fs[robots_by_name_def,EXTENSION]
+  \\ first_x_assum(qspec_then`r`(match_mp_tac o #1 o EQ_IMP_RULE))
+  \\ metis_tac[wf_state_def,ALOOKUP_ALL_DISTINCT_MEM,wf_state_with_hole_def]);
+
 val clock_preserved = Q.store_thm("clock_preserved",
   `wf_state s ⇒
    IMAGE robot_processor (robots_by_name (step s) nm) =
@@ -1277,6 +1289,65 @@ val FST_if_focal = Q.store_thm("FST_if_focal[simp]",
   `FST (if_focal nm f x) = FST x`,
   PairCases_on`x` \\ EVAL_TAC);
 
+open match_goal
+
+val updateInventory_const = Q.store_thm("updateInventory_const[simp]",
+  `(SND(updateInventory sq nm ra)).memory = (FST ra).memory ∧
+   (SND(updateInventory sq nm ra)).frame = (FST ra).frame ∧
+   (SND(updateInventory sq nm ra)).command = (FST ra).command ∧
+   (SND(updateInventory sq nm ra)).processor = (FST ra).processor`,
+  Cases_on`ra`\\rw[updateInventory_def] >>
+  BasicProvers.CASE_TAC >> rw[])
+
+val computeEvents_only_inventory = Q.store_thm("computeEvents_only_inventory",
+  `wf_state s ∧
+   sq ∈ FRANGE s.grid ∧
+   MEM (nm,r) sq.robots ∧
+   ev ∈ FRANGE (computeEvents s.grid) ∧
+   MEM (nm,r',a) ev.robotActions
+   ⇒
+   ∃i. r' = r with inventory := i`,
+  rw[IN_FRANGE_FLOOKUP,computeEvents_def,FLOOKUP_FMAP_MAP2,event_def] \\ fs[]
+  \\ fs[MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,o_DEF,UNCURRY,MEM_MAP,MEM_FLAT,MEM_GENLIST,EXISTS_PROD]
+  \\ rw[] \\ fs[]
+  >- (
+    fs[localActions_def,MEM_MAP,EXISTS_PROD]
+    \\ drule same_name_same_square
+    \\ simp[IN_FRANGE_FLOOKUP,PULL_EXISTS,PULL_FORALL]
+    \\ simp[GSYM AND_IMP_INTRO]
+    \\ match_tac ([mg.ab"h1"`FLOOKUP`,mg.ab"h2"`FLOOKUP`],
+         fn(a,t)=>disch_then(drule_thm(a"h1"))
+                \\disch_then(drule_thm(a"h2")))
+    \\ simp[MEM_MAP,PULL_EXISTS,EXISTS_PROD,PULL_FORALL]
+    \\ rpt(disch_then drule)
+    \\ rw[] \\ fs[]
+    \\ match_tac ([mg.ab"1"`(nm,r1_)`,mg.ab"2"`(nm,r2_)`], fn(a,t)=>
+       `^(t"r1") = ^(t"r2")` by (
+         metis_tac[wf_state_def,ALL_DISTINCT_MAP_FST,IN_FRANGE_FLOOKUP]))
+    \\ rveq \\ fs[robot_component_equality] )
+  \\ match1_tac(mg.aub`incomingFrom _ x_`,fn(a,t)=>Cases_on`^(t"x")`)
+  \\ fs[incomingFrom_def,MEM_MAP,MEM_FILTER,EXISTS_PROD]
+  \\ rfs[neighbours_def,EL_MAP]
+  \\ drule same_name_same_square
+  \\ simp[IN_FRANGE_FLOOKUP,PULL_EXISTS,PULL_FORALL]
+  \\ simp[GSYM AND_IMP_INTRO]
+  \\ rveq
+  \\ match_tac ([mg.ab"h1"`FLOOKUP`,mg.ab"h2"`FLOOKUP`],
+       fn(a,t)=>disch_then(drule_thm(a"h1"))
+              \\disch_then(drule_thm(a"h2"))
+              \\ simp[MEM_MAP,PULL_EXISTS,EXISTS_PROD,PULL_FORALL]
+              \\ rpt(disch_then drule)
+              \\ strip_tac \\ (CHANGED_TAC rveq))
+  \\ match_tac ([mg.ab"1"`(nm,r1_)`,mg.ab"2"`(nm,r2_)`], fn(a,t)=>
+     `^(t"r1") = ^(t"r2")` by (
+       metis_tac[wf_state_def,ALL_DISTINCT_MAP_FST,IN_FRANGE_FLOOKUP]))
+  \\ rveq
+  \\ simp[robot_component_equality]);
+
+val wf_state_with_hole_wf_state = Q.store_thm("wf_state_with_hole_wf_state",
+  `wf_state_with_hole s ⇒ wf_state s.state`,
+  rw[wf_state_with_hole_def])
+
 val steph_fill_step = Q.store_thm("steph_fill_step",
   `wf_state_with_hole s ∧
    steph c s = SOME (obs,s') ∧
@@ -1288,7 +1359,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   \\ pop_assum (assume_tac o SYM)
   \\ fs[steph_def]
   \\ pairarg_tac \\ fs[]
-  \\ fs[wf_state_with_hole_def]
+  \\ imp_res_tac (wf_state_with_hole_def |> SPEC_ALL |> EQ_IMP_RULE |> #1)
   \\ `wf_state (fill (with_command c) s)` by metis_tac[wf_state_fill]
   \\ drule (GEN_ALL focal_event_sing)
   \\ simp[FRANGE_fill,PULL_EXISTS]
@@ -1354,7 +1425,27 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
       first_x_assum(qspec_then`MovedOut (opposite dir)`mp_tac)
       \\ simp[] \\ rw[] \\ fs[] )
     \\ rveq \\ fs[]
-    \\ `r.processor = (get_focal_robot s).processor` by cheat (* focal clock preserved *)
+    \\ `r.processor = (get_focal_robot s).processor`
+    by (
+      drule (GEN_ALL computeEvents_only_inventory)
+      \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS]
+      \\ simp[Abbr`s'`,fill_def,FLOOKUP_o_f]
+      \\ CONV_TAC(LAND_CONV(STRIP_QUANT_CONV(LAND_CONV(
+           move_conj_left(can(match_term``FLOOKUP events _ = _``))))))
+      \\ disch_then drule
+      \\ disch_then(qspec_then`k`mp_tac o CONV_RULE (RESORT_FORALL_CONV List.rev))
+      \\ fs[MEM_MAP,PULL_EXISTS]
+      \\ CONV_TAC(LAND_CONV(STRIP_QUANT_CONV(LAND_CONV(
+           move_conj_left(listSyntax.is_mem)))))
+      \\ disch_then drule
+      \\ CONV_TAC(LAND_CONV(STRIP_QUANT_CONV(LAND_CONV(
+           move_conj_left(listSyntax.is_mem)))))
+      \\ disch_then drule
+      \\ rw[if_focal_eta,UNCURRY]
+      \\ drule (GEN_ALL get_focal_robot_unique)
+      \\ simp[IN_FRANGE_FLOOKUP,PULL_EXISTS]
+      \\ disch_then drule
+      \\ metis_tac[PAIR] )
     \\ fs[]
     \\ qmatch_goalsub_abbrev_tac`(_,x',_)`
     \\ `run_policy p r.processor (s.focal_name,x',private a) =
@@ -1365,12 +1456,114 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   \\ simp[if_focal_eta,UNCURRY]
   \\ rpt strip_tac
   \\ IF_CASES_TAC
-  >- cheat (* wrong time step *)
+  >- (
+    fs[wf_state_def,IN_FRANGE_FLOOKUP,PULL_EXISTS]
+    \\ match1_tac(mg.ab"h"`_.time_step`,fn (a,t) => drule(a"h"))
+    \\ disch_then drule
+    \\ pop_assum(SUBST_ALL_TAC o SYM)
+    \\ simp[Abbr`s'`])
   \\ simp[prepare_def]
   \\ simp[runMachine_def,UNCURRY,robot_component_equality]
   \\ qmatch_goalsub_abbrev_tac`(_,x'',_)`
   \\ qmatch_goalsub_abbrev_tac`(nm,x'',_)`
   \\ cheat (* same info hiding *));
+
+open terminationTheory
+
+val ffi_state_rel_def = Define`
+  ffi_state_rel R s1 s2 ⇔ R s1.ffi_state s2.ffi_state ∧
+                          s2 = s1 with ffi_state := s2.ffi_state`;
+
+val ffi_rel_def = Define`
+  ffi_rel R s1 s2 ⇔
+    ffi_state_rel R s1.ffi s2.ffi ∧
+    s2 = s1 with ffi := s2.ffi`;
+
+val ffi_rel_dec_clock = Q.store_thm("ffi_rel_dec_clock",
+  `ffi_rel R s1 s2 ⇒
+   ffi_rel R (dec_clock s1) (dec_clock s2)`,
+  EVAL_TAC \\ rw[semanticPrimitivesTheory.state_component_equality]);
+
+val ffi_rel_same_clock = Q.store_thm("ffi_rel_same_clock",
+  `ffi_rel R s1 s2 ⇒ s1.clock = s2.clock`,
+  EVAL_TAC \\ rw[semanticPrimitivesTheory.state_component_equality]);
+
+val ffi_rel_same_refs = Q.store_thm("ffi_rel_same_refs",
+  `ffi_rel R s1 s2 ⇒ s1.refs = s2.refs`,
+  EVAL_TAC \\ rw[semanticPrimitivesTheory.state_component_equality]);
+
+fun extends_tac (tac:tactic) ((g as (asl,w)):goal) =
+  let
+    val asms1 = HOLset.fromList Term.compare asl
+    val (gs,v) = tac g
+    fun extends asl =
+      let
+        val asms2 = HOLset.fromList Term.compare asl
+      in not (HOLset.isEmpty (HOLset.difference(asms2,asms1))) end
+  in
+    (assert(List.all (extends o #1)) gs,v)
+  end
+
+val do_app_ffi_extensional = Q.store_thm("do_app_ffi_extensional",
+  `ffi_state_rel R ffi1 ffi2 ⇒
+   OPTION_REL
+    (λ((refs1,ffi1),res1) ((refs2,ffi2),res2).
+       refs1 = refs2 ∧ res1 = res2 ∧ ffi_state_rel R ffi1 ffi2)
+    (do_app (refs,ffi1) op es)
+    (do_app (refs,ffi2) op es)`,
+  rpt (match1_tac(mg.acb`o_ : 'a option`,(fn(a,t)=>extends_tac(Cases_on`^(t("o"))` \\fs[]\\rveq))))
+  \\ rpt (match1_tac(mg.acb`o_ : 'a # 'b`,(fn(a,t)=>extends_tac(Cases_on`^(t("o"))` \\fs[]\\rveq))))
+  \\ fs[OPTREL_def]
+  \\ cheat
+  (*
+  \\ fs[evalPropsTheory.do_app_cases] \\ rveq
+  \\ fs[semanticPrimitivesTheory.do_app_def] \\ rveq
+  \\ rpt(pop_assum mp_tac) \\ rw[]
+  *));
+
+val evaluate_ffi_extensional = Q.store_thm("evaluate_ffi_extensional",
+  `(∀ffi ffi'. R ffi ffi' ⇒
+      ∀i ws.
+        let (ffj,vs) = call_FFI ffi i ws in
+        let (ffj',vs') = call_FFI ffi' i ws in
+          R ffj ffj' ∧ vs = vs') ⇒
+   (∀st env es st' res res' st2 st2'.
+      ffi_rel R st st' ∧
+      evaluate st env es = (st2,res) ∧
+      evaluate st' env es = (st2',res')
+      ⇒ res = res' ∧ ffi_rel R st2 st2') ∧
+   (∀st env v pes err_v st' res res' st2 st2'.
+       ffi_rel R st st' ∧
+       evaluate_match st env v pes err_v = (st2,res) ∧
+       evaluate_match st' env v pes err_v = (st2',res')
+       ⇒ res = res' ∧ ffi_rel R st2 st2')`,
+  strip_tac
+  \\ ho_match_mp_tac evaluate_ind
+  \\ rpt conj_tac
+  \\ rpt gen_tac \\ simp[evaluate_def] \\ strip_tac
+  \\ rveq \\ rpt gen_tac \\ fs[] \\ strip_tac
+  \\ TRY (
+    every_case_tac
+  \\ rpt (qpat_assum`_ ∧ _`strip_assume_tac) \\ rveq
+  \\ fs[] \\ rfs[] \\ rveq
+  \\ imp_res_tac ffi_rel_same_refs \\ fs[]
+  \\ first_x_assum drule \\ fs[]
+  \\ rpt( strip_tac \\ rveq)
+  \\ spose_not_then strip_assume_tac \\ fs[] \\ rveq
+  \\ first_x_assum drule \\ fs[])
+  (* App case *)
+  \\ every_case_tac
+  \\ rpt (qpat_assum`_ ∧ _`strip_assume_tac) \\ rveq
+  \\ fs[] \\ rfs[] \\ rveq
+  \\ imp_res_tac ffi_rel_same_refs \\ fs[]
+  \\ first_x_assum drule \\ fs[]
+  \\ rpt( strip_tac \\ rveq)
+  \\ spose_not_then strip_assume_tac \\ fs[] \\ rveq
+  \\ imp_res_tac ffi_rel_dec_clock
+  \\ imp_res_tac ffi_rel_same_clock \\ fs[]
+  \\ TRY(first_x_assum drule \\ fs[])
+  \\ imp_res_tac ffi_rel_same_refs \\ fs[]
+  \\ cheat);
 
 (*
 val LENGTH_localActions = Q.store_thm("LENGTH_localActions[simp]",
@@ -1396,11 +1589,6 @@ val contested_ignores_policy = Q.store_thm("contested_ignores_policy[simp]",
   AP_TERM_TAC >>
   match_mp_tac (MP_CANON LENGTH_FILTER_memory) >>
   simp[canLift_def])
-
-val updateInventory_const = Q.store_thm("updateInventory_const[simp]",
-  `(updateInventory sq r a).memory = r.memory`,
-  rw[updateInventory_def] >>
-  BasicProvers.CASE_TAC >> rw[])
 
 val updateInventory_map_inspected = Q.store_thm("updateInventory_map_inspected[simp]",
   `updateInventory sq i (map_inspected f a) = updateInventory sq i a`,
