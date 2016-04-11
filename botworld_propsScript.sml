@@ -1504,29 +1504,57 @@ fun extends_tac (tac:tactic) ((g as (asl,w)):goal) =
     (assert(List.all (extends o #1)) gs,v)
   end
 
+val call_FFI_invariant_def = Define`
+  call_FFI_invariant R ⇔
+  ∀ffi ffi'. R ffi.ffi_state ffi'.ffi_state ⇒
+    ∀i ws.
+      let (ffj,vs) = call_FFI ffi i ws in
+      let (ffj',vs') = call_FFI ffi' i ws in
+        R ffj.ffi_state ffj'.ffi_state
+        ∧ ffj' = ffj with ffi_state := ffj'.ffi_state
+        ∧ vs = vs'`;
+
 val do_app_ffi_extensional = Q.store_thm("do_app_ffi_extensional",
-  `ffi_state_rel R ffi1 ffi2 ⇒
+  `call_FFI_invariant R ∧
+   ffi_state_rel R ffi1 ffi2 ⇒
    OPTION_REL
     (λ((refs1,ffi1),res1) ((refs2,ffi2),res2).
-       refs1 = refs2 ∧ res1 = res2 ∧ ffi_state_rel R ffi1 ffi2)
+       refs1 = refs2 ∧ res1 = res2 ∧
+       ffi2 = ffi1 with ffi_state := ffi2.ffi_state ∧
+       R ffi1.ffi_state ffi2.ffi_state)
     (do_app (refs,ffi1) op es)
     (do_app (refs,ffi2) op es)`,
-  rpt (match1_tac(mg.acb`o_ : 'a option`,(fn(a,t)=>extends_tac(Cases_on`^(t("o"))` \\fs[]\\rveq))))
-  \\ rpt (match1_tac(mg.acb`o_ : 'a # 'b`,(fn(a,t)=>extends_tac(Cases_on`^(t("o"))` \\fs[]\\rveq))))
+  (match1_tac(mg.acb`o_ : 'a option`,(fn(a,t)=>extends_tac(Cases_on`^(t("o"))` \\fs[]\\rveq))))
   \\ fs[OPTREL_def]
-  \\ cheat
-  (*
-  \\ fs[evalPropsTheory.do_app_cases] \\ rveq
-  \\ fs[semanticPrimitivesTheory.do_app_def] \\ rveq
-  \\ rpt(pop_assum mp_tac) \\ rw[]
-  *));
+  \\ rpt (match1_tac(mg.acb`o_ : 'a # 'b`,(fn(a,t)=>extends_tac(Cases_on`^(t("o"))` \\fs[]\\rveq))))
+  >- (
+    reverse(Cases_on`op`)\\fs[semanticPrimitivesTheory.do_app_def]
+    \\ every_case_tac \\ fs[UNCURRY]
+    \\ spose_not_then strip_assume_tac
+    \\ fs[call_FFI_invariant_def,ffi_state_rel_def]
+    \\ first_x_assum drule
+    \\ simp[]
+    \\ qmatch_assum_rename_tac`call_FFI _ i ws = _`
+    \\ map_every qexists_tac[`i`,`ws`]
+    \\ simp[]
+    \\ spose_not_then strip_assume_tac
+    \\ fs[] )
+  \\ rw[ffi_state_rel_def,ffiTheory.ffi_state_component_equality]
+  \\ fs[evalPropsTheory.do_app_cases,semanticPrimitivesTheory.do_app_def] \\ rw[]
+  \\ every_case_tac \\ fs[]
+  \\ spose_not_then strip_assume_tac
+  \\ fs[call_FFI_invariant_def]
+  \\ first_x_assum drule
+  \\ simp[]
+  \\ qmatch_assum_rename_tac`call_FFI _ i ws = _`
+  \\ map_every qexists_tac[`i`,`ws`]
+  \\ simp[]
+  \\ spose_not_then strip_assume_tac
+  \\ fs[]
+  \\ fs[ffiTheory.ffi_state_component_equality]);
 
 val evaluate_ffi_extensional = Q.store_thm("evaluate_ffi_extensional",
-  `(∀ffi ffi'. R ffi ffi' ⇒
-      ∀i ws.
-        let (ffj,vs) = call_FFI ffi i ws in
-        let (ffj',vs') = call_FFI ffi' i ws in
-          R ffj ffj' ∧ vs = vs') ⇒
+  `call_FFI_invariant R ⇒
    (∀st env es st' res res' st2 st2'.
       ffi_rel R st st' ∧
       evaluate st env es = (st2,res) ∧
@@ -1563,7 +1591,20 @@ val evaluate_ffi_extensional = Q.store_thm("evaluate_ffi_extensional",
   \\ imp_res_tac ffi_rel_same_clock \\ fs[]
   \\ TRY(first_x_assum drule \\ fs[])
   \\ imp_res_tac ffi_rel_same_refs \\ fs[]
-  \\ cheat);
+  \\ imp_res_tac do_app_ffi_extensional
+  \\ fs[ffi_rel_def,
+        semanticPrimitivesTheory.state_component_equality,
+        funBigStepTheory.dec_clock_def]
+  \\ match_tac(
+       [mg.a"h"`ffi_state_rel R ffi_ _`,
+        mg.bau`do_app (refs_,ffi_) op_ es_`
+       ],
+       fn(a,t)=>first_x_assum(drule_thm(a"h")) \\ simp[]
+                \\ map_every (exists_tac o t) ["refs","op","es"])
+  \\ simp[OPTREL_def]
+  \\ spose_not_then strip_assume_tac \\ fs[]
+  \\ rveq \\ fs[]
+  \\ fs[ffi_state_rel_def]);
 
 (*
 val LENGTH_localActions = Q.store_thm("LENGTH_localActions[simp]",
