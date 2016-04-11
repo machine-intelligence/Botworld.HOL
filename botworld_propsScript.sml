@@ -45,6 +45,17 @@ val PAIR_MAP_COMPOSE = Q.store_thm("PAIR_MAP_COMPOSE",
   `(a ## b) o (c ## d) = (a o c ## b o d)`,
   rw[FUN_EQ_THM,FORALL_PROD]);
 
+val MAP_FILTER_remove = Q.store_thm("MAP_FILTER_remove",
+  `∀l1 l2. MAP f l1 = MAP f l2 ∧ (∀n. n < LENGTH l1 ⇒ (P (EL n l1) ⇔ P (EL n l2)))
+    ⇒ MAP f (FILTER P l1) = MAP f (FILTER P l2)`,
+  Induct \\ rw[]
+  \\ Cases_on`l2` \\ fs[]
+  \\ first_assum(qspec_then`0`mp_tac)
+  \\ simp_tac(srw_ss())[] \\ strip_tac \\ fs[]
+  \\ first_x_assum match_mp_tac \\ rw[]
+  \\ first_x_assum(qspec_then`SUC n`mp_tac)
+  \\ simp[]);
+
 val PERM_FLAT = Q.store_thm("PERM_FLAT",
   `∀l1 l2. PERM l1 l2 ⇒ PERM (FLAT l1) (FLAT l2)`,
   ho_match_mp_tac PERM_IND
@@ -259,7 +270,8 @@ val FST_updateInventory = Q.store_thm("FST_updateInventory[simp]",
 
 val SND_updateInventory_const = Q.store_thm("SND_updateInventory_const[simp]",
   `(SND (updateInventory sq nm y)).command = (FST y).command ∧
-   (SND (updateInventory sq nm y)).processor = (FST y).processor`,
+   (SND (updateInventory sq nm y)).processor = (FST y).processor ∧
+   (SND (updateInventory sq nm y)).frame = (FST y).frame`,
   Cases_on`y` \\ rw[updateInventory_def]
   \\ BasicProvers.TOP_CASE_TAC \\ fs[]);
 
@@ -1252,6 +1264,10 @@ val fill_time_step = Q.store_thm("fill_time_step[simp]",
 val update_robots_def = Define`
   update_robots nm f = (square_robots_fupd (MAP (if_focal nm f)))`
 
+val update_robots_items = Q.store_thm("update_robots_items[simp]",
+  `(update_robots nm f sq).items = sq.items`,
+  EVAL_TAC);
+
 val update_robots_intro =
   Q.ISPEC`update_robots nm f`ETA_AX
   |> CONV_RULE(LAND_CONV(REWRITE_CONV[update_robots_def]))
@@ -1268,6 +1284,119 @@ val event_update_robots_def = Define`
     event_robotActions_fupd
       (MAP (if_focal nm (f ## I)))`;
 
+val SND_if_focal_with_memory_command = Q.store_thm("SND_if_focal_with_memory_command[simp]",
+  `(SND (if_focal nm (with_memory p) r)).command = (SND r).command`,
+  Cases_on`r` \\ rw[if_focal_def]);
+
+val SND_if_focal_with_memory_inventory = Q.store_thm("SND_if_focal_with_memory_inventory[simp]",
+  `(SND (if_focal nm (with_memory p) r)).inventory = (SND r).inventory`,
+  Cases_on`r` \\ rw[if_focal_def]);
+
+val SND_if_focal_with_memory_canLift = Q.store_thm("SND_if_focal_with_memory_canLift[simp]",
+  `canLift (SND (if_focal nm (with_memory p) x)) = canLift (SND x)`,
+  Cases_on`x` \\ rw[if_focal_def,FUN_EQ_THM,canLift_def]);
+
+val LENGTH_FILTER_requests_with_memory = Q.store_thm("LENGTH_FILTER_requests_with_memory",
+  `LENGTH (FILTER (requests x y o SND o if_focal nm (with_memory p)) ls) =
+   LENGTH (FILTER (requests x y o SND) ls)`,
+  Induct_on`ls` \\ rw[requests_def]);
+
+val contested_with_memory = Q.store_thm("contested_with_memory[simp]",
+  `contested (update_robots nm (with_memory p) sq) = contested sq`,
+  rw[FUN_EQ_THM,contested_def,update_robots_def,MAP_MAP_o]
+  \\ simp[FILTER_MAP,LENGTH_FILTER_requests_with_memory]);
+
+val usedItem_with_memory = Q.store_thm("usedItem_with_memory",
+  `usedItem
+    (MAP (SND o SND)
+      (localActions (update_robots nm (with_memory p) sq)
+        (neighbours (update_robots nm (with_memory p) o_f g) k))) =
+   usedItem
+     (MAP (SND o SND)
+       (localActions sq (neighbours g k)))`,
+  rw[localActions_def,MAP_MAP_o,o_DEF,UNCURRY]
+  \\ rw[FUN_EQ_THM,usedItem_def,EXISTS_MAP]
+  \\ rw[update_robots_def,EXISTS_MAP]
+  \\ match_mp_tac EXISTS_CONG \\ simp[]
+  \\ Cases \\ simp[]
+  \\ simp[act_def]
+  \\ every_case_tac \\ fs[] \\ rveq \\ fs[]
+  \\ fs[GSYM update_robots_def,Once EXISTS_NOT_EVERY]
+  \\ fs[EVERY_MEM,EXISTS_MEM]
+  \\ metis_tac[]);
+
+val dropItem_with_memory = Q.store_thm("dropItem_with_memory",
+  `MAP (dropItem o SND)
+     (localActions (update_robots nm (with_memory p) x)
+       (neighbours (update_robots nm (with_memory p) o_f g) k)) =
+   MAP (dropItem o SND) (localActions x (neighbours g k))`,
+  rw[localActions_def,MAP_MAP_o,o_DEF,UNCURRY]
+  \\ rw[update_robots_def,MAP_MAP_o,o_DEF,MAP_EQ_f]
+  \\ rw[dropItem_def]
+  \\ simp[act_def]
+  \\ every_case_tac \\ fs[]);
+
+val fled_with_memory = Q.store_thm("fled_with_memory",
+  `fled (neighbours (robots_fupd (MAP (if_focal nm (with_memory p))) o_f g) k) =
+   fled (neighbours g k)`,
+  simp[FUN_EQ_THM] \\ Cases \\ rw[fled_def]
+  \\ simp[neighbours_def]
+  \\ rw[EQ_IMP_THM]
+  \\ rfs[EL_MAP,IS_SOME_EXISTS]
+  \\ fs[FLOOKUP_o_f]
+  \\ every_case_tac \\ fs[]);
+
+val MEM_Destroyed_localActions_with_memory = Q.store_thm("MEM_Destroyed_localActions_with_memory",
+  `MEM (Destroyed nm')
+     (MAP (SND o SND)
+        (localActions (update_robots nm (with_memory p) x)
+          (neighbours (update_robots nm (with_memory p) o_f g) k))) ⇔
+   MEM (Destroyed nm')
+     (MAP (SND o SND)
+        (localActions x (neighbours g k)))`,
+  rw[MEM_MAP,localActions_def,PULL_EXISTS,update_robots_def,UNCURRY]
+  \\ rw[EQ_IMP_THM]
+  \\ ONCE_REWRITE_TAC[CONJ_COMM]
+  \\ asm_exists_tac \\ simp[]
+  \\ qpat_assum`_ = _`(mp_tac o SYM)
+  \\ simp[act_def]
+  \\ every_case_tac \\ fs[]
+  \\ fs[MAP_MAP_o,o_DEF,fled_with_memory]
+  \\ fs[ALOOKUP_MAP_gen,if_focal_eta] \\ rveq \\ fs[]
+  \\ spose_not_then strip_assume_tac \\ fs[]
+  \\ rveq \\ fs[]
+  \\ every_case_tac \\ fs[]);
+
+val MAP_robot_command_o_SND_update_robots_with_memory = Q.store_thm("MAP_robot_command_o_SND_update_robots_with_memory[simp]",
+  `MAP (robot_command o SND) (update_robots nm (with_memory p) sq).robots =
+   MAP (robot_command o SND) sq.robots`,
+  rw[update_robots_def,MAP_MAP_o,o_DEF,MAP_EQ_f]);
+
+val FILTER_isBuilt_localActions_with_memory = Q.store_thm("FILTER_isBuilt_localActions_with_memory",
+  `FILTER isBuilt
+     (MAP (SND o SND)
+        (localActions (update_robots nm (with_memory p) x)
+          (neighbours (update_robots nm (with_memory p) o_f g) k))) =
+   FILTER isBuilt
+     (MAP (SND o SND)
+        (localActions x (neighbours g k)))`,
+  rw[localActions_def,MAP_MAP_o,update_robots_def]
+  \\ qspec_tac(`x.robots`,`ls`)
+  \\ Induct \\ simp[UNCURRY]
+  \\ Cases
+  \\ simp[act_def]
+  \\ every_case_tac \\ fs[]
+  \\ fs[EVERY_MEM,EXISTS_MEM,GSYM update_robots_def]
+  \\ metis_tac[]);
+
+val SND_SND_if_focal_I = Q.store_thm("SND_SND_if_focal_I[simp]",
+  `SND (SND (if_focal nm (f ## I) x)) = SND (SND x)`,
+  PairCases_on`x` \\ EVAL_TAC \\ rw[]);
+
+val FST_if_focal = Q.store_thm("FST_if_focal[simp]",
+  `FST (if_focal nm f x) = FST x`,
+  PairCases_on`x` \\ EVAL_TAC);
+
 val computeEvents_update_robots_with_memory = Q.store_thm("computeEvents_update_robots_with_memory",
   `wf_state s ∧
    FEVERY
@@ -1279,15 +1408,49 @@ val computeEvents_update_robots_with_memory = Q.store_thm("computeEvents_update_
   rw[fmap_eq_flookup,FLOOKUP_o_f,computeEvents_def,FLOOKUP_FMAP_MAP2]
   \\ BasicProvers.TOP_CASE_TAC \\ fs[]
   \\ fs[FEVERY_ALL_FLOOKUP,FLOOKUP_FMAP_MAP2,PULL_EXISTS]
-  \\ cheat);
-
-val SND_SND_if_focal_I = Q.store_thm("SND_SND_if_focal_I[simp]",
-  `SND (SND (if_focal nm (f ## I) x)) = SND (SND x)`,
-  PairCases_on`x` \\ EVAL_TAC \\ rw[]);
-
-val FST_if_focal = Q.store_thm("FST_if_focal[simp]",
-  `FST (if_focal nm f x) = FST x`,
-  PairCases_on`x` \\ EVAL_TAC);
+  \\ first_x_assum drule
+  \\ rw[event_def,event_update_robots_def]
+  \\ simp[usedItem_with_memory,dropItem_with_memory,
+          MEM_Destroyed_localActions_with_memory,
+          FILTER_isBuilt_localActions_with_memory]
+  \\ TRY (
+    match_mp_tac APPEND_EQ_suff
+    \\ conj_tac
+    >- (
+      simp[localActions_def,update_robots_def,MAP2_MAP,MAP2_same,MAP_MAP_o,PAIR_MAP_COMPOSE,o_DEF,UNCURRY]
+      \\ cheat )
+    \\ simp[MAP_FLAT,MAP_GENLIST]
+    \\ AP_TERM_TAC
+    \\ REWRITE_TAC[LENGTH_neighbours]
+    \\ REWRITE_TAC[GENLIST_FUN_EQ]
+    \\ simp[]
+    \\ simp[neighbours_def,EL_MAP,LENGTH_neighbour_coords]
+    \\ simp[FLOOKUP_o_f]
+    \\ rw[]
+    \\ BasicProvers.TOP_CASE_TAC \\ fs[incomingFrom_def]
+    \\ simp[MAP_MAP_o,o_DEF,if_focal_def,UNCURRY,update_robots_def]
+    \\ simp[FILTER_MAP,o_DEF,UNCURRY,if_focal_def,LAMBDA_PROD]
+    \\ simp[MAP_MAP_o,MAP_EQ_f,UNCURRY,FORALL_PROD,if_focal_def]
+    \\ rw[] )
+  \\ match_mp_tac MAP_FILTER_remove
+  \\ reverse conj_tac
+  >- (
+    simp[EL_MAP,localActions_def,update_robots_def,MAP_MAP_o]
+    \\ simp[UNCURRY,o_DEF,if_focal_eta] )
+  \\ simp[MAP_MAP_o,localActions_def,UNCURRY,o_DEF,update_robots_def,MAP_EQ_f]
+  \\ simp[shatter_def,FORALL_PROD]
+  \\ simp[]
+  \\ rpt gen_tac \\ strip_tac
+  \\ conj_tac >- (EVAL_TAC \\ rw[])
+  \\ simp[GSYM update_robots_def]
+  \\ qpat_abbrev_tac`a1 = act _ _ _`
+  \\ qpat_abbrev_tac`a2 = act _ _ _`
+  \\ `a1 = a2`
+  by (
+    unabbrev_all_tac
+    \\ cheat )
+  \\ simp[updateInventory_def]
+  \\ every_case_tac \\ fs[]);
 
 open match_goal
 
