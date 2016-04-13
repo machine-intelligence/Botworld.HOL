@@ -1397,12 +1397,6 @@ val FST_if_focal = Q.store_thm("FST_if_focal[simp]",
   `FST (if_focal nm f x) = FST x`,
   PairCases_on`x` \\ EVAL_TAC);
 
-val EL_neighbours_update_robots = Q.store_thm("EL_neighbours_update_robots",
-  `n < 8
-   ⇒
-   EL n (neighbours (update_robots nm (with_memory p) o_f g) k) =
-   OPTION_MAP (if_focal nm (with_memory p)) (EL n (neighbours g k))`,
-
 val canLift_with_memory = Q.store_thm("canLift_with_memory[simp]",
   `canLift (r with memory := p) = canLift r`,
   rw[canLift_def,FUN_EQ_THM]);
