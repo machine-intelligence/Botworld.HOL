@@ -1,6 +1,6 @@
 open preamble botworldTheory botworld_dataTheory
 local open realSimps in end
-
+open match_goal
 val _ = new_theory"botworld_props";
 
 (* TODO: move *)
@@ -1506,8 +1506,6 @@ val computeEvents_update_robots_with_memory = Q.store_thm("computeEvents_update_
     \\ metis_tac[])
   \\ simp[updateInventory_def]
   \\ every_case_tac \\ fs[]);
-
-open match_goal
 
 (* TODO: move *)
 
@@ -3664,6 +3662,17 @@ val _ = export_rewrites["no_ffi_def"];
 
 (* TODO: constrain thy to be an extension of the theory set up by the Botworld preamble *)
 
+val evaluate_prog_prefix = Q.store_thm("evaluate_prog_prefix",
+   `evaluate_prog st env π = (st', new_ctors, r) ⇒
+    ∀ ψ. evaluate_prog st env (π ++ ψ) = case r of 
+                                             (Rerr e) => (st', new_ctors, Rerr e) 
+                                           | (Rval (new_mods,new_vals)) => 
+                                              case evaluate_prog st' (extend_top_env new_mods new_vals new_ctors env) ψ of 
+                                                  (st'',new_ctors',r') => (st'', merge_alist_mod_env new_ctors' new_ctors, 
+                                                                          combine_mod_result new_mods new_vals r')`,
+   cheat);
+
+open simpleSexpTheory
 val sv_thm = Q.store_thm("sv_thm",
   `wf_game (S,u) ∧
    canupdateh S c ∧
@@ -3686,8 +3695,13 @@ val sv_thm = Q.store_thm("sv_thm",
   \\ qho_match_abbrev_tac`(∀o' cp' cp''. thm o' cp' cp'' ⇒ (_ o' cp' cp'')) ⇒ _`
   \\ simp[] \\ strip_tac
   \\ `run_policy psv ck o' = run_policy p ck o' ∨
-      thm o' (run_policy psv ck o') (run_policy p ck o')`
-  by ( cheat (* "by inspection" *))
+      thm o' (run_policy psv ck o') (run_policy p ck o')` 
+  by (simp[run_policy_def] >> rpt (pairarg_tac >> fs[])
+          >> `∃p'. psv = p ++ p'` by (rw[Abbr`psv`, sv_def]) >> rveq
+          >> imp_res_tac evaluate_prog_prefix
+          >> reverse(cases_on `res'`)
+          >- fs[]
+          >- (pop_assum kall_tac >> fs[] >> pop_assum kall_tac >> every_case_tac >> fs[] >> rveq >> cheat))
   >- (
     simp[]
     \\ match_mp_tac dominates'_refl
