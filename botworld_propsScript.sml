@@ -1784,9 +1784,171 @@ val preamble_env_ignores_ffi = Q.store_thm("preamble_env_ignores_ffi",
    st' = st with ffi := st'.ffi ∧ env1 = env2`,
   cheat);
 
-val print_sexp_11 = Q.store_thm("print_sexp_11[simp]",
-  `print_sexp x = print_sexp y ⇔ x = y`,
-  cheat);
+val strip_sxcons_11 = Q.store_thm("strip_sxcons_11",
+  `∀s1 s2 x. strip_sxcons s1 = SOME x ∧ strip_sxcons s2 = SOME x ⇒ s1 = s2`,
+  ho_match_mp_tac simpleSexpTheory.strip_sxcons_ind
+  \\ ntac 4 strip_tac
+  \\ simp[Once simpleSexpTheory.strip_sxcons_def]
+  \\ CASE_TAC \\ fs[] \\ strip_tac \\ rveq \\ fs[]
+  \\ pop_assum mp_tac
+  \\ simp[Once simpleSexpTheory.strip_sxcons_def]
+  \\ CASE_TAC \\ fs[] \\ strip_tac \\ rveq \\ fs[]);
+
+val escape_string_11 = Q.store_thm("escape_string_11[simp]",
+  `∀s s'. escape_string s = escape_string s' ⇔ s = s'`,
+  ho_match_mp_tac simpleSexpParseTheory.escape_string_ind \\ rw[]
+  \\ rw[Once simpleSexpParseTheory.escape_string_def]
+  \\ CONV_TAC(LAND_CONV(SIMP_CONV(srw_ss())[Once simpleSexpParseTheory.escape_string_def,SimpRHS]))
+  \\ every_case_tac \\ fs[]);
+
+val print_sexp_11 = Q.store_thm("print_sexp_11",
+  `∀x y. valid_sexp x ∧ valid_sexp y ∧ print_sexp x = print_sexp y ⇒ x = y`,
+  ho_match_mp_tac simpleSexpParseTheory.print_sexp_ind
+  \\ conj_tac
+  >- (
+    simp[simpleSexpParseTheory.print_sexp_def]
+    \\ reverse Cases \\ simp[simpleSexpParseTheory.print_sexp_def]
+    >- (
+      Cases_on`toString n` \\ simp[]
+      \\ metis_tac[simpleSexpParseTheory.EVERY_isDigit_num_to_dec_string,EVERY_MEM,MEM] )
+    \\ spose_not_then strip_assume_tac
+    \\ every_case_tac \\ fs[] )
+  \\ conj_tac
+  >- (
+    gen_tac \\ reverse Cases \\ simp[simpleSexpParseTheory.print_sexp_def]
+    \\ spose_not_then strip_assume_tac \\ rveq
+    \\ qcase_tac`num_to_dec_string n`
+    \\ assume_tac(simpleSexpParseTheory.EVERY_isDigit_num_to_dec_string)
+    \\ rfs[]
+    >- (pop_assum mp_tac \\ EVAL_TAC)
+    >- (Cases_on`toString n`\\fs[])
+    \\ pop_assum mp_tac
+    \\ CASE_TAC \\ simp[] >- EVAL_TAC
+    \\ CASE_TAC \\ simp[] >- EVAL_TAC
+    \\ BasicProvers.TOP_CASE_TAC \\ fs[] >- EVAL_TAC
+    \\ reverse BasicProvers.TOP_CASE_TAC \\ fs[] >- EVAL_TAC
+    \\ rw[] \\ EVAL_TAC )
+  \\ conj_tac
+  >- (
+    gen_tac
+    \\ Cases \\ simp[simpleSexpParseTheory.print_sexp_def]
+    \\ spose_not_then strip_assume_tac
+    \\ every_case_tac \\ fs[] \\ rw[] \\ fs[]
+    \\ pop_assum(assume_tac o SYM)
+    \\ assume_tac(simpleSexpParseTheory.EVERY_isDigit_num_to_dec_string)
+    \\ rfs[]
+    \\ pop_assum mp_tac
+    \\ EVAL_TAC)
+  \\ rpt gen_tac \\ strip_tac
+  \\ reverse Cases \\ simp_tac(srw_ss())[simpleSexpParseTheory.print_sexp_def]
+  >- ( every_case_tac \\ simp[] )
+  >- (
+    spose_not_then strip_assume_tac
+    \\ mp_tac(simpleSexpParseTheory.EVERY_isDigit_num_to_dec_string)
+    \\ qpat_assum`_ = _`(mp_tac o SYM)
+    \\ BasicProvers.TOP_CASE_TAC \\ simp_tac(srw_ss())[]
+    \\ (strip_tac ORELSE IF_CASES_TAC \\ simp_tac(srw_ss())[])
+    \\ EVAL_TAC
+    \\ BasicProvers.TOP_CASE_TAC \\ simp_tac(srw_ss())[] \\ EVAL_TAC
+    \\ BasicProvers.TOP_CASE_TAC \\ simp_tac(srw_ss())[] \\ EVAL_TAC
+    \\ BasicProvers.TOP_CASE_TAC \\ simp_tac(srw_ss())[] \\ EVAL_TAC
+    \\ BasicProvers.TOP_CASE_TAC \\ simp_tac(srw_ss())[] \\ EVAL_TAC)
+  >- (
+    spose_not_then strip_assume_tac
+    \\ rveq
+    \\ every_case_tac \\ fs[] )
+  \\ POP_ASSUM_LIST (MAP_EVERY (strip_assume_tac o SIMP_RULE(srw_ss())[]))
+  (*
+  \\ BasicProvers.TOP_CASE_TAC
+  >- (
+    fs[]
+    \\ BasicProvers.TOP_CASE_TAC
+    >- (
+      simp[] \\ strip_tac \\ fs[]
+      \\ cheat )
+    \\ BasicProvers.TOP_CASE_TAC
+    >- ( fs[Once simpleSexpTheory.strip_sxcons_def] )
+    \\ BasicProvers.TOP_CASE_TAC
+    >- (
+      fs[Once simpleSexpTheory.strip_sxcons_def]
+      \\ strip_tac
+
+  \\  qpat_abbrev_tac`s1 = strip_sxcons _`
+  \\ qpat_abbrev_tac`s2 = strip_sxcons _`
+  \\ strip_tac
+  \\ Cases_on`s1` \\ fs[]
+  >- (
+    reverse (Cases_on`s2`) \\ fs[]
+    >- (
+      every_case_tac
+      \\ fs[simpleSexpParseTheory.print_space_separated_def,
+            simpleSexpParseTheory.print_sexp_def,
+            markerTheory.Abbrev_def]
+      >- (
+        fs[Once simpleSexpTheory.strip_sxcons_def]
+        \\ rveq \\ fs[]
+        \\ pop_assum(mp_tac o Q.AP_TERM`combin$C MEM`)
+        \\ simp[FUN_EQ_THM]
+        \\ disch_then(qspec_then`#"."`mp_tac)
+        \\ simp[] )
+      >- (
+        fs[Once simpleSexpTheory.strip_sxcons_def]
+        \\ rveq \\ fs[]
+        \\ pop_assum mp_tac
+        \\ simp[Once simpleSexpTheory.strip_sxcons_def]
+        \\ BasicProvers.CASE_TAC \\ simp[] \\ strip_tac
+        \\ rveq \\ fs[]
+        \\ Cases_on`x` \\ fs[simpleSexpParseTheory.print_sexp_def]
+        >- ( every_case_tac \\ fs[] )
+        \\ TRY (
+          assume_tac(simpleSexpParseTheory.EVERY_isDigit_num_to_dec_string)
+          \\ Cases_on`toString n` \\ fs[] \\ rveq
+          \\ qpat_assum`isDigit _` mp_tac
+          \\ EVAL_TAC \\ NO_TAC )
+        \\ Cases_on`s` \\ fs[]
+        \\ qmatch_asmsub_rename_tac`STRCAT s "."`
+        \\ Cases_on`s` \\ fs[]
+        \\ qmatch_asmsub_rename_tac`STRCAT s "."`
+        \\ Cases_on`s` \\ fs[]
+        \\ qmatch_asmsub_rename_tac`STRCAT s "."`
+        \\ Cases_on`s` \\ fs[]
+        \\ qmatch_asmsub_rename_tac`STRCAT s "."`
+        \\ Cases_on`s` \\ fs[]
+        \\ qmatch_asmsub_rename_tac`STRCAT s "."`
+        \\ Cases_on`s` \\ fs[]
+        \\ rveq
+        \\ qpat_assum`isGraph #" "`mp_tac
+        \\ EVAL_TAC )
+      >- (
+        fs[Once simpleSexpTheory.strip_sxcons_def]
+        \\ rveq
+        \\ cheat )
+      >- (
+        fs[Once simpleSexpTheory.strip_sxcons_def]
+        \\ rveq
+        \\ fs[Once simpleSexpTheory.strip_sxcons_def]
+        \\ pop_assum mp_tac
+        \\ BasicProvers.TOP_CASE_TAC \\ fs[]
+        \\ strip_tac \\ rveq
+        \\ cheat )
+      \\ fs[Once simpleSexpTheory.strip_sxcons_def]
+
+  \\ `s1 = s2`
+  by (
+    cheat
+    \\ every_case_tac
+    \\ fs[simpleSexpParseTheory.print_space_separated_def,
+          simpleSexpParseTheory.print_sexp_def,
+          markerTheory.Abbrev_def]
+    \\ fs[Once simpleSexpTheory.strip_sxcons_def] \\ rveq
+    \\ fs[Once simpleSexpTheory.strip_sxcons_def] \\ rveq)
+  \\ fs[Abbr`s1`,Abbr`s2`]
+  \\ reverse every_case_tac \\ fs[]
+  >- ( imp_res_tac strip_sxcons_11 \\ fs[] )
+  \\ fs[Once simpleSexpTheory.strip_sxcons_def]
+  \\ fs[Once simpleSexpTheory.strip_sxcons_def]
+  *)
+  \\ cheat);
 
 val outputsexp_11 = Q.store_thm("outputsexp_11[simp]",
   `outputsexp x = outputsexp y ⇔ x = y`,
@@ -1794,15 +1956,19 @@ val outputsexp_11 = Q.store_thm("outputsexp_11[simp]",
   \\ simp[botworld_serialiseTheory.outputsexp_def]
   \\ cheat);
 
+val outputsexp_valid = Q.store_thm("outputsexp_valid",
+  `∀x. valid_sexp (outputsexp x)`,
+  cheat);
+
 val encode_output_inj = Q.store_thm("encode_output_inj",
   `encode_output x = encode_output y ⇒ x = y`,
   rw[botworld_serialiseTheory.encode_output_def]
-  \\ (holSyntaxLibTheory.MAP_EQ_MAP_IMP
+  \\ (MAP_EQ_MAP_IMP
       |> ONCE_REWRITE_RULE[IMP_ANTISYM_RULE SWAP_IMP (Q.SPECL[`P`,`Q`](Q.GENL[`P`,`Q`]SWAP_IMP))]
       |> drule)
   \\ impl_tac
   >- ( simp[] \\ metis_tac[ORD_11,LESS_MOD,ORD_BOUND] )
-  \\ simp[]);
+  \\ metis_tac[print_sexp_11,outputsexp_11,outputsexp_valid]);
 
 val run_policy_ffi_with_memory = Q.store_thm("run_policy_ffi_with_memory",
   `x' = x with robotActions updated_by (MAP (if_focal nm' (with_memory p' ## I))) ⇒
