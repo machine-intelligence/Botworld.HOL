@@ -1788,21 +1788,94 @@ val print_sexp_11 = Q.store_thm("print_sexp_11[simp]",
   `print_sexp x = print_sexp y ⇔ x = y`,
   cheat);
 
-val outputsexp_11 = Q.store_thm("outputsexp_11[simp]",
+open botworld_serialiseTheory
+open fromSexpTheory
+
+val listsexp_11 = Q.store_thm("listsexp_11[simp]",
+  `∀ l1 l2. listsexp l1 = listsexp l2 ⇔ l1 = l2`,
+  Induct >> gen_tac >> cases_on `l2` >> fs[listsexp_def]);
+
+val intsexp_11 = Q.store_thm("intsexp_11[simp]",
+  `∀ i1 i2. intsexp i1 = intsexp i2 ⇔ i1 = i2`,
+  rw[intsexp_def] >> intLib.COOPER_TAC);
+
+val coordsexp_11 = Q.store_thm("coordsexp_11[simp]",
+  `coordsexp c1 = coordsexp c2 ⇔ c1 = c2`,
+  cases_on `c1` >> cases_on `c2` >> fs[]);
+
+val namesexp_11 = Q.store_thm("namesexp_11[simp]",
+  `∀ n1 n2. namesexp n1 = namesexp n2 ⇔ n1 = n2`,
+  Induct >> gen_tac >> cases_on `n2` >> fs[namesexp_def]);
+
+val optsexp_11 = Q.store_thm("optsexp_11[simp]",
+  `optsexp o1 = optsexp o2 ⇔ o1 = o2`,
+  cases_on `o1` >> cases_on `o2` >> fs[optsexp_def, listsexp_def]);
+
+val idsexp_11 = Q.store_thm("idsexp_11[simp]",
+  `∀ i1 i2. idsexp i1 = idsexp i2 ⇔ i1 = i2`,
+  Induct >> gen_tac >> cases_on `i2` >> fs[idsexp_def]);
+
+val tctorsexp_11 = Q.store_thm("tctorsexp_11[simp]",
+  `∀ t1 t2. tctorsexp t1 = tctorsexp t2 ⇔ t1 = t2`,
+  Induct >> gen_tac >> cases_on `t2` >> fs[tctorsexp_def, listsexp_def]);
+
+val typesexp_11 = Q.store_thm("typesexp_11[simp]",
+  `∀ t1 t2. typesexp t1 = typesexp t2 ⇔ t1 = t2`,
+  Induct >> gen_tac >> cases_on `t2` >> fs[typesexp_def] >> srw_tac[ETA_ss][]
+         (* >> rw[typesexp_def, MAP_EQ_MAP_IMP] *) (* I don't understand why this doesn't work *)
+         >> cheat);
+
+val type_defsexp_11 = Q.store_thm("type_defsexp_11[simp]",
+  `∀ t1 t2. type_defsexp t1 = type_defsexp t2 ⇔ t1 = t2`,
+  Induct >> gen_tac >> cases_on `t2`
+         >- fs[] >- fs[type_defsexp_def] >- fs[type_defsexp_def]
+         >> cheat); (* requires induction on h, splitting, ugly *)
+
+val specsexp_11 = Q.store_thm("specsexp_11[simp]",
+  `∀ s1 s2. specsexp s1 = specsexp s2 ⇔ s1 = s2`,
+  Induct >> gen_tac >> cases_on `s2` >> fs[specsexp_def] >> rpt gen_tac >> simp[]
+         >> cheat); (* all need the antisym thing *)
+
+val decsexp_11 = Q.store_thm("decsexp_11[simp]",
+  `∀ d1 d2. decsexp d1 = decsexp d2 ⇔ d1 = d2`,
+  cheat);
+
+open optionTheory
+(* val FOLDR_EQ_FOLDR_IMP = Q.store_thm("FOLDR_EQ_FOLDR_IMP", *)
+(*     `∀ xs ys.  *)
+(*      (∀ x y a1 a2. MEM x xs ∧ MEM yg ys ⇒ (f x a1 = f y a2 ⇔ x = y ∧ a1 = a2)) *)
+(*      ∧ (∀ x a. a ≠ f x a)  *)
+(*      ⇒ ∀ acc. (FOLDR f acc xs = FOLDR f acc ys ⇔ xs = ys)`, *)
+(*     Induct >> gen_tac >> cases_on `ys` >> fs[FOLDR] >> rw[] >> cheat); *)
+
+val topsexp_11 = Q.store_thm("topsexp_11[simp]",
+  `∀ t1 t2. topsexp t1 = topsexp t2 ⇔ t1 = t2`,
+  Induct >> gen_tac >> cases_on `t2` 
+         >> fs[topsexp_def, listsexp_def, FOLDR_MAP, o_DEF] 
+         >> srw_tac[ETA_ss][]
+         >> match1_tac (mg.cb `lift (FOLDR _ _) o1_ = lift (FOLDR _ _) o2_`, 
+                        (fn (_,t) => (cases_on `^(t"o1")` >> cases_on `^(t"o2")`)))
+         >> rw[GSYM o_DEF]
+         >> cheat);
+
+val commandsexp_11 = Q.store_thm("commandsexp_11[simp]",
+  `∀ c c'. commandsexp c = commandsexp c' ⇔ c = c'`,
+  Induct >> gen_tac >> cases_on `c'` >> fs[commandsexp_def, listsexp_11]
+         >> cheat);
+
+val outputsexp_11 = Q.store_thm("outputsexp_11",
   `outputsexp x = outputsexp y ⇔ x = y`,
-  Cases_on`x` \\ Cases_on`y`
-  \\ simp[botworld_serialiseTheory.outputsexp_def]
-  \\ cheat);
+  cases_on `x` \\ cases_on `y` \\ simp[outputsexp_def] >> cheat);
 
 val encode_output_inj = Q.store_thm("encode_output_inj",
   `encode_output x = encode_output y ⇒ x = y`,
   rw[botworld_serialiseTheory.encode_output_def]
-  \\ (holSyntaxLibTheory.MAP_EQ_MAP_IMP
+  \\ (MAP_EQ_MAP_IMP
       |> ONCE_REWRITE_RULE[IMP_ANTISYM_RULE SWAP_IMP (Q.SPECL[`P`,`Q`](Q.GENL[`P`,`Q`]SWAP_IMP))]
       |> drule)
   \\ impl_tac
-  >- ( simp[] \\ metis_tac[ORD_11,LESS_MOD,ORD_BOUND] )
-  \\ simp[]);
+  >- ( simp[outputsexp_11] \\ metis_tac[ORD_11,LESS_MOD,ORD_BOUND] )
+  \\ simp[outputsexp_11]);
 
 val run_policy_ffi_with_memory = Q.store_thm("run_policy_ffi_with_memory",
   `x' = x with robotActions updated_by (MAP (if_focal nm' (with_memory p' ## I))) ⇒
