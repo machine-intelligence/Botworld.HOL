@@ -1,6 +1,6 @@
-open preamble botworldTheory botworld_dataTheory
+open preamble botworldTheory botworld_dataTheory match_goal
 local open realSimps in end
-open match_goal
+
 val _ = new_theory"botworld_props";
 
 (* TODO: move *)
@@ -229,6 +229,23 @@ val APPEND_EQ_suff =
   DISCH_ALL(#2(EQ_IMP_RULE(UNDISCH(SPEC_ALL(CONJUNCT1 (SPEC_ALL APPEND_11_LENGTH))))))
   |> SIMP_RULE(pure_ss)[AND_IMP_INTRO,CONJ_ASSOC]
   |> SIMP_RULE(pure_ss)[PROVE[]``LENGTH a = LENGTH b ∧ a = b ⇔ a = b``]
+
+val strip_sxcons_11 = Q.store_thm("strip_sxcons_11",
+  `∀s1 s2 x. strip_sxcons s1 = SOME x ∧ strip_sxcons s2 = SOME x ⇒ s1 = s2`,
+  ho_match_mp_tac simpleSexpTheory.strip_sxcons_ind
+  \\ ntac 4 strip_tac
+  \\ simp[Once simpleSexpTheory.strip_sxcons_def]
+  \\ CASE_TAC \\ fs[] \\ strip_tac \\ rveq \\ fs[]
+  \\ pop_assum mp_tac
+  \\ simp[Once simpleSexpTheory.strip_sxcons_def]
+  \\ CASE_TAC \\ fs[] \\ strip_tac \\ rveq \\ fs[]);
+
+val escape_string_11 = Q.store_thm("escape_string_11[simp]",
+  `∀s s'. escape_string s = escape_string s' ⇔ s = s'`,
+  ho_match_mp_tac simpleSexpParseTheory.escape_string_ind \\ rw[]
+  \\ rw[Once simpleSexpParseTheory.escape_string_def]
+  \\ CONV_TAC(LAND_CONV(SIMP_CONV(srw_ss())[Once simpleSexpParseTheory.escape_string_def,SimpRHS]))
+  \\ every_case_tac \\ fs[]);
 
 (* -- *)
 
@@ -1784,9 +1801,9 @@ val preamble_env_ignores_ffi = Q.store_thm("preamble_env_ignores_ffi",
    st' = st with ffi := st'.ffi ∧ env1 = env2`,
   cheat);
 
-val print_sexp_11 = Q.store_thm("print_sexp_11[simp]",
-  `print_sexp x = print_sexp y ⇔ x = y`,
-  cheat);
+val print_sexp_11 = Q.store_thm("print_sexp_11",
+  `∀x y. valid_sexp x ∧ valid_sexp y ∧ print_sexp x = print_sexp y ⇒ x = y`,
+  metis_tac[simpleSexpParseTheory.parse_print,SOME_11]);
 
 open botworld_serialiseTheory
 open fromSexpTheory
@@ -1863,9 +1880,13 @@ val commandsexp_11 = Q.store_thm("commandsexp_11[simp]",
   Induct >> gen_tac >> cases_on `c'` >> fs[commandsexp_def, listsexp_11]
          >> cheat);
 
-val outputsexp_11 = Q.store_thm("outputsexp_11",
+val outputsexp_11 = Q.store_thm("outputsexp_11[simp]",
   `outputsexp x = outputsexp y ⇔ x = y`,
   cases_on `x` \\ cases_on `y` \\ simp[outputsexp_def] >> cheat);
+
+val outputsexp_valid = Q.store_thm("outputsexp_valid",
+  `∀x. valid_sexp (outputsexp x)`,
+  cheat);
 
 val encode_output_inj = Q.store_thm("encode_output_inj",
   `encode_output x = encode_output y ⇒ x = y`,
@@ -1874,8 +1895,8 @@ val encode_output_inj = Q.store_thm("encode_output_inj",
       |> ONCE_REWRITE_RULE[IMP_ANTISYM_RULE SWAP_IMP (Q.SPECL[`P`,`Q`](Q.GENL[`P`,`Q`]SWAP_IMP))]
       |> drule)
   \\ impl_tac
-  >- ( simp[outputsexp_11] \\ metis_tac[ORD_11,LESS_MOD,ORD_BOUND] )
-  \\ simp[outputsexp_11]);
+  >- ( simp[] \\ metis_tac[ORD_11,LESS_MOD,ORD_BOUND] )
+  \\ metis_tac[print_sexp_11,outputsexp_11,outputsexp_valid]);
 
 val run_policy_ffi_with_memory = Q.store_thm("run_policy_ffi_with_memory",
   `x' = x with robotActions updated_by (MAP (if_focal nm' (with_memory p' ## I))) ⇒
@@ -3737,11 +3758,11 @@ val _ = export_rewrites["no_ffi_def"];
 
 val evaluate_prog_prefix = Q.store_thm("evaluate_prog_prefix",
    `evaluate_prog st env π = (st', new_ctors, r) ⇒
-    ∀ ψ. evaluate_prog st env (π ++ ψ) = case r of 
-                                             (Rerr e) => (st', new_ctors, Rerr e) 
-                                           | (Rval (new_mods,new_vals)) => 
-                                              case evaluate_prog st' (extend_top_env new_mods new_vals new_ctors env) ψ of 
-                                                  (st'',new_ctors',r') => (st'', merge_alist_mod_env new_ctors' new_ctors, 
+    ∀ ψ. evaluate_prog st env (π ++ ψ) = case r of
+                                             (Rerr e) => (st', new_ctors, Rerr e)
+                                           | (Rval (new_mods,new_vals)) =>
+                                              case evaluate_prog st' (extend_top_env new_mods new_vals new_ctors env) ψ of
+                                                  (st'',new_ctors',r') => (st'', merge_alist_mod_env new_ctors' new_ctors,
                                                                           combine_mod_result new_mods new_vals r')`,
    cheat);
 
@@ -3768,7 +3789,7 @@ val sv_thm = Q.store_thm("sv_thm",
   \\ qho_match_abbrev_tac`(∀o' cp' cp''. thm o' cp' cp'' ⇒ (_ o' cp' cp'')) ⇒ _`
   \\ simp[] \\ strip_tac
   \\ `run_policy psv ck o' = run_policy p ck o' ∨
-      thm o' (run_policy psv ck o') (run_policy p ck o')` 
+      thm o' (run_policy psv ck o') (run_policy p ck o')`
   by (simp[run_policy_def] >> rpt (pairarg_tac >> fs[])
           >> `∃p'. psv = p ++ p'` by (rw[Abbr`psv`, sv_def]) >> rveq
           >> imp_res_tac evaluate_prog_prefix
