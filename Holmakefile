@@ -8,6 +8,7 @@ endif
 
 INCLUDES = $(HOLDIR)/examples/pattern_matches\
 					 $(CAKEMLDIR)/semantics\
+					 $(CAKEMLDIR)/semantics/proofs\
 					 $(CAKEMLDIR)/compiler/parsing\
 					 $(CAKEMLDIR)/translator\
 					 $(HOLDIR)/examples/formal-languages/context-free\
@@ -25,6 +26,7 @@ HOLHEAP = heap
 EXTRA_CLEANS = $(HOLHEAP) $(HOLHEAP).o
 BARE_THYS = $(CAKEMLDIR)/preamble\
 						$(CAKEMLDIR)/semantics/terminationTheory\
+						$(CAKEMLDIR)/semantics/proofs/funBigStepPropsTheory\
 						$(CAKEMLDIR)/compiler/parsing/fromSexpTheory\
 						$(CAKEMLDIR)/translator/ml_translatorLib\
 						$(CAKEMLDIR)/candle/standard/monadic/holKernelTheory\

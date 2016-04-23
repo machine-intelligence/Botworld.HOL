@@ -3,6 +3,7 @@ open simpleSexpTheory fromSexpTheory monadsyntax
 open simpleSexpParseTheory
 open botworld_miscTheory
 open botworld_dataTheory
+open terminationTheory
 
 val _ = new_theory"botworld_serialise"
 
@@ -369,7 +370,6 @@ val botworld_initial_state_def = Define`
     <| bot_input := obs ; bot_output := (Pass, []) |>`;
 
 (* CakeML declarations of helper functions for interfacing with the Botworld FFI *)
-open astTheory semanticPrimitivesTheory terminationTheory
 
 val ByteArrayFromList_dec_def = Define`
   ByteArrayFromList_dec =
@@ -415,6 +415,8 @@ val length_rec_def = Define`
       then INL (2n * n)
       else INR (OPTION_BIND (parse_sexp (MAP (CHR o w2n) bs)) odestSXNUM)`;
 
+(* TODO: this is wrong because length_rec expects a list of bytes, whereas bs
+         is a reference to a byte array *)
 val get_input_length_loop_body_def = Define`
  get_input_length_loop_body =
            (Let (SOME "bs") (App Aw8alloc [Var(Short"n"); Lit(Word8 0w)])
@@ -458,52 +460,6 @@ val read_output_dec_def = Define`
            (Let (SOME "bs") (App Aw8alloc [App Opapp [Var(Short"get_output_length"); Var(Short"unit")]])
            (Let NONE (App (FFI 4) [Var(Short"bs")])
            (App Opapp [Var(Long "Botworld" "decode_output"); App Opapp [Var(Long "ByteArray" "toList") ; Var(Short"bs")]]))))`;
-
-(*
-val _ = register_type ``:'a + 'b``
-val _ = register_type ``:'a option``
-
-val _ = Globals.max_print_depth := 0;
-val evals = [evaluate_def, do_app_def, do_opapp_def, lookup_var_id_def, evalPropsTheory.build_rec_env_merge,
-             evalPropsTheory.find_recfun_ALOOKUP, store_alloc_def, store_lookup_def, store_assign_def,
-             libTheory.opt_bind_def, rich_listTheory.EL_LENGTH_APPEND];
-val _ = Globals.max_print_depth := 10;
-
-val get_input_length_rec_thm = Q.store_thm("get_input_length_rec_thm",
-  `∀ m n s st env.
-   s.ffi.oracle = botworld_oracle ∧
-   s.ffi.ffi_state = st ∧
-   m = LENGTH (encode_observation st.bot_input) ∧
-   lookup_var_id (Short "n") env = SOME(Litv(IntLit &n)) ∧
-   lookup_var_id (Short "f") env = SOME(Recclosure env0 [("f","n",get_input_length_loop_body)] "f") ⇒
-   ∃ bs ck s'.
-   evaluate s env [get_input_length_loop_body] = (s',Rval[Litv(IntLit (&m))]) ∧
-   s' = s with <| refs := MAP W8array bs ++ s.refs;
-                  clock := s.clock - ck |>`,
-   gen_tac \\ completeInduct_on `m` \\ rw[]
-   \\ rw[get_input_length_loop_body_def] \\ rw[evaluate_def, do_app_def] \\ rw evals
-)
-val get_input_length_thm = Q.store_thm("get_input_length_thm",
-  `lookup_var_id (Long"Botworld""get_input_length") env = SOME (Closure env0 "x" get_input_length_body) ∧
-   s.ffi.oracle = botworld_oracle ∧
-   evaluateg s env [u] = (s,Rval[Conv NONE []]) ∧
-   evaluate s env [App Opapp [Var(Long"Botworld""get_input_length"); u]] = (s', res) ∧
-   Eval env (Var (Long "Botworld""length_rec")) ((LIST_TYPE WORD8 --> NUM --> SUM_TYPE NUM (OPTION_TYPE NUM)) length_rec) ∧
-   res ≠ Rerr(Rabort Rtimeout_error)
-   ⇒
-   ∃ck bs.
-     s' = s with <| refs := MAP W8array bs ++ s.refs;
-                    clock := s.clock - ck |>
-     ∧ res = Rval[Litv(IntLit (&(LENGTH (encode_observation st.bot_input))))]`,
-  rw[evaluate_def] \\ rfs[]
-  \\ fs[do_opapp_def]
-  \\ every_case_tac \\ fs[]
-  \\ qhdtm_x_assum `funBigStep$evaluate` mp_tac
-  \\ simp[get_input_length_body_def, evaluate_def, lookup_var_id_def, evalPropsTheory.build_rec_env_merge]
-  \\ simp[do_opapp_def, evalPropsTheory.find_recfun_ALOOKUP]
-  \\ rw[] \\ fs[] \\ pop_assum mp_tac
-  \\ simp[evalPropsTheory.build_rec_env_merge]
-*)
 
 (* properties of the encoding *)
 
