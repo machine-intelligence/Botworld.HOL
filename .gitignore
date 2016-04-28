@@ -3,4 +3,5 @@
 *Theory.sml
 *Theory.sig
 .HOLMK
+.hollogs
 heap
