@@ -3,12 +3,6 @@ val _ = new_theory"botworld_misc"
 
 (* TODO: move these to HOL if appropriate *)
 
-val OPTION_MAP_INJ = Q.store_thm("OPTION_MAP_INJ",
-  `(∀x y. f x = f y ⇒ x = y)
-   ⇒ ∀o1 o2.
-     OPTION_MAP f o1 = OPTION_MAP f o2 ⇒ o1 = o2`,
-  strip_tac \\ Cases \\ Cases \\ simp[]);
-
 val map_option_def = Define`
   (map_option [] = SOME []) ∧
   (map_option (NONE::_) = NONE) ∧
