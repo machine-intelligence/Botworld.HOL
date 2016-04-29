@@ -9,6 +9,18 @@ val _ = new_theory"botworld_serialise"
 
 (* TODO: move *)
 
+val listsexp_valid = Q.store_thm("listsexp_valid",
+  `∀ls. EVERY valid_sexp ls ⇒ valid_sexp (listsexp ls)`,
+  Induct \\ simp[listsexp_def] \\ simp[GSYM listsexp_def]
+  \\ EVAL_TAC);
+
+val topsexp_valid = Q.store_thm("topsexp_valid[simp]",
+  `∀t. valid_sexp (topsexp t)`,
+  Cases \\ simp[topsexp_def]
+  \\ match_mp_tac listsexp_valid
+  \\ simp[]
+  \\ cheat (* not true currently: need the AST encoding to be more careful about strings *));
+
 val escape_string_11 = Q.store_thm("escape_string_11[simp]",
   `∀s s'. escape_string s = escape_string s' ⇔ s = s'`,
   ho_match_mp_tac simpleSexpParseTheory.escape_string_ind \\ rw[]
@@ -469,8 +481,36 @@ val outputsexp_11 = Q.store_thm("outputsexp_11[simp]",
   \\ imp_res_tac (REWRITE_RULE[AND_IMP_INTRO] MAP_EQ_MAP_IMP)
   \\ fs[]);
 
+val intsexp_valid = Q.store_thm("intsexp_valid[simp]",
+  `∀i. valid_sexp (intsexp i)`,
+  rw[intsexp_def]
+  \\ match_mp_tac listsexp_valid
+  \\ simp[]
+  \\ EVAL_TAC);
+
+val coordsexp_valid = Q.store_thm("coordsexp_valid[simp]",
+  `∀p. valid_sexp (coordsexp p)`,
+  Cases \\ simp[]);
+
+val namesexp_valid = Q.store_thm("namesexp_valid[simp]",
+  `∀n. valid_sexp (namesexp n)`,
+  Cases \\ simp[namesexp_def]);
+
+val commandsexp_valid = Q.store_thm("commandsexp_valid[simp]",
+  `∀c. valid_sexp (commandsexp c)`,
+  Cases \\ simp[commandsexp_def]
+  \\ match_mp_tac listsexp_valid
+  \\ simp[]
+  \\ TRY (EVAL_TAC \\ NO_TAC)
+  \\ rpt conj_tac
+  \\ TRY (EVAL_TAC \\ NO_TAC)
+  \\ match_mp_tac listsexp_valid
+  \\ simp[EVERY_MAP]);
+
 val outputsexp_valid = Q.store_thm("outputsexp_valid",
   `∀x. valid_sexp (outputsexp x)`,
-  cheat);
+  Cases \\ rw[outputsexp_def]
+  \\ match_mp_tac listsexp_valid
+  \\ simp[EVERY_MAP]);
 
 val _ = export_theory()
