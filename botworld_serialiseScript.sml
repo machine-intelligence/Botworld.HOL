@@ -9,18 +9,6 @@ val _ = new_theory"botworld_serialise"
 
 (* TODO: move *)
 
-val listsexp_valid = Q.store_thm("listsexp_valid",
-  `∀ls. EVERY valid_sexp ls ⇒ valid_sexp (listsexp ls)`,
-  Induct \\ simp[listsexp_def] \\ simp[GSYM listsexp_def]
-  \\ EVAL_TAC);
-
-val topsexp_valid = Q.store_thm("topsexp_valid[simp]",
-  `∀t. valid_sexp (topsexp t)`,
-  Cases \\ simp[topsexp_def]
-  \\ match_mp_tac listsexp_valid
-  \\ simp[]
-  \\ cheat (* not true currently: need the AST encoding to be more careful about strings *));
-
 val escape_string_11 = Q.store_thm("escape_string_11[simp]",
   `∀s s'. escape_string s = escape_string s' ⇔ s = s'`,
   ho_match_mp_tac simpleSexpParseTheory.escape_string_ind \\ rw[]
