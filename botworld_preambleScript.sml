@@ -102,12 +102,56 @@ val OPTION_MAP_cases = Q.store_thm("OPTION_MAP_cases",
     listTheory.MAP,mls_sexp_inv]
 *)
 
+val res = translate numposrepTheory.n2l_def;
+
+val n2l_side_thm = prove(``n2l_side x y = (x ≠ 0)``,
+  qid_spec_tac`x` >> completeInduct_on`y`
+  \\ rw[Once(theorem"n2l_side_def")]);
+val _ = update_precondition n2l_side_thm
+
+val safe_hex_def = Define`
+  safe_hex x = if x < 16 then HEX x else #"!"`;
+
+val res = translate ASCIInumbersTheory.HEX_def;
+val res = translate safe_hex_def;
+val safe_hex_side_thm = prove(``∀x. safe_hex_side x``,
+  simp[definition"safe_hex_side_def"]
+  \\ gen_tac
+  \\ simp[GSYM rich_listTheory.MEM_COUNT_LIST]
+  \\ CONV_TAC(LAND_CONV EVAL)
+  \\ strip_tac
+  \\ rw[definition"hex_side_def"]);
+val _ = update_precondition (safe_hex_side_thm |> SPEC_ALL |> EQT_INTRO)
+
+val res = translate ASCIInumbersTheory.n2s_def;
+
+val n2s_safe_hex = Q.store_thm("n2s_safe_hex",
+  `n2s 16 HEX = n2s 16 safe_hex`,
+  simp[FUN_EQ_THM]
+  \\ simp[ASCIInumbersTheory.n2s_def]
+  \\ simp[listTheory.MAP_EQ_f,safe_hex_def]
+  \\ rw[]
+  \\ qspecl_then[`16`,`x`]mp_tac numposrepTheory.n2l_BOUND
+  \\ simp[listTheory.EVERY_MEM]
+  \\ strip_tac \\ res_tac \\ fs[]);
+
+val res = translate (
+  ASCIInumbersTheory.num_to_hex_string_def
+  |> REWRITE_RULE[n2s_safe_hex]);
+
+val num_to_hex_string_side_thm = prove(``∀x. num_to_hex_string_side x``,
+  EVAL_TAC \\ rw[]);
+val _ = update_precondition (num_to_hex_string_side_thm |> SPEC_ALL |> EQT_INTRO)
+
 val res = translate simpleSexpTheory.strip_sxcons_def;
 val res = translate simpleSexpParseTheory.print_space_separated_def;
 val res = translate simpleSexpParseTheory.escape_string_def;
 val res = translate simpleSexpParseTheory.print_sexp_def;
 val res = translate fromSexpTheory.listsexp_def;
 val res = translate fromSexpTheory.optsexp_def;
+val res = translate stringTheory.isPrint_def;
+val res = translate fromSexpTheory.encode_control_def;
+val res = translate fromSexpTheory.SEXSTR_def;
 val res = translate fromSexpTheory.idsexp_def;
 val res = translate fromSexpTheory.tctorsexp_def;
 val res = translate fromSexpTheory.typesexp_def;
