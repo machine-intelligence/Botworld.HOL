@@ -11,6 +11,9 @@ val _ = translate_into_module "Botworld";
 
 val _ = std_preludeLib.std_prelude();
 
+(* TODO: translate botworld_dataTheory *)
+(* This can happen before everything else - has no depends other than stdlib stuff *)
+
 (* TODO: want a version of sexp that uses mlstring rather than string *)
 (* more precisely, here are some example steps to follow:
    1. Define a copy of sexp (from $HOLDIR/examples/formal-languages/context-free/simpleSexpScript.sml
@@ -243,6 +246,13 @@ val res = translate (
 (* TODO: translate length_rec *)
 
 (* TODO: translate decode_output *)
+
+(* TODO: translate cakeml *)
+(* We'll need this for all of candle *)
+(* TODO: include candle *)
+
+(* TODO: load botworld_Script up to ffi_from_observation_def into candle in the preamble *)
+(* Should we just axiomatize the relevant parts for sv? *)
 
 val _ = Feedback.set_trace "TheoryPP.include_docs" 0;
 
