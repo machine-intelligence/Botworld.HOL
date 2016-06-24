@@ -71,6 +71,12 @@ val quote_word8_def = Define`quote_word8 = (quote_word8_aux,^(type_to_deep``:wor
 
 val _ = special_quoters := (``:word8``,``FST quote_word8``) :: !special_quoters;
 
+val quote_word64_aux_def = Define`quote_word64_aux (w:word64) =
+  Comb ^(term_to_deep``w2n:word64->num``) (FST quote_num (w2n w))`;
+val quote_word64_def = Define`quote_word64 = (quote_word64_aux,^(type_to_deep``:word64``))`;
+
+val _ = special_quoters := (``:word64``,``FST quote_word64``) :: !special_quoters;
+
 val (quote_lit_aux_def,quote_lit_def) = mk_quote NONE ``:lit``
 
 val _ = mk_quote_tac := (wf_rel_tac `measure pat_size` \\ gen_tac \\ Induct \\ rw[astTheory.pat_size_def]
@@ -78,10 +84,14 @@ val _ = mk_quote_tac := (wf_rel_tac `measure pat_size` \\ gen_tac \\ Induct \\ r
 val (quote_pat_aux_def,quote_pat_def) = mk_quote NONE ``:pat``
 val quote_pat_aux_def = save_thm("quote_pat_aux_def",quote_pat_aux_def |> REWRITE_RULE[GSYM quote_list_is_aux,ETA_AX])
 
+val (quote_word_size_aux_def,quote_word_size_def) = mk_quote NONE ``:word_size``
+val (quote_shift_aux_def,quote_shift_def) = mk_quote NONE ``:shift``
+
 val (quote_opn_aux_def,quote_opn_def) = mk_quote NONE ``:opn``
 val (quote_opb_aux_def,quote_opb_def) = mk_quote NONE ``:opb``
-val (quote_op_aux_def,quote_op_def) = mk_quote NONE ``:op``
+val (quote_opw_aux_def,quote_opw_def) = mk_quote NONE ``:opw``
 val (quote_lop_aux_def,quote_lop_def) = mk_quote NONE ``:lop``
+val (quote_op_aux_def,quote_op_def) = mk_quote NONE ``:op``
 
 val quote_option_is_aux = Q.prove(
   `FST (quote_option qt) z = quote_option_aux qt z`,
