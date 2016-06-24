@@ -1,8 +1,50 @@
 open preamble botworld_quoteLib
+     reflectionLib holSemanticsTheory
+     setSpecTheory reflectionTheory
 
 val _ = new_theory"botworld_quote";
 
-val (quote_num_aux_def,quote_num_def) = mk_quote NONE ``:num``
+val ty = ``:num``
+val (quote_num_aux_def,quote_num_def) = mk_quote NONE ty
+
+val num_constrs =
+  quote_num_aux_def |> CONJUNCTS
+  |> map (#1 o strip_comb o rand o lhs o concl o SPEC_ALL)
+
+val num_assums = map base_term_assums num_constrs
+  |> List.concat |> cons (to_inner_prop [] ty)
+  |> list_mk_conj
+  |> subst[tmass |-> ``tmaof (i:'U interpretation)``]
+
+val quote_num_thm = Q.store_thm("quote_num_thm",
+  `is_set_theory ^mem ⇒
+   ∀tmsig i v.
+    ^num_assums ⇒
+    ∀n. termsem tmsig i v (FST quote_num n) = to_inner (SND quote_num) n`,
+  ntac 5 strip_tac
+  \\ simp[quote_num_def]
+  \\ Induct
+  \\ rw[quote_num_aux_def]
+  \\ rw[termsem_def]
+  >- (
+    qhdtm_x_assum`FLOOKUP`kall_tac
+    \\ drule instance_def
+    \\ simp[]
+    \\ disch_then(qspecl_then[`i`,`[]`]mp_tac)
+    \\ rw[]
+    \\ CONV_TAC(LAND_CONV(RAND_CONV EVAL))
+    \\ simp[] )
+  \\ drule instance_def
+  \\ simp[]
+  \\ disch_then(qspecl_then[`i`,`[]`]mp_tac)
+  \\ rw[]
+  \\ CONV_TAC(LAND_CONV(LAND_CONV(RAND_CONV EVAL)))
+  \\ simp[]
+  \\ simp[fun_to_inner_def]
+  \\ match_mp_tac apply_abstract_matchable
+  \\ simp[wf_to_inner_range_thm]
+  \\ metis_tac[wf_to_inner_finv_left]);
+
 val (quote_level_aux_def,quote_level_def) = mk_quote NONE ``:level``
 
 val (quote_prod_aux_def,quote_prod_def) = mk_quote (SOME(["q1","q2"],["t1","t2"])) ``:'a # 'b``
