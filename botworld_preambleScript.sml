@@ -1,4 +1,4 @@
-open HolKernel boolLib bossLib ml_translatorLib
+open HolKernel boolLib bossLib ml_translatorLib ml_progLib
      astTheory funBigStepTheory
      botworld_dataTheory botworld_serialiseTheory
      holSyntaxTheory holKernelTheory
@@ -7,7 +7,7 @@ local open std_preludeLib in end
 
 val _ = new_theory"botworld_preamble";
 
-val _ = translate_into_module "Botworld";
+val _ = ml_prog_update (open_module "Botworld");
 
 val _ = std_preludeLib.std_prelude();
 
@@ -253,6 +253,8 @@ val res = translate (
 
 (* TODO: load botworld_Script up to ffi_from_observation_def into candle in the preamble *)
 (* Should we just axiomatize the relevant parts for sv? *)
+
+val _ = ml_prog_update (close_module NONE);
 
 val _ = Feedback.set_trace "TheoryPP.include_docs" 0;
 
