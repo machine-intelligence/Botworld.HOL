@@ -7,19 +7,20 @@ val _ = new_theory"botworld_quote";
 val ty = ``:num``
 val (quote_num_aux_def,quote_num_def) = mk_quote NONE ty
 
-val num_constrs =
+val constrs =
   quote_num_aux_def |> CONJUNCTS
   |> map (#1 o strip_comb o rand o lhs o concl o SPEC_ALL)
 
-val num_assums = map base_term_assums num_constrs
+val assums = map base_term_assums constrs
   |> List.concat |> cons (to_inner_prop [] ty)
-  |> list_mk_conj
-  |> subst[tmass |-> ``tmaof (i:'U interpretation)``]
+  |> map (subst[tmass |-> ``tmaof (i:'U interpretation)``])
+
+val num_assums = assums
 
 val quote_num_thm = Q.store_thm("quote_num_thm",
   `is_set_theory ^mem ⇒
    ∀tmsig i v.
-    ^num_assums ⇒
+    ^(list_mk_conj assums) ⇒
     ∀n. termsem tmsig i v (FST quote_num n) = to_inner (SND quote_num) n`,
   ntac 5 strip_tac
   \\ simp[quote_num_def]
@@ -45,9 +46,51 @@ val quote_num_thm = Q.store_thm("quote_num_thm",
   \\ simp[wf_to_inner_range_thm]
   \\ metis_tac[wf_to_inner_finv_left]);
 
-val (quote_level_aux_def,quote_level_def) = mk_quote NONE ``:level``
+val ty = ``:level``
+val (quote_level_aux_def,quote_level_def) = mk_quote NONE ty
 
-val (quote_prod_aux_def,quote_prod_def) = mk_quote (SOME(["q1","q2"],["t1","t2"])) ``:'a # 'b``
+val constrs =
+  quote_level_aux_def |> CONJUNCTS
+  |> map (#1 o strip_comb o rand o lhs o concl o SPEC_ALL)
+
+val assums = map base_term_assums constrs
+  |> List.concat |> cons (to_inner_prop [] ty)
+  |> map (subst[tmass |-> ``tmaof (i:'U interpretation)``])
+
+val quote_level_thm = Q.store_thm("quote_level_thm",
+  `is_set_theory ^mem ⇒
+   ∀tmsig i v.
+    ^(list_mk_conj (assums@num_assums)) ⇒
+    ∀n. termsem tmsig i v (FST quote_level n) = to_inner (SND quote_level) n`,
+  ntac 5 strip_tac
+  \\ simp[quote_level_def]
+  \\ Induct
+  \\ rw[quote_level_aux_def]
+  \\ rw[termsem_def]
+  >- (
+    qpat_assum`FLOOKUP _ (strlit "MP") = _`assume_tac
+    \\ drule instance_def
+    \\ simp[]
+    \\ disch_then(qspecl_then[`i`,`[]`]mp_tac)
+    \\ rw[]
+    \\ CONV_TAC(LAND_CONV(RAND_CONV EVAL))
+    \\ simp[] )
+  \\ qpat_assum`FLOOKUP _ (strlit "Trust") = _`assume_tac
+  \\ drule instance_def
+  \\ simp[]
+  \\ disch_then(qspecl_then[`i`,`[]`]mp_tac)
+  \\ rw[]
+  \\ CONV_TAC(LAND_CONV(LAND_CONV(RAND_CONV EVAL)))
+  \\ simp[]
+  \\ simp[fun_to_inner_def]
+  \\ match_mp_tac apply_abstract_matchable
+  \\ dep_rewrite.DEP_REWRITE_TAC[quote_num_thm]
+  \\ simp[wf_to_inner_range_thm,quote_num_def]
+  \\ metis_tac[wf_to_inner_finv_left]);
+
+val ty = ``:'a # 'b``
+
+val (quote_prod_aux_def,quote_prod_def) = mk_quote (SOME(["q1","q2"],["t1","t2"])) ty
 
 val quote_prod_aux_cong = Q.store_thm("quote_prod_aux_cong",
   `∀xy1 xy2 qta1 qtb1 qta2 qtb2.
@@ -59,7 +102,57 @@ val quote_prod_aux_cong = Q.store_thm("quote_prod_aux_cong",
   rpt Cases \\ rw[quote_prod_aux_def]);
 val _ = DefnBase.export_cong "quote_prod_aux_cong";
 
-val (quote_list_aux_def,quote_list_def) = mk_quote (SOME(["q"],["t"])) ``:'a list``
+val constrs =
+  quote_prod_aux_def |> CONJUNCTS
+  |> map (#1 o strip_comb o rand o lhs o concl o SPEC_ALL)
+
+val [q1,t1,q2,t2] = quote_prod_def |> concl |> strip_forall |> #1
+
+val assums = map base_term_assums constrs
+  |> List.concat |> cons (to_inner_prop [] ty)
+  |> mapi (fn i => if i mod 2 = 0 then
+       subst[tmass |-> ``tmaof (i:'U interpretation)``,
+             ``Tyvar (strlit "A")`` |-> t1,
+             ``Tyvar (strlit "B")`` |-> t2] else I)
+
+val _ = Parse.bring_to_front_overload"tyvars"{Name="tyvars",Thy="holSyntax"};
+
+val to_inner_t1 = ``(to_inner ^t1):'a -> 'U``
+val to_inner_t2 = ``(to_inner ^t2):'b -> 'U``
+
+val quote_prod_thm = Q.store_thm("quote_prod_thm",
+  `is_set_theory ^mem ⇒
+   ∀^q1 ^t1 ^q2 ^t2 tmsig i v.
+     (*tyvars t1 = [] ∧ tyvars t2 = [] ∧*)
+     wf_to_inner ^to_inner_t1 ∧
+     typesem (tyaof i) (tyvof v) t1 = range ^to_inner_t1 ∧
+     (∀a. termsem tmsig i v (q1 a) = to_inner t1 a) ∧
+     wf_to_inner ^to_inner_t2 ∧
+     typesem (tyaof i) (tyvof v) t2 = range ^to_inner_t2 ∧
+     (∀b. termsem tmsig i v (q2 b) = to_inner t2 b) ∧
+     ^(list_mk_conj assums) ⇒
+     ∀p. termsem tmsig i v (FST (quote_prod ((q1,t1),(q2,t2))) p) =
+       to_inner (SND (quote_prod ((q1,t1),(q2,t2)))) p`,
+  ntac 9 strip_tac
+  \\ Cases
+  \\ rw[quote_prod_def,quote_prod_aux_def,termsem_def]
+  \\ drule instance_def
+  \\ simp[]
+  \\ disch_then(qspecl_then[`i`,`[(t1,Tyvar(strlit"A"));(t2,Tyvar(strlit"B"))]`]mp_tac)
+  \\ CONV_TAC(LAND_CONV(LAND_CONV(RAND_CONV EVAL)))
+  \\ rw[]
+  \\ CONV_TAC(LAND_CONV(LAND_CONV(LAND_CONV(RAND_CONV EVAL))))
+  \\ rw[fun_to_inner_def]
+  \\ dep_rewrite.DEP_REWRITE_TAC[apply_abstract]
+  \\ rw[wf_to_inner_range_thm,range_fun_to_inner]
+  \\ TRY (
+    match_mp_tac (UNDISCH abstract_in_funspace)
+    \\ rw[wf_to_inner_range_thm] )
+  \\ metis_tac[wf_to_inner_finv_left]);
+
+val ty = ``:'a list``;
+
+val (quote_list_aux_def,quote_list_def) = mk_quote (SOME(["q"],["t"])) ty;
 
 val quote_list_aux_cong = Q.store_thm("quote_list_aux_cong",
   `!l1 l2 t1 t2 q1 q2.
@@ -69,6 +162,57 @@ val quote_list_aux_cong = Q.store_thm("quote_list_aux_cong",
       ==> quote_list_aux (q1,t1) l1 = quote_list_aux (q2,t2) l2`,
   Induct \\ rw[quote_list_aux_def] \\ rw[quote_list_aux_def]);
 val _ = DefnBase.export_cong "quote_list_aux_cong";
+
+val constrs =
+  quote_list_aux_def |> CONJUNCTS
+  |> map (#1 o strip_comb o rand o lhs o concl o SPEC_ALL)
+
+val [q,t] = quote_list_def |> concl |> strip_forall |> #1
+
+val assums = map base_term_assums constrs
+  |> List.concat |> cons (to_inner_prop [] ty)
+  |> mapi (fn i => if i mod 2 = 0 then
+       subst[tmass |-> ``tmaof (i:'U interpretation)``,
+             ``Tyvar (strlit "A")`` |-> t] else I)
+
+val to_inner_t = ``(to_inner ^t):'a -> 'U``
+
+val quote_list_thm = Q.store_thm("quote_list_thm",
+  `is_set_theory ^mem ⇒
+   ∀^q ^t tmsig i v.
+     wf_to_inner ^to_inner_t ∧
+     typesem (tyaof i) (tyvof v) t = range ^to_inner_t ∧
+     (∀a. termsem tmsig i v (q a) = to_inner t a) ∧
+     ^(list_mk_conj assums) ⇒
+     ∀l. termsem tmsig i v (FST (quote_list (q,t)) l) =
+       to_inner (SND (quote_list (q,t))) l`,
+  ntac 7 strip_tac
+  \\ Induct
+  \\ rw[quote_list_def,quote_list_aux_def,termsem_def]
+  >- (
+    qpat_assum`FLOOKUP _ (strlit"NIL") = _`assume_tac
+    \\ drule instance_def
+    \\ simp[]
+    \\ disch_then(qspecl_then[`i`,`[(t,Tyvar(strlit"A"))]`]mp_tac)
+    \\ CONV_TAC(LAND_CONV(LAND_CONV(RAND_CONV EVAL)))
+    \\ rw[]
+    \\ CONV_TAC(LAND_CONV(RAND_CONV EVAL))
+    \\ rw[] )
+  \\ qpat_assum`FLOOKUP _ (strlit"CONS") = _`assume_tac
+  \\ drule instance_def
+  \\ simp[]
+  \\ disch_then(qspecl_then[`i`,`[(t,Tyvar(strlit"A"))]`]mp_tac)
+  \\ CONV_TAC(LAND_CONV(LAND_CONV(RAND_CONV EVAL)))
+  \\ rw[]
+  \\ CONV_TAC(LAND_CONV(LAND_CONV(LAND_CONV(RAND_CONV EVAL))))
+  \\ rw[fun_to_inner_def]
+  \\ fs[quote_list_def]
+  \\ dep_rewrite.DEP_REWRITE_TAC[apply_abstract]
+  \\ rw[wf_to_inner_range_thm,range_fun_to_inner]
+  \\ TRY (
+    match_mp_tac (UNDISCH abstract_in_funspace)
+    \\ rw[wf_to_inner_range_thm] )
+  \\ metis_tac[wf_to_inner_finv_left]);
 
 val quote_list_is_aux = Q.prove(
   `FST (quote_list (x,y)) z = quote_list_aux (x,y) z`,
