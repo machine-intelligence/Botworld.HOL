@@ -1,6 +1,7 @@
 open preamble botworld_quoteLib
      reflectionLib holSemanticsTheory
      setSpecTheory reflectionTheory
+     local open dep_rewrite in end
 
 val _ = new_theory"botworld_quote";
 
@@ -174,6 +175,7 @@ val assums = map base_term_assums constrs
   |> mapi (fn i => if i mod 2 = 0 then
        subst[tmass |-> ``tmaof (i:'U interpretation)``,
              ``Tyvar (strlit "A")`` |-> t] else I)
+val list_assums = assums
 
 val to_inner_t = ``(to_inner ^t):'a -> 'U``
 
@@ -218,13 +220,214 @@ val quote_list_is_aux = Q.prove(
   `FST (quote_list (x,y)) z = quote_list_aux (x,y) z`,
   rw[quote_list_def]);
 
+val num_list_assums =
+  (list_mk_conj list_assums)
+  |> subst[t |-> ``SND quote_num``]
+  |> inst[alpha |-> ``:num``]
+
+val num_ty_assums =
+  base_type_assums ``:num``
+  |> map (subst [tyass |-> ``tyaof (i:'U interpretation)``])
+
+val quote_num_list_example = Q.store_thm("quote_num_list_example",
+  `is_set_theory ^mem ⇒
+   ∀tysig tmsig i v.
+     ^(list_mk_conj num_ty_assums) ∧
+     ^(list_mk_conj (tl num_assums)) ∧
+     ^num_list_assums ⇒
+   ∀l. termsem tmsig i v (FST (quote_list quote_num) l) = to_inner (SND (quote_list quote_num)) l`,
+  ntac 6 strip_tac
+  \\ fs[quote_num_def]
+  \\ match_mp_tac (UNDISCH quote_list_thm)
+  \\ simp[]
+  \\ conj_tac >- ( rw[typesem_def] )
+  \\ match_mp_tac (UNDISCH quote_num_thm |> SIMP_RULE std_ss [quote_num_def])
+  \\ simp[]);
+
 val _ = aux_rws := concl quote_list_is_aux :: !aux_rws
 
-val quote_char_aux_def = Define `quote_char_aux c = Comb ^(term_to_deep ``CHR``) (quote_num_aux (ORD c))`
-val quote_char_def = Define `quote_char = (quote_char_aux , ^(type_to_deep ``:char``))`
+val ty = ``:char``;
 
-val (quote_id_aux_def,quote_id_def) = mk_quote (SOME(["q"],["t"])) ``:'a id``
-val (quote_tctor_aux_def,quote_tctor_def) = mk_quote NONE ``:tctor``
+val quote_char_aux_def = Define `quote_char_aux c = Comb ^(term_to_deep ``CHR``) (quote_num_aux (ORD c))`
+val quote_char_def = Define `quote_char = (quote_char_aux , ^(type_to_deep ty))`
+
+val constrs = [``CHR``]
+
+val assums = map base_term_assums constrs
+  |> List.concat |> cons (to_inner_prop [] ty)
+  |> map (subst[tmass |-> ``tmaof (i:'U interpretation)``])
+val char_assums = assums
+
+val quote_char_thm = Q.store_thm("quote_char_thm",
+  `is_set_theory ^mem ⇒
+   ∀tmsig i v.
+     ^(list_mk_conj num_assums) ∧
+     ^(list_mk_conj assums)
+     ⇒
+     ∀c. termsem tmsig i v (FST quote_char c) = to_inner (SND quote_char) c`,
+  ntac 5 strip_tac
+  \\ Cases
+  \\ fs[quote_char_def,quote_char_aux_def]
+  \\ rw[termsem_def]
+  \\ drule instance_def
+  \\ simp[]
+  \\ disch_then(qspecl_then[`i`,`[]`]mp_tac)
+  \\ rw[]
+  \\ CONV_TAC(LAND_CONV(LAND_CONV(RAND_CONV EVAL)))
+  \\ simp[]
+  \\ simp[fun_to_inner_def]
+  \\ match_mp_tac apply_abstract_matchable
+  \\ simp[wf_to_inner_range_thm]
+  \\ dep_rewrite.DEP_REWRITE_TAC[UNDISCH quote_num_thm |> SIMP_RULE std_ss [quote_num_def]]
+  \\ simp[wf_to_inner_range_thm]
+  \\ metis_tac[wf_to_inner_finv_left]);
+
+val char_list_assums =
+  (list_mk_conj list_assums)
+  |> subst[t |-> ``SND quote_char``]
+  |> inst[alpha |-> ``:char``]
+
+val char_ty_assums =
+  base_type_assums ``:char``
+  |> map (subst [tyass |-> ``tyaof (i:'U interpretation)``])
+
+val quote_char_list_thm = Q.store_thm("quote_char_list_thm",
+  `is_set_theory ^mem ⇒
+   ∀tysig tmsig i v.
+    ^(list_mk_conj char_ty_assums) ∧
+    ^(list_mk_conj (tl char_assums)) ∧
+    ^(list_mk_conj num_assums) ∧
+    ^char_list_assums ⇒
+    ∀l. termsem tmsig i v (FST (quote_list quote_char) l) = to_inner (SND (quote_list quote_char)) l`,
+  ntac 6 strip_tac
+  \\ fs[quote_char_def]
+  \\ match_mp_tac (UNDISCH quote_list_thm)
+  \\ simp[]
+  \\ conj_tac >- ( rw[typesem_def] )
+  \\ match_mp_tac (UNDISCH quote_char_thm |> SIMP_RULE std_ss [quote_char_def])
+  \\ simp[]);
+
+val ty = ``:'a id``;
+
+val (quote_id_aux_def,quote_id_def) = mk_quote (SOME(["q"],["t"])) ty;
+
+val constrs =
+  quote_id_aux_def |> SPEC_ALL |> CONJUNCTS
+  |> map (#1 o strip_comb o rand o lhs o concl o SPEC_ALL)
+
+val [q,t] = quote_id_def |> concl |> strip_forall |> #1
+
+val assums = map base_term_assums constrs
+  |> List.concat |> cons (to_inner_prop [] ty)
+  |> mapi (fn i => if i mod 2 = 0 then
+       subst[tmass |-> ``tmaof (i:'U interpretation)``,
+             ``Tyvar (strlit "A")`` |-> t] else I)
+val id_assums = assums
+
+val to_inner_t = ``(to_inner ^t):'a -> 'U``
+
+val quote_id_thm = Q.store_thm("quote_id_thm",
+  `is_set_theory ^mem ⇒
+   ∀^q ^t tysig tmsig i v.
+     wf_to_inner ^to_inner_t ∧
+     typesem (tyaof i) (tyvof v) t = range ^to_inner_t ∧
+     (∀a. termsem tmsig i v (q a) = to_inner t a) ∧
+     ^(list_mk_conj assums) ∧
+     ^(list_mk_conj char_ty_assums) ∧
+     ^(list_mk_conj (tl char_assums)) ∧
+     ^(list_mk_conj num_assums) ∧
+     ^char_list_assums
+     ⇒
+     ∀l. termsem tmsig i v (FST (quote_id (q,t)) l) =
+       to_inner (SND (quote_id (q,t))) l`,
+  ntac 8 strip_tac
+  \\ Induct
+  \\ rw[quote_id_def,quote_id_aux_def,termsem_def]
+  >- (
+    qpat_assum`FLOOKUP _ (strlit"Short") = _`assume_tac
+    \\ drule instance_def
+    \\ simp[]
+    \\ disch_then(qspecl_then[`i`,`[(t,Tyvar(strlit"A"))]`]mp_tac)
+    \\ CONV_TAC(LAND_CONV(LAND_CONV(RAND_CONV EVAL)))
+    \\ rw[]
+    \\ CONV_TAC(LAND_CONV(LAND_CONV(RAND_CONV EVAL)))
+    \\ rw[fun_to_inner_def]
+    \\ dep_rewrite.DEP_REWRITE_TAC[apply_abstract]
+    \\ rw[wf_to_inner_range_thm]
+    \\ metis_tac[wf_to_inner_finv_left])
+  \\ qpat_assum`FLOOKUP _ (strlit"Long") = _`assume_tac
+  \\ drule instance_def
+  \\ simp[]
+  \\ disch_then(qspecl_then[`i`,`[(t,Tyvar(strlit"A"))]`]mp_tac)
+  \\ CONV_TAC(LAND_CONV(LAND_CONV(RAND_CONV EVAL)))
+  \\ rw[]
+  \\ CONV_TAC(LAND_CONV(LAND_CONV(LAND_CONV(RAND_CONV EVAL))))
+  \\ rw[fun_to_inner_def]
+  \\ dep_rewrite.DEP_REWRITE_TAC[UNDISCH quote_char_list_thm]
+  \\ simp[] \\ conj_tac >- metis_tac[]
+  \\ dep_rewrite.DEP_REWRITE_TAC[apply_abstract]
+  \\ rw[wf_to_inner_range_thm,range_fun_to_inner]
+  \\ TRY (
+    match_mp_tac (UNDISCH abstract_in_funspace)
+    \\ rw[wf_to_inner_range_thm] )
+  \\ fs[quote_char_def,quote_list_def,wf_to_inner_range_thm]
+  \\ metis_tac[wf_to_inner_finv_left]);
+
+val char_list_id_assums =
+  list_mk_conj id_assums
+  |> subst[t |-> ``SND (quote_list quote_char)``]
+  |> inst[alpha |-> ``:char list``]
+
+val char_list_ty_assums =
+  base_type_assums ``:char list``
+  |> map (subst [tyass |-> ``tyaof (i:'U interpretation)``])
+
+val quote_char_list_id_thm = Q.store_thm("quote_char_list_id_thm",
+  `is_set_theory ^mem ⇒
+   ∀tysig tmsig i v.
+     ^(list_mk_conj char_ty_assums) ∧
+     ^(list_mk_conj (tl char_assums)) ∧
+     ^(list_mk_conj num_assums) ∧
+     ^char_list_assums ∧
+     ^(list_mk_conj char_list_ty_assums) ∧
+     ^char_list_id_assums ⇒
+   ∀x. termsem tmsig i v (FST (quote_id (quote_list quote_char)) x) = to_inner (SND (quote_id (quote_list quote_char))) x`,
+  ntac 6 strip_tac
+  \\ fs[quote_list_def,quote_char_def]
+  \\ match_mp_tac (UNDISCH quote_id_thm)
+  \\ simp[]
+  \\ qexists_tac`tysig`
+  \\ simp[]
+  \\ conj_tac >- ( rw[typesem_def] )
+  \\ fs[quote_char_def]
+  \\ match_mp_tac (UNDISCH quote_char_list_thm |> SIMP_RULE std_ss [quote_list_def,quote_char_def])
+  \\ qexists_tac`tysig`
+  \\ simp[]);
+
+val ty = ``:tctor``;
+
+val (quote_tctor_aux_def,quote_tctor_def) = mk_quote NONE ty;
+
+val constrs =
+  quote_tctor_aux_def |> SPEC_ALL |> CONJUNCTS
+  |> map (#1 o strip_comb o rand o lhs o concl o SPEC_ALL)
+
+val assums = map base_term_assums constrs
+  |> List.concat |> cons (to_inner_prop [] ty)
+  |> map (subst[tmass |-> ``tmaof (i:'U interpretation)``])
+
+val tctor_assums = assums
+
+val quote_tctor_thm = Q.store_thm("quote_tctor_thm",
+  `is_set_theory ^mem ⇒
+   ∀tmsig i v.
+     ^(list_mk_conj assums)
+     ⇒
+     ∀t. termsem tmsig i v (FST quote_tctor t) = to_inner (SND quote_tctor) t`,
+  ntac 5 strip_tac
+  \\ simp[quote_tctor_def]
+  \\ Induct
+  \\ rw[quote_tctor_aux_def]
 
 val _ = mk_quote_tac := (wf_rel_tac `measure t_size` \\ gen_tac \\ Induct \\ rw[astTheory.t_size_def]
                                    \\ simp[] \\ res_tac \\ simp[])
