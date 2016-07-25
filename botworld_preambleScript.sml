@@ -149,6 +149,7 @@ val _ = update_precondition (num_to_hex_string_side_thm |> SPEC_ALL |> EQT_INTRO
 val res = translate simpleSexpTheory.strip_sxcons_def;
 val res = translate simpleSexpParseTheory.print_space_separated_def;
 val res = translate simpleSexpParseTheory.escape_string_def;
+val res = translate simpleSexpParseTheory.strip_dot_def;
 val res = translate simpleSexpParseTheory.print_sexp_def;
 val res = translate fromSexpTheory.listsexp_def;
 val res = translate fromSexpTheory.optsexp_def;

@@ -418,17 +418,6 @@ val assums = map base_term_assums constrs
 
 val tctor_assums = assums
 
-val quote_tctor_thm = Q.store_thm("quote_tctor_thm",
-  `is_set_theory ^mem ⇒
-   ∀tmsig i v.
-     ^(list_mk_conj assums)
-     ⇒
-     ∀t. termsem tmsig i v (FST quote_tctor t) = to_inner (SND quote_tctor) t`,
-  ntac 5 strip_tac
-  \\ simp[quote_tctor_def]
-  \\ Induct
-  \\ rw[quote_tctor_aux_def]
-
 val _ = mk_quote_tac := (wf_rel_tac `measure t_size` \\ gen_tac \\ Induct \\ rw[astTheory.t_size_def]
                                    \\ simp[] \\ res_tac \\ simp[])
 

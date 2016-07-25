@@ -6,8 +6,7 @@ ifndef HOLREFLDIR
 HOLREFLDIR = $(HOME)/hol-reflection
 endif
 
-INCLUDES = $(HOLDIR)/examples/pattern_matches\
-					 $(CAKEMLDIR)/semantics\
+INCLUDES = $(CAKEMLDIR)/semantics\
 					 $(CAKEMLDIR)/semantics/proofs\
 					 $(CAKEMLDIR)/compiler/parsing\
 					 $(CAKEMLDIR)/translator\
