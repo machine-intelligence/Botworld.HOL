@@ -400,7 +400,7 @@ val wf_state_event_same_name = Q.store_thm("wf_state_event_same_name",
   \\ rpt (
     qmatch_asmsub_abbrev_tac`incomingFrom _ nb`
     \\ Cases_on`nb`
-    \\ qpat_assum`Abbrev _`(strip_assume_tac o SYM o SIMP_RULE std_ss [markerTheory.Abbrev_def])
+    \\ qpat_x_assum`Abbrev _`(strip_assume_tac o SYM o SIMP_RULE std_ss [markerTheory.Abbrev_def])
     \\ fs[incomingFrom_def])
   \\ fs[MEM_MAP,MEM_FILTER]
   \\ fs[localActions_def,MEM_MAP] \\ rw[]
@@ -488,11 +488,11 @@ val same_name_same_action = Q.store_thm("same_name_same_action",
   \\ drule (GEN_ALL event_name_in_grid)
   \\ disch_then drule
   \\ drule (GEN_ALL event_name_in_grid)
-  \\ qpat_assum`MEM (nm,ra1) _`assume_tac
+  \\ qpat_x_assum`MEM (nm,ra1) _`assume_tac
   \\ disch_then drule
   \\ rw[]
   >- (
-    rpt(qpat_assum`MEM _ _.robotActions`mp_tac)
+    rpt(qpat_x_assum`MEM _ _.robotActions`mp_tac)
     \\ simp[event_def,MEM_FLAT,MEM_GENLIST,PULL_EXISTS,MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,UNCURRY,o_DEF,MEM_MAP,EXISTS_PROD]
     \\ reverse strip_tac
     >- ( imp_res_tac incomingFrom_MovedIn \\ fs[] )
@@ -507,7 +507,7 @@ val same_name_same_action = Q.store_thm("same_name_same_action",
     \\ metis_tac[PAIR_EQ,ALL_DISTINCT_MAP_FST] )
   >- ( fs[wf_state_def,IN_DISJOINT] \\ metis_tac[] )
   >- ( fs[wf_state_def,IN_DISJOINT] \\ metis_tac[] )
-  \\ rpt(qpat_assum`MEM _ _.robotActions`mp_tac)
+  \\ rpt(qpat_x_assum`MEM _ _.robotActions`mp_tac)
   \\ simp[event_def,MEM_FLAT,MEM_GENLIST,PULL_EXISTS,MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,UNCURRY,o_DEF,MEM_MAP,EXISTS_PROD]
   \\ strip_tac
   >- ( metis_tac[NOT_MEM_MovedIn_localActions,SND] )
@@ -573,7 +573,7 @@ val event_MovedIn_MovedOut = Q.store_thm("event_MovedIn_MovedOut",
   >- (
     fs[MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,MEM_MAP,UNCURRY]
     \\ imp_res_tac NOT_MEM_MovedIn_localActions
-    \\ qpat_assum`MovedIn _ = _`(assume_tac o SYM)
+    \\ qpat_x_assum`MovedIn _ = _`(assume_tac o SYM)
     \\ fs[] )
   \\ fs[MEM_FLAT,MEM_GENLIST] \\ rw[]
   \\ simp[MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,MEM_MAP,UNCURRY]
@@ -656,7 +656,7 @@ val wf_state_step = Q.store_thm("wf_state_step",
           \\ Cases_on`n2` \\ simp[incomingFrom_def,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
           \\ rw[]
           \\ fs[markerTheory.Abbrev_def]
-          \\ rpt(qpat_assum`SOME _ = _`(assume_tac o SYM))
+          \\ rpt(qpat_x_assum`SOME _ = _`(assume_tac o SYM))
           \\ rfs[neighbours_def,EL_MAP]
           \\ Q.ISPEC_THEN`neighbour_coords k`match_mp_tac
                (Q.GEN`l` (MP_CANON (DISCH_ALL (#1 (EQ_IMP_RULE (UNDISCH_ALL (SPEC_ALL ALL_DISTINCT_EL_IMP)))))))
@@ -681,7 +681,7 @@ val wf_state_step = Q.store_thm("wf_state_step",
           \\ Cases_on`nb` \\ simp[incomingFrom_def,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
           \\ match_mp_tac ALL_DISTINCT_MAP_FILTER
           \\ fs[markerTheory.Abbrev_def]
-          \\ rpt(qpat_assum`SOME _ = _`(assume_tac o SYM))
+          \\ rpt(qpat_x_assum`SOME _ = _`(assume_tac o SYM))
           \\ rfs[neighbours_def,EL_MAP]
           \\ metis_tac[] )
         \\ qx_genl_tac[`d1`,`d2`]
@@ -696,14 +696,14 @@ val wf_state_step = Q.store_thm("wf_state_step",
         \\ drule same_name_same_square
         \\ simp[IN_FRANGE_FLOOKUP,PULL_EXISTS,MEM_MAP]
         \\ asm_exists_tac \\ simp[]
-        \\ qpat_assum`FLOOKUP _ (EL d1 _) = _`assume_tac
+        \\ qpat_x_assum`FLOOKUP _ (EL d1 _) = _`assume_tac
         \\ asm_exists_tac \\ simp[]
         \\ asm_exists_tac \\ simp[]
         \\ rveq
         \\ asm_exists_tac \\ simp[]
         \\ spose_not_then strip_assume_tac \\ rveq
         \\ last_x_assum drule
-        \\ qpat_assum`FLOOKUP _ (EL d2 _) = _`assume_tac
+        \\ qpat_x_assum`FLOOKUP _ (EL d2 _) = _`assume_tac
         \\ disch_then drule
         \\ simp[GSYM NULL_EQ, NOT_NULL_MEM]
         \\ reverse conj_tac >- metis_tac[]
@@ -716,7 +716,7 @@ val wf_state_step = Q.store_thm("wf_state_step",
       \\ fs[MEM_MAP,MEM_FILTER,UNCURRY]
       \\ rveq \\ fs[]
       \\ last_x_assum drule
-      \\ qpat_assum`FLOOKUP _ k = _`assume_tac
+      \\ qpat_x_assum`FLOOKUP _ k = _`assume_tac
       \\ disch_then drule
       \\ simp[IN_DISJOINT,MEM_MAP,PULL_EXISTS]
       \\ metis_tac[NOT_MEM_neighbour_coords,MEM_EL])
@@ -763,17 +763,17 @@ val wf_state_step = Q.store_thm("wf_state_step",
       \\ qmatch_assum_rename_tac`FST ra1 = FST ra2`
       \\ Cases_on`ra1` \\ Cases_on`ra2` \\ fs[] \\ rveq
       \\ qmatch_assum_rename_tac`MEM (nm,a1) _`
-      \\ qpat_assum`MEM (nm,a1) _`mp_tac
+      \\ qpat_x_assum`MEM (nm,a1) _`mp_tac
       \\ qmatch_assum_rename_tac`MEM (nm,a2) _`
       \\ strip_tac
       \\ drule (GEN_ALL wf_state_event_same_name)
       \\ disch_then drule
-      \\ qpat_assum`MEM (nm,a2) _`assume_tac
+      \\ qpat_x_assum`MEM (nm,a2) _`assume_tac
       \\ disch_then drule
       \\ CONV_TAC(LAND_CONV(SIMP_CONV(srw_ss())[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS,GSYM CONJ_ASSOC]))
       \\ disch_then drule
       \\ simp[]
-      \\ qpat_assum`FLOOKUP _ c2 = _`assume_tac
+      \\ qpat_x_assum`FLOOKUP _ c2 = _`assume_tac
       \\ asm_exists_tac
       \\ rw[EXTENSION]
       \\ disj2_tac
@@ -789,18 +789,18 @@ val wf_state_step = Q.store_thm("wf_state_step",
       \\ qmatch_assum_rename_tac`FST ra1 = FST ra2`
       \\ Cases_on`ra1` \\ Cases_on`ra2` \\ fs[] \\ rveq
       \\ qmatch_assum_rename_tac`MEM (nm,a1) _`
-      \\ qpat_assum`MEM (nm,a1) _`mp_tac
+      \\ qpat_x_assum`MEM (nm,a1) _`mp_tac
       \\ qmatch_assum_rename_tac`MEM (nm,a2) _`
       \\ strip_tac
       \\ drule (GEN_ALL wf_state_event_same_name)
       \\ disch_then drule
-      \\ qpat_assum`MEM (nm,a2) _`assume_tac
+      \\ qpat_x_assum`MEM (nm,a2) _`assume_tac
       \\ disch_then drule
       \\ CONV_TAC(LAND_CONV(SIMP_CONV(srw_ss())[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS,GSYM CONJ_ASSOC]))
-      \\ qpat_assum`FLOOKUP _ c1 = _`assume_tac
+      \\ qpat_x_assum`FLOOKUP _ c1 = _`assume_tac
       \\ disch_then drule
       \\ simp[]
-      \\ qpat_assum`FLOOKUP _ c2 = _`assume_tac
+      \\ qpat_x_assum`FLOOKUP _ c2 = _`assume_tac
       \\ asm_exists_tac
       \\ rw[EXTENSION]
       \\ disj2_tac
@@ -817,18 +817,18 @@ val wf_state_step = Q.store_thm("wf_state_step",
       \\ qmatch_assum_rename_tac`FST ra1 = FST ra2`
       \\ Cases_on`ra1` \\ Cases_on`ra2` \\ fs[] \\ rveq
       \\ qmatch_assum_rename_tac`MEM (nm,a1) _`
-      \\ qpat_assum`MEM (nm,a1) _`mp_tac
+      \\ qpat_x_assum`MEM (nm,a1) _`mp_tac
       \\ qmatch_assum_rename_tac`MEM (nm,a2) _`
       \\ strip_tac
       \\ drule (GEN_ALL wf_state_event_same_name)
       \\ disch_then drule
-      \\ qpat_assum`MEM (nm,a2) _`assume_tac
+      \\ qpat_x_assum`MEM (nm,a2) _`assume_tac
       \\ disch_then drule
       \\ CONV_TAC(LAND_CONV(SIMP_CONV(srw_ss())[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS,GSYM CONJ_ASSOC]))
-      \\ qpat_assum`FLOOKUP _ c1 = _`assume_tac
+      \\ qpat_x_assum`FLOOKUP _ c1 = _`assume_tac
       \\ disch_then drule
       \\ simp[]
-      \\ qpat_assum`FLOOKUP _ c2 = _`assume_tac
+      \\ qpat_x_assum`FLOOKUP _ c2 = _`assume_tac
       \\ asm_exists_tac
       \\ rw[EXTENSION]
       \\ disj2_tac
@@ -839,7 +839,7 @@ val wf_state_step = Q.store_thm("wf_state_step",
       \\ fs[]))
   >- (
     rw[]
-    \\ qpat_assum`FLOOKUP _ c1 = _`assume_tac
+    \\ qpat_x_assum`FLOOKUP _ c1 = _`assume_tac
     \\ drule (GEN_ALL event_name_in_grid)
     \\ disch_then drule
     \\ rw[]
@@ -847,22 +847,22 @@ val wf_state_step = Q.store_thm("wf_state_step",
       rw[MEM_MAP]
       \\ spose_not_then strip_assume_tac
       \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS,MEM_MAP]
-      \\ qpat_assum`_ = FST _`(assume_tac o SYM)
+      \\ qpat_x_assum`_ = FST _`(assume_tac o SYM)
       \\ res_tac \\ rfs[] )
     >- (
       rw[MEM_MAP]
       \\ spose_not_then strip_assume_tac
       \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS,MEM_MAP]
-      \\ qpat_assum`_ = FST _`(assume_tac o SYM)
+      \\ qpat_x_assum`_ = FST _`(assume_tac o SYM)
       \\ res_tac \\ rfs[] ))
   \\ rw[]
   \\ drule (GEN_ALL event_name_in_grid)
   \\ disch_then drule
-  \\ qpat_assum`_ = FST _`(assume_tac o SYM)
+  \\ qpat_x_assum`_ = FST _`(assume_tac o SYM)
   \\ rw[MEM_MAP]
   \\ spose_not_then strip_assume_tac \\ fs[]
   \\ fs[IN_FRANGE_FLOOKUP,MEM_MAP,PULL_EXISTS]
-  \\ qpat_assum`_ = FST _`(assume_tac o SYM)
+  \\ qpat_x_assum`_ = FST _`(assume_tac o SYM)
   \\ res_tac \\ rfs[]);
 
 val wf_state_fill = Q.store_thm("wf_state_fill",
@@ -951,7 +951,7 @@ val focal_event_sing = Q.store_thm("focal_event_sing",
         drule (GEN_ALL same_name_same_action)
         \\ simp[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS]
         \\ disch_then drule
-        \\ qpat_assum`FLOOKUP _ (_ _) = _`assume_tac
+        \\ qpat_x_assum`FLOOKUP _ (_ _) = _`assume_tac
         \\ disch_then drule
         \\ disch_then drule
         \\ disch_then drule
@@ -974,7 +974,7 @@ val focal_event_sing = Q.store_thm("focal_event_sing",
     \\ drule (GEN_ALL same_name_same_action)
     \\ simp[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS]
     \\ disch_then drule
-    \\ qpat_assum`FLOOKUP _ k = _`assume_tac
+    \\ qpat_x_assum`FLOOKUP _ k = _`assume_tac
     \\ disch_then drule
     \\ disch_then drule
     \\ disch_then drule
@@ -1138,7 +1138,7 @@ val clock_preserved = Q.store_thm("clock_preserved",
     drule same_name_same_square
     \\ simp[IN_FRANGE_FLOOKUP,PULL_EXISTS]
     \\ disch_then drule
-    \\ qpat_assum`_ = SOME sq`assume_tac
+    \\ qpat_x_assum`_ = SOME sq`assume_tac
     \\ disch_then drule
     \\ disch_then drule
     \\ simp[MEM_MAP,EXISTS_PROD]
@@ -1146,7 +1146,7 @@ val clock_preserved = Q.store_thm("clock_preserved",
     \\ strip_tac \\ rveq
     \\ drule grid_injective
     \\ disch_then drule
-    \\ qpat_assum`_ _ k' = _`assume_tac
+    \\ qpat_x_assum`_ _ k' = _`assume_tac
     \\ disch_then drule
     \\ simp[NOT_NULL_MEM]
     \\ impl_tac >- metis_tac[]
@@ -1166,11 +1166,11 @@ val clock_preserved = Q.store_thm("clock_preserved",
   \\ Cases_on`a` \\ fs[]
   \\ drule (GEN_ALL event_MovedIn_MovedOut)
   \\ simp[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS]
-  \\ qpat_assum`_ = SOME sq'`assume_tac
+  \\ qpat_x_assum`_ = SOME sq'`assume_tac
   \\ disch_then drule \\ simp[]
   \\ strip_tac
   \\ first_x_assum(qspec_then`ARB`kall_tac)
-  \\ qpat_assum`MEM (_,_,MovedIn _) _`kall_tac
+  \\ qpat_x_assum`MEM (_,_,MovedIn _) _`kall_tac
   \\ reverse(fs[event_def])
   >- (
     fs[MEM_FLAT,MEM_GENLIST] \\ rw[]
@@ -1183,7 +1183,7 @@ val clock_preserved = Q.store_thm("clock_preserved",
   \\ drule same_name_same_square
   \\ simp[IN_FRANGE_FLOOKUP,PULL_EXISTS]
   \\ disch_then drule
-  \\ qpat_assum`_ = SOME sq`assume_tac
+  \\ qpat_x_assum`_ = SOME sq`assume_tac
   \\ disch_then drule
   \\ simp[MEM_MAP,PULL_EXISTS]
   \\ disch_then drule
@@ -1361,7 +1361,7 @@ val MEM_Destroyed_localActions_with_memory = Q.store_thm("MEM_Destroyed_localAct
   \\ rw[EQ_IMP_THM]
   \\ ONCE_REWRITE_TAC[CONJ_COMM]
   \\ asm_exists_tac \\ simp[]
-  \\ qpat_assum`_ = _`(mp_tac o SYM)
+  \\ qpat_x_assum`_ = _`(mp_tac o SYM)
   \\ simp[act_def]
   \\ every_case_tac \\ fs[]
   \\ fs[MAP_MAP_o,o_DEF,fled_with_memory]
@@ -1635,7 +1635,7 @@ val evaluate_ffi_extensional = Q.store_thm("evaluate_ffi_extensional",
   \\ rveq \\ rpt gen_tac \\ fs[] \\ strip_tac
   \\ TRY (
     every_case_tac
-  \\ rpt (qpat_assum`_ ∧ _`strip_assume_tac) \\ rveq
+  \\ rpt (qpat_x_assum`_ ∧ _`strip_assume_tac) \\ rveq
   \\ fs[] \\ rfs[] \\ rveq
   \\ imp_res_tac ffi_rel_same_refs \\ fs[]
   \\ first_x_assum drule \\ fs[]
@@ -1644,7 +1644,7 @@ val evaluate_ffi_extensional = Q.store_thm("evaluate_ffi_extensional",
   \\ first_x_assum drule \\ fs[])
   (* App case *)
   \\ every_case_tac
-  \\ rpt (qpat_assum`_ ∧ _`strip_assume_tac) \\ rveq
+  \\ rpt (qpat_x_assum`_ ∧ _`strip_assume_tac) \\ rveq
   \\ fs[] \\ rfs[] \\ rveq
   \\ imp_res_tac ffi_rel_same_refs \\ fs[]
   \\ first_x_assum drule \\ fs[]
@@ -1960,7 +1960,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
     \\ simp[prepare_def,runMachine_def,UNCURRY,robot_component_equality]
     \\ drule (GEN_ALL same_name_same_action) \\ simp[]
     \\ disch_then drule
-    \\ qpat_assum `_ = SOME ev` assume_tac
+    \\ qpat_x_assum `_ = SOME ev` assume_tac
     \\ disch_then drule
     \\ disch_then drule
     \\ disch_then drule
@@ -2270,7 +2270,7 @@ val sv_thm = Q.store_thm("sv_thm",
   \\ conj_tac >- simp[]
   \\ gen_tac \\ simp[]
   \\ qpat_abbrev_tac`ck = get_game_clock S`
-  \\ qpat_assum`∀x. _`mp_tac
+  \\ qpat_x_assum`∀x. _`mp_tac
   \\ qho_match_abbrev_tac`(∀o' cp' cp''. thm o' cp' cp'' ⇒ (_ o' cp' cp'')) ⇒ _`
   \\ simp[] \\ strip_tac
   \\ `run_policy psv ck o' = run_policy p ck o' ∨
@@ -2816,7 +2816,7 @@ val computeEvents_ignores_policy = Q.store_thm("computeEvents_ignores_policy",
       rw[] >>
       fs[focal_at_def] >>
       pop_assum mp_tac >> simp_tac std_ss [MEM_EL] >> strip_tac >>
-      qpat_assum`MEM _ _`mp_tac >>
+      qpat_x_assum`MEM _ _`mp_tac >>
       Cases_on`c`>> simp_tac(srw_ss())[neighbours_def] >>
       metis_tac[PAIR_EQ,intLib.ARITH_PROVE``(∀x. x ≠ x + 1 ∧ x ≠ x -1)``] ) >>
   Cases_on`FLOOKUP g k`>>simp[]>>
