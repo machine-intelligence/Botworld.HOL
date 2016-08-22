@@ -49,6 +49,10 @@ val sexpint_def = Define`
 
 val _ = Parse.overload_on("sexpcoord",``sexppair sexpint sexpint``);
 
+val sexpbytes_def = Define`
+  (sexpbytes (SX_STR s) = SOME (MAP (n2w o ORD) s)) ∧
+  (sexpbytes _ = (NONE:word8 list option))`;
+
 val sexpname_def = Define`
   sexpname s =
     do
@@ -72,7 +76,7 @@ val sexpcommand_def = Define`
             (lift Destroy (sexpname (EL 0 args))) ++
       guard (nm = "Build" ∧ LENGTH args = 2)
             (lift2 Build (sexplist sexpnum (EL 0 args))
-                         (sexplist sexptop (EL 1 args))) ++
+                         (sexplist sexpbytes (EL 1 args))) ++
       guard (nm = "Pass" ∧ LENGTH args = 0)
             (return Pass)
     od`;
@@ -147,9 +151,6 @@ val sexpaction_def = Define`
                    (return empty_robot))
     od`;
 
-val sexpoutput_def = Define`
-  sexpoutput = sexppair sexpcommand (sexplist sexptop)`;
-
 val sexpitemCache_def = Define`
   sexpitemCache s = do (com,pos) <- sexppair (sexplist sexpitem) (sexplist sexpitem) s;
                        return <| components := com ; possessions := pos |>
@@ -163,7 +164,7 @@ val sexpprivateData_def = Define`
                                (return pNothing) ++
                          guard (nm = "pInspected" ∧ LENGTH args = 2)
                                (lift2 pInspected (sexpnum (EL 0 args))
-                                                 (sexplist sexptop (EL 1 args)))
+                                                 (sexplist sexpbytes (EL 1 args)))
                       od`;
 
 val sexpevent_def = Define`
@@ -183,20 +184,30 @@ sexpevent s = do (ras,crs,unt,drop,fall) <-
 `;
 
 val sexpobservation_def = Define`
-  sexpobservation = sexppair sexpnum (sexppair sexpevent sexpprivateData)
+  sexpobservation s = do
+    (name,event,private) <- sexppair sexpname (sexppair sexpevent sexpprivateData) s;
+    return <| name := name; event := event; private := private |>
+  od
 `;
 
-val decode_observation_def = Define`
-  decode_observation (bytes:word8 list) = do
+val decode_bytes_def = Define`
+  decode_bytes f (bytes:word8 list) = do
     s <- parse_sexp (MAP (CHR o w2n) bytes);
-    sexpobservation s
+    f s
   od`;
 
-val decode_output_def = Define`
-  decode_output (bytes:word8 list) = do
-    s <- parse_sexp (MAP (CHR o w2n) bytes);
-    sexpoutput s
-  od`;
+val _ = overload_on("decode_observation",``decode_bytes sexpobservation``);
+
+val decode_register_def = Define`
+  decode_register n f d m =
+    if LENGTH m ≤ n then d else
+      option_CASE (decode_bytes f (EL n m)) d I`;
+
+val read_command_def = Define`
+  read_command = decode_register 0 sexpcommand Pass`;
+
+val read_policy_def = Define`
+  read_policy = decode_register 1 (sexplist sexptop) []`;
 
 (* encoding to sexp *)
 
@@ -222,6 +233,9 @@ val intsexp_def = Define`
 
 val _ = Parse.overload_on("coordsexp",``λ(i,j). SX_CONS (intsexp i) (intsexp j)``);
 
+val bytessexp_def = Define`
+  bytessexp (bs:word8 list) = listsexp (MAP (SX_NUM o w2n) bs)`;
+
 val namesexp_def = Define`
   namesexp nm = SX_CONS (SX_NUM nm.built_step) (SX_CONS (coordsexp nm.built_coord) (SX_NUM nm.id))`;
 
@@ -231,7 +245,7 @@ val commandsexp_def = Define`
   (commandsexp (Drop num) = listsexp [SX_SYM "Drop"; SX_NUM num]) ∧
   (commandsexp (Inspect nm) = listsexp [SX_SYM "Inspect"; namesexp nm]) ∧
   (commandsexp (Destroy nm) = listsexp [SX_SYM "Destroy"; namesexp nm]) ∧
-  (commandsexp (Build ns prog) = listsexp [SX_SYM "Build"; listsexp (MAP SX_NUM ns); listsexp (MAP topsexp prog)]) ∧
+  (commandsexp (Build ns m) = listsexp [SX_SYM "Build"; listsexp (MAP SX_NUM ns); listsexp (MAP bytessexp m)]) ∧
   (commandsexp (Pass) = listsexp [SX_SYM "Pass"])`;
 
 val robotsexp_def = Define`
@@ -273,84 +287,79 @@ val eventsexp_def = Define`
 val privateDatasexp_def = Define`
   (privateDatasexp pInvalid = listsexp [SX_SYM "pInvalid"]) ∧
   (privateDatasexp pNothing = listsexp [SX_SYM "pNothing"]) ∧
-  (privateDatasexp (pInspected proc prog) =
+  (privateDatasexp (pInspected proc mem) =
    listsexp [SX_SYM "pInspected";
              SX_NUM proc;
-             listsexp (MAP topsexp prog)])`;
+             listsexp (MAP bytessexp mem)])`;
 
 val observationsexp_def = Define`
-  observationsexp ((nm,e,p):observation) =
-    SX_CONS (namesexp nm)
-      (SX_CONS (eventsexp e) (privateDatasexp p))`;
+  observationsexp obs =
+    SX_CONS (namesexp obs.name)
+      (SX_CONS (eventsexp obs.event) (privateDatasexp obs.private))`;
 
-val outputsexp_def = Define`
-  outputsexp (c,p) = SX_CONS (commandsexp c) (listsexp (MAP topsexp p))`;
+val encode_bytes_def = Define`
+  encode_bytes f x =
+    MAP (n2w o ORD) (print_sexp (f x)) : word8 list`;
 
-val encode_observation_def = Define`
-  (encode_observation:observation -> word8 list) =
-    MAP (n2w o ORD) o print_sexp o observationsexp`;
+val _ = overload_on("encode_observation",``encode_bytes observationsexp``);
 
-val encode_output_def = Define`
-  encode_output : command # prog -> word8 list=
-    MAP (n2w o ORD) o print_sexp o outputsexp`;
+val encode_register_def = Define`
+  encode_register n f x m =
+    if LENGTH m ≤ n ∨ LENGTH (EL n m) ≠ LENGTH (encode_bytes f x) then m
+    else LUPDATE (encode_bytes f x) n m`;
 
 (* botworld ffi *)
 
-val _ = Datatype`
-  botworld_ffi_state = <|
-    bot_input : observation
-  ; bot_output : command # prog |>`;
+(* ffi state = word8 list list
+   conventions:
+   first element is encoded observation,
+   remaining elements are bot's memory
+   thus 2nd and 3rd elements are
+   the previous command and policy
+*)
 
-val botworld_get_input_length_def = Define`
-  botworld_get_input_length st bytes =
-    let n = LENGTH (encode_observation st.bot_input) in
+val ffi_get_num_def = Define`
+  ffi_get_num n bytes =
     let s = print_sexp (SX_NUM n) in
     if LENGTH bytes ≤ LENGTH s then
-      Oracle_return st (MAP (K (0w:word8)) bytes)
+      (MAP (K (0w:word8)) bytes)
     else
-      Oracle_return st (MAP (n2w o ORD) s ++ GENLIST (K 0w) (LENGTH bytes - LENGTH s))`;
+      (MAP (n2w o ORD) s ++ GENLIST (K 0w) (LENGTH bytes - LENGTH s))`;
 
-val botworld_get_output_length_def = Define`
-  botworld_get_output_length st bytes =
-    let n = LENGTH (encode_output st.bot_output) in
-    let s = print_sexp (SX_NUM n) in
-    if LENGTH bytes ≤ LENGTH s then
-      Oracle_return st (MAP (K (0w:word8)) bytes)
-    else
-      Oracle_return st (MAP (n2w o ORD) s ++ GENLIST (K 0w) (LENGTH bytes - LENGTH s))`;
+val botworld_get_count_def = Define`
+  botworld_get_count st bytes =
+    Oracle_return st (ffi_get_num (LENGTH st) bytes)`;
+
+val botworld_get_size_def = Define`
+  botworld_get_size n st bytes =
+  if n < LENGTH st then
+    Oracle_return st (ffi_get_num (LENGTH (EL n st)) bytes)
+  else Oracle_fail`;
 
 val botworld_read_def = Define`
-  botworld_read st bytes =
-    let bytes' = encode_observation st.bot_input in
-    if LENGTH bytes < LENGTH bytes' then Oracle_fail else
-      Oracle_return st (bytes' ++ (GENLIST (K 0w) (LENGTH bytes - LENGTH bytes')))`;
-
-val botworld_read_output_def = Define`
-  botworld_read_output st bytes =
-    let bytes' = encode_output st.bot_output in
-    if LENGTH bytes < LENGTH bytes' then Oracle_fail else
-      Oracle_return st (bytes' ++ (GENLIST (K 0w) (LENGTH bytes - LENGTH bytes')))`;
+  botworld_read n st bytes =
+    if n < LENGTH st ∧ LENGTH bytes = LENGTH (EL n st) then
+      Oracle_return st (EL n st)
+    else Oracle_fail`;
 
 val botworld_write_def = Define`
-  botworld_write st bytes =
-    case decode_output bytes of
-    | SOME output => Oracle_return (st with bot_output := output) bytes
-    | NONE => Oracle_return st bytes`;
+  botworld_write n st bytes =
+    if n < LENGTH st ∧ LENGTH bytes = LENGTH (EL n st) then
+      Oracle_return (LUPDATE bytes n st) (EL n st)
+    else Oracle_fail`;
 
 val botworld_oracle_def = Define`
   botworld_oracle n =
-    if n = 0n then botworld_get_input_length
-    else if n = 1 then botworld_read
-    else if n = 2 then botworld_write
-    else if n = 3 then botworld_get_output_length
-    else botworld_read_output`;
-
-val botworld_initial_state_def = Define`
-  botworld_initial_state obs =
-    <| bot_input := obs ; bot_output := (Pass, []) |>`;
+    if n = 0n then botworld_get_count else
+    let n = n-1 in
+      if n MOD 3 = 0 then botworld_get_size (n DIV 3) else
+      if n MOD 3 = 1 then botworld_read (n DIV 3) else
+      botworld_write (n DIV 3)`;
 
 (* CakeML declarations of helper functions for interfacing with the Botworld FFI *)
+(* TODO: these should be replaced with CF verified functions *)
 
+(*
 val ByteArrayFromList_dec_def = Define`
   ByteArrayFromList_dec =
     Dlet(Pvar"fromList")
@@ -440,6 +449,7 @@ val read_output_dec_def = Define`
            (Let (SOME "bs") (App Aw8alloc [App Opapp [Var(Short"get_output_length"); Var(Short"unit")]])
            (Let NONE (App (FFI 4) [Var(Short"bs")])
            (App Opapp [Var(Long "Botworld" "decode_output"); App Opapp [Var(Long "ByteArray" "toList") ; Var(Short"bs")]]))))`;
+*)
 
 (* properties of the encoding *)
 
@@ -455,19 +465,18 @@ val namesexp_11 = Q.store_thm("namesexp_11[simp]",
   `∀ n1 n2. namesexp n1 = namesexp n2 ⇔ n1 = n2`,
   Induct >> gen_tac >> cases_on `n2` >> fs[namesexp_def]);
 
+val bytessexp_11 = Q.store_thm("bytessexp_11[simp]",
+  `∀l1 l2. bytessexp l1 = bytessexp l2 ⇔ l1 = l2`,
+  rw[bytessexp_def,EQ_IMP_THM]
+  \\ imp_res_tac (REWRITE_RULE[AND_IMP_INTRO] MAP_EQ_MAP_IMP)
+  \\ first_x_assum match_mp_tac \\ rw[]);
+
 val commandsexp_11 = Q.store_thm("commandsexp_11[simp]",
   `∀ c c'. commandsexp c = commandsexp c' ⇔ c = c'`,
   Induct >> gen_tac >> cases_on `c'` >> fs[commandsexp_def, listsexp_11]
   \\ rw[EQ_IMP_THM]
   \\ imp_res_tac (REWRITE_RULE[AND_IMP_INTRO] MAP_EQ_MAP_IMP)
   \\ first_x_assum match_mp_tac \\ rw[]);
-
-val outputsexp_11 = Q.store_thm("outputsexp_11[simp]",
-  `outputsexp x = outputsexp y ⇔ x = y`,
-  cases_on `x` \\ cases_on `y` \\ simp[outputsexp_def]
-  \\ rw[EQ_IMP_THM]
-  \\ imp_res_tac (REWRITE_RULE[AND_IMP_INTRO] MAP_EQ_MAP_IMP)
-  \\ fs[]);
 
 val intsexp_valid = Q.store_thm("intsexp_valid[simp]",
   `∀i. valid_sexp (intsexp i)`,
@@ -484,6 +493,12 @@ val namesexp_valid = Q.store_thm("namesexp_valid[simp]",
   `∀n. valid_sexp (namesexp n)`,
   Cases \\ simp[namesexp_def]);
 
+val bytessexp_valid = Q.store_thm("bytessexp_valid[simp]",
+  `∀ls. valid_sexp (bytessexp ls)`,
+  rw[bytessexp_def]
+  \\ match_mp_tac listsexp_valid
+  \\ simp[EVERY_MAP]);
+
 val commandsexp_valid = Q.store_thm("commandsexp_valid[simp]",
   `∀c. valid_sexp (commandsexp c)`,
   Cases \\ simp[commandsexp_def]
@@ -492,12 +507,6 @@ val commandsexp_valid = Q.store_thm("commandsexp_valid[simp]",
   \\ TRY (EVAL_TAC \\ NO_TAC)
   \\ rpt conj_tac
   \\ TRY (EVAL_TAC \\ NO_TAC)
-  \\ match_mp_tac listsexp_valid
-  \\ simp[EVERY_MAP]);
-
-val outputsexp_valid = Q.store_thm("outputsexp_valid",
-  `∀x. valid_sexp (outputsexp x)`,
-  Cases \\ rw[outputsexp_def]
   \\ match_mp_tac listsexp_valid
   \\ simp[EVERY_MAP]);
 

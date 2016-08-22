@@ -273,19 +273,15 @@ val FST_updateInventory = Q.store_thm("FST_updateInventory[simp]",
   Cases_on`y`\\rw[updateInventory_def]);
 
 val SND_updateInventory_const = Q.store_thm("SND_updateInventory_const[simp]",
-  `(SND (updateInventory sq nm y)).command = (FST y).command ∧
+  `(SND (updateInventory sq nm y)).memory = (FST y).memory ∧
    (SND (updateInventory sq nm y)).processor = (FST y).processor ∧
    (SND (updateInventory sq nm y)).frame = (FST y).frame`,
   Cases_on`y` \\ rw[updateInventory_def]
   \\ BasicProvers.TOP_CASE_TAC \\ fs[]);
 
 val FST_runMachine = Q.store_thm("FST_runMachine[simp]",
-  `FST (runMachine obsr) = FST(FST obsr)`,
-  Cases_on`obsr`\\rw[runMachine_def,UNCURRY]);
-
-val FST_FST_prepare = Q.store_thm("FST_FST_prepare[simp]",
-  `FST (FST (prepare z x)) = FST x`,
-  PairCases_on`x` \\ simp[prepare_def]);
+  `FST (runMachine ev nmra) = FST nmra`,
+  PairCases_on`nmra`\\rw[runMachine_def,UNCURRY]);
 
 val FST_o_if_focal = Q.store_thm("FST_o_if_focal[simp]",
   `FST o if_focal x y = FST`,
@@ -454,7 +450,7 @@ val MEM_MovedOut_localActions = Q.store_thm("MEM_MovedOut_localActions",
    SND(SND nra) = MovedOut dir
    ⇒
    dir < LENGTH nb ∧
-   (FST(SND nra)).command = Move dir ∧
+   (read_command (FST(SND nra)).memory) = Move dir ∧
    IS_SOME (EL dir nb)`,
   simp[localActions_def,MEM_MAP]
   \\ strip_tac
@@ -629,13 +625,13 @@ val wf_state_step = Q.store_thm("wf_state_step",
   >- (
     fs[IN_FRANGE_FLOOKUP,step_def,FLOOKUP_FMAP_MAP2]
     \\ simp[computeSquare_def,MAP_MAP_o,MAP_GENLIST]
-    \\ simp[ALL_DISTINCT_APPEND,MEM_GENLIST,ALL_DISTINCT_GENLIST,MEM_MAP,MEM_FILTER,PULL_EXISTS]
+    \\ simp[ALL_DISTINCT_APPEND,MEM_GENLIST,ALL_DISTINCT_GENLIST,MEM_MAP,MEM_FILTER,PULL_EXISTS,MEM_MAPi]
     \\ simp[combinTheory.o_DEF,ETA_AX]
     \\ conj_tac
     >- (
       match_mp_tac ALL_DISTINCT_MAP_FILTER
       \\ fs[computeEvents_def,FLOOKUP_FMAP_MAP2]
-      \\ simp[event_def,MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
+      \\ simp[event_def,MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX,ZIP_MAP]
       \\ simp[localActions_def,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
       \\ fs[PULL_EXISTS]
       \\ simp[ALL_DISTINCT_APPEND]
@@ -645,34 +641,6 @@ val wf_state_step = Q.store_thm("wf_state_step",
       \\ conj_tac
       >- (
         simp[ALL_DISTINCT_FLAT,MEM_GENLIST,PULL_EXISTS]
-        \\ conj_tac
-        >- (
-          simp[ALL_DISTINCT_FILTER_GENLIST]
-          \\ qx_genl_tac[`d1`,`d2`]
-          \\ qmatch_goalsub_abbrev_tac`incomingFrom _ n1`
-          \\ qmatch_goalsub_abbrev_tac`_ = _ _ (incomingFrom _ n2)`
-          \\ Cases_on`n1` \\ simp[incomingFrom_def,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
-          \\ Cases_on`n2` \\ simp[incomingFrom_def,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
-          \\ rw[]
-          \\ fs[markerTheory.Abbrev_def]
-          \\ rpt(qpat_x_assum`SOME _ = _`(assume_tac o SYM))
-          \\ rfs[neighbours_def,EL_MAP]
-          \\ Q.ISPEC_THEN`neighbour_coords k`match_mp_tac
-               (Q.GEN`l` (MP_CANON (DISCH_ALL (#1 (EQ_IMP_RULE (UNDISCH_ALL (SPEC_ALL ALL_DISTINCT_EL_IMP)))))))
-          \\ simp[]
-          \\ spose_not_then strip_assume_tac
-          \\ last_x_assum drule
-          \\ rator_x_assum`FLOOKUP`kall_tac
-          \\ disch_then drule
-          \\ disch_then drule
-          \\ simp[IN_DISJOINT]
-          \\ fs[GSYM NULL_EQ,NOT_NULL_MEM]
-          \\ fs[MEM_FILTER]
-          \\ qmatch_assum_abbrev_tac`(l1:'a list) = l2`
-          \\ `MEM (FST e) l1` by (simp[Abbr`l1`,MEM_MAP,MEM_FILTER] \\ metis_tac[])
-          \\ `MEM (FST e) l2` by metis_tac[]
-          \\ fs[Abbr`l1`,Abbr`l2`,MEM_MAP,MEM_FILTER]
-          \\ metis_tac[] )
         \\ conj_tac
         >- (
           rw[]
@@ -698,15 +666,17 @@ val wf_state_step = Q.store_thm("wf_state_step",
         \\ qpat_x_assum`FLOOKUP _ (EL d1 _) = _`assume_tac
         \\ asm_exists_tac \\ simp[]
         \\ asm_exists_tac \\ simp[]
-        \\ rveq
-        \\ asm_exists_tac \\ simp[]
+        \\ rveq \\ fs[MEM_MAP,MEM_FILTER]
+        \\ pairarg_tac \\ fs[] \\ rveq
+        \\ first_assum(part_match_exists_tac(el 2 o strip_conj) o concl)
+        \\ fs[]
         \\ spose_not_then strip_assume_tac \\ rveq
         \\ last_x_assum drule
         \\ qpat_x_assum`FLOOKUP _ (EL d2 _) = _`assume_tac
         \\ disch_then drule
         \\ simp[GSYM NULL_EQ, NOT_NULL_MEM]
         \\ reverse conj_tac >- metis_tac[]
-        \\ `d1 ≠ d2` suffices_by metis_tac[ALL_DISTINCT_neighbour_coords,EL_ALL_DISTINCT_EL_EQ]
+        \\ `d1 ≠ d2` suffices_by metis_tac[ALL_DISTINCT_neighbour_coords,EL_ALL_DISTINCT_EL_EQ,LESS_TRANS]
         \\ spose_not_then strip_assume_tac \\ fs[])
       \\ rw[]
       \\ spose_not_then strip_assume_tac
@@ -738,7 +708,7 @@ val wf_state_step = Q.store_thm("wf_state_step",
   \\ REWRITE_TAC[CONJ_ASSOC]
   \\ reverse conj_tac
   >- (
-    simp[IN_DISJOINT,MEM_GENLIST,MEM_MAPi]
+    simp[IN_DISJOINT,MEM_MAPi]
     \\ spose_not_then strip_assume_tac
     \\ rw[] \\ fs[name_component_equality] )
   \\ fs[computeEvents_def,FLOOKUP_FMAP_MAP2]
@@ -907,7 +877,7 @@ val focal_event_sing = Q.store_thm("focal_event_sing",
   rw[computeEvents_def,IN_FRANGE_FLOOKUP,FLOOKUP_FMAP_MAP2,EXTENSION,PULL_EXISTS]
   \\ `MEM nm (MAP FST (event sq (neighbours s.grid k)).robotActions)`
   by (
-    rw[event_def,MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX]
+    rw[event_def,MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX,ZIP_MAP]
     \\ rw[localActions_def,MAP_MAP_o,o_DEF,UNCURRY,ETA_AX] )
   \\ qmatch_asmsub_abbrev_tac`MEM nm (MAP FST ev.robotActions)`
   \\ `FLOOKUP (computeEvents s.grid) k = SOME ev`
@@ -1121,8 +1091,8 @@ val clock_preserved = Q.store_thm("clock_preserved",
     imp_res_tac ALOOKUP_MEM
     \\ fs[MEM_MAP,MEM_MAPi]
     \\ rw[]
-    \\ fs[prepare_def,runMachine_def]
-    \\ pairarg_tac \\ fs[]
+    \\ fs[runMachine_def]
+    \\ rpt(pairarg_tac \\ fs[])
     \\ rw[]
     \\ fs[wf_state_def,IN_FRANGE_FLOOKUP,PULL_EXISTS]
     \\ qmatch_assum_abbrev_tac`MEM (nm,r) sq.robots`
@@ -1132,10 +1102,9 @@ val clock_preserved = Q.store_thm("clock_preserved",
   \\ imp_res_tac ALOOKUP_MEM
   \\ fs[MEM_MAP,MEM_FILTER]
   \\ pairarg_tac \\ fs[] \\ rw[]
-  \\ fs[prepare_def,runMachine_def]
-  \\ pairarg_tac \\ fs[] \\ rw[]
+  \\ fs[runMachine_def]
+  \\ rpt(pairarg_tac \\ fs[]) \\ rw[]
   \\ rator_x_assum`ALOOKUP`kall_tac
-  \\ rator_x_assum`run_policy`kall_tac
   \\ drule (GEN_ALL event_name_in_grid)
   \\ disch_then drule
   \\ rw[] >- (
@@ -1158,10 +1127,10 @@ val clock_preserved = Q.store_thm("clock_preserved",
     \\ fs[]
     \\ reverse(fs[event_def])
     >- (
-      fs[MEM_FLAT,MEM_GENLIST] \\ rw[]
+      fs[MEM_FLAT,MEM_GENLIST,MEM_MAPi] \\ rw[]
       \\ imp_res_tac incomingFrom_MovedIn
       \\ fs[] )
-    \\ fs[MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,o_DEF,UNCURRY,MEM_MAP]
+    \\ fs[MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,o_DEF,UNCURRY,MEM_MAP,MEM_MAPi,ZIP_MAP]
     \\ rw[]
     \\ fs[localActions_def,MEM_MAP,UNCURRY]
     \\ rw[] \\ fs[]
@@ -1180,7 +1149,7 @@ val clock_preserved = Q.store_thm("clock_preserved",
     fs[MEM_FLAT,MEM_GENLIST] \\ rw[]
     \\ imp_res_tac incomingFrom_MovedIn
     \\ fs[] )
-  \\ fs[MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,o_DEF,UNCURRY,MEM_MAP]
+  \\ fs[MAP2_MAP,MAP2_same,PAIR_MAP_COMPOSE,o_DEF,UNCURRY,MEM_MAP,ZIP_MAP]
   \\ rw[]
   \\ fs[localActions_def,MEM_MAP,UNCURRY]
   \\ rw[] \\ fs[]
@@ -1279,12 +1248,14 @@ val update_robots_intro =
   Q.ISPEC`update_robots nm f`ETA_AX
   |> CONV_RULE(LAND_CONV(REWRITE_CONV[update_robots_def]))
 
+(*
 val update_robots_split = Q.store_thm("update_robots_split",
   `update_robots nm (with_policy c p) =
    update_robots nm (with_memory p) o
    update_robots nm (with_command c)`,
   rw[FUN_EQ_THM,update_robots_def,square_component_equality]
   \\ rw[MAP_MAP_o,MAP_EQ_f,FORALL_PROD,if_focal_def]);
+*)
 
 val event_update_robots_def = Define`
   event_update_robots nm f =

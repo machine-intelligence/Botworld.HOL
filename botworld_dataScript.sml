@@ -14,16 +14,22 @@ val _ = Datatype`
     Cargo cargo
   | ProcessorPart num
   | FramePart frame
+  | RegisterPart (word8 list)
   | InspectShield
   | DestroyShield`;
 
+val isRegisterPart_def = Define`
+  (isRegisterPart (RegisterPart _) = T) ∧
+  (isRegisterPart _ = F)`;
+val destRegisterPart_def = Define`
+  destRegisterPart (RegisterPart ws) = ws`;
 val isInspectShield_def = Define`
   (isInspectShield InspectShield = T) ∧
   (isInspectShield _ = F)`;
 val isDestroyShield_def = Define`
   (isDestroyShield DestroyShield = T) ∧
   (isDestroyShield _ = F)`;
-val _ = export_rewrites["isInspectShield_def","isDestroyShield_def"];
+val _ = export_rewrites["isRegisterPart_def","destRegisterPart_def","isInspectShield_def","isDestroyShield_def"];
 
 val weight_def = Define`
   weight (Cargo c) = c.cargoWeight ∧
@@ -46,7 +52,7 @@ val _ = Datatype`
   | Drop num
   | Inspect name
   | Destroy name
-  | Build (num list) prog
+  | Build (num list) (word8 list list)
   | Pass`;
 
 val _ = Datatype`
@@ -54,8 +60,11 @@ val _ = Datatype`
   <| frame : frame
    ; processor : num (* ticks per Botworld step *)
    ; inventory : item list
-   ; memory : prog
-   ; command : command
+   ; memory : word8 list list
+     (* convention:
+          1st register encodes the command
+          2nd register encodes the policy
+          remaining registers are storage *)
    |>`;
 
 val empty_robot_def = Define`
@@ -63,20 +72,26 @@ val empty_robot_def = Define`
     <| frame := empty_frame;
        processor := 0;
        inventory := [];
-       memory := [];
-       command := Pass
+       memory := []
      |>`;
 
 val construct_def = Define`
   construct ls m =
   case ls of
-  | [FramePart f;ProcessorPart p] =>
-     SOME <| frame := f; processor := p; memory := m;
-             inventory := []; command := Pass |>
+  |  (FramePart f::ProcessorPart p::rs)	 =>
+     if EVERY isRegisterPart rs ∧
+        LIST_REL (λp r. LENGTH (destRegisterPart p) = LENGTH r)
+          rs m then
+       SOME <| frame := f; processor := p; memory := m;
+               inventory := [] |>
+     else NONE
   | _ => NONE`;
 
 val shatter_def = Define`
-  shatter r = [FramePart r.frame;ProcessorPart r.processor]`;
+  shatter r =
+    FramePart r.frame::
+    ProcessorPart r.processor::
+    MAP (RegisterPart o MAP (K 0w)) r.memory`;
 
 val canLift_def = Define`
   canLift r i ⇔
@@ -145,9 +160,14 @@ val _ = Datatype`
   ; fallenItems   : itemCache list|>`;
 
 val _ = Datatype`
-  privateData = pInvalid | pNothing | pInspected num prog`;
+  privateData = pInvalid | pNothing | pInspected num (word8 list list)`;
 
-val _ = Parse.type_abbrev("observation",``:name # event # privateData``);
+val _ = Datatype`
+  observation = <|
+    name : name
+  ; event : event
+  ; private : privateData
+  |>`;
 
 val _ = Datatype`
   square = <| robots: (name,robot) alist; items: item list |>`;

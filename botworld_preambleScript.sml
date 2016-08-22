@@ -176,6 +176,7 @@ val res = translate (
 
 val res = translate intsexp_def;
 val res = translate namesexp_def;
+val res = translate (REWRITE_RULE[combinTheory.o_DEF]bytessexp_def);
 
 val res = translate fromSexpTheory.patsexp_def;
 val res = translate fromSexpTheory.opsexp_def;
@@ -184,12 +185,6 @@ val res = translate fromSexpTheory.expsexp_def;
 val res = translate fromSexpTheory.decsexp_def;
 val res = translate fromSexpTheory.topsexp_def;
 val res = translate commandsexp_def;
-val res = translate outputsexp_def;
-
-val res = translate (
-  encode_output_def
-  |> SIMP_RULE std_ss [FUN_EQ_THM,combinTheory.o_DEF]
-  );
 
 val res = translate (
   fromSexpTheory.sexppair_def

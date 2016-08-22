@@ -32,7 +32,7 @@ val neighbours_def = Define`
 
 val requests_def = Define`
   requests i items r =
-    case r.command of
+    case read_command r.memory of
     | Lift li => li = i ∧ canLift r (EL i items)
     | Build is m => MEM i is ∧
                     EVERY (λi. i < LENGTH items) is ∧
@@ -68,7 +68,7 @@ val destroyShielded_def = Define`
 
 val act_def = Define`
   act sq nb r =
-    case r.command of
+    case read_command r.memory of
     | Move dir =>
       if dir < LENGTH nb then
         (if IS_SOME (EL dir nb) then MovedOut else MoveBlocked) dir
@@ -86,18 +86,18 @@ val act_def = Define`
     | Inspect nm =>
       (case ALOOKUP sq.robots nm of
           NONE => Invalid
-        | SOME r' => if ¬fled nb r'.command then
+        | SOME r' => if ¬fled nb (read_command r'.memory) then
                        if ¬inspectShielded
-                           (MAP (robot_command o SND) sq.robots) nm r'.inventory
+                           (MAP (read_command o robot_memory o SND) sq.robots) nm r'.inventory
                        then Inspected nm r'
                        else InspectBlocked nm
                      else InspectTargetFled nm)
     | Destroy nm =>
       (case ALOOKUP sq.robots nm of
           NONE    => Invalid
-        | SOME r' => if ¬fled nb r'.command then
+        | SOME r' => if ¬fled nb (read_command r'.memory) then
                          if ¬destroyShielded
-                             (MAP (robot_command o SND) sq.robots) nm r'.inventory
+                             (MAP (read_command o robot_memory o SND) sq.robots) nm r'.inventory
                          then Destroyed nm
                          else DestroyBlocked nm
                      else DestroyTargetFled nm)
@@ -122,7 +122,7 @@ val defend_def = Define`
 
 val updateInventory_def = Define`
   updateInventory sq nm (r,a) =
-    let intents = MAP (robot_command o SND) sq.robots in
+    let intents = MAP (read_command o robot_memory o SND) sq.robots in
     (nm,
       case a of
       | MovedOut _ => r
@@ -134,7 +134,7 @@ val incomingFrom_def = Define`
   (incomingFrom dir NONE = []) ∧
   (incomingFrom dir (SOME sq) =
    MAP (λ(nm,r). (nm, (r, MovedIn dir)))
-     (FILTER (λ(nm,r). r.command = Move (opposite dir)) sq.robots))`;
+     (FILTER (λ(nm,r). read_command r.memory = Move (opposite dir)) sq.robots))`;
 
 val dropItem_def = Define`
   dropItem (r,a) =
@@ -170,32 +170,24 @@ val private_def = Define`
   (private Invalid = pInvalid) ∧
   (private _ = pNothing)`;
 
-val ffi_from_observation_def = Define`
-  ffi_from_observation (obs:observation) =
-    initial_ffi_state botworld_oracle
-      (botworld_initial_state obs)`;
-
 (* TODO:
   define this in botworld_preambleTheory, as the environment produced by
   the translator (plus extra definitions as necessary) *)
 val preamble_env_def = Define`
   preamble_env (ffi:'ffi ffi_state) = ARB:('ffi semanticPrimitives$state # v environment)`;
 
-val run_policy_def = Define`
-  run_policy policy clock obs =
-    let ffi = ffi_from_observation obs in
-    let (st,env) = preamble_env ffi in
-    let (st',c,res) = evaluate_prog (st with clock := clock) env policy in
-    st'.ffi.ffi_state.bot_output`;
-
 val runMachine_def = Define`
-  runMachine (obs,r) =
-    let (command,prog) = run_policy r.memory r.processor obs in
-    (FST obs, r with <| command := command; memory := prog |>)`;
+  runMachine ev (nm,r,a) =
+    let obs = observation nm ev (private a) in
+    let ffi = initial_ffi_state botworld_oracle
+      ((encode_observation obs)::r.memory) in
+    let (st,env) = preamble_env ffi in
+    let policy = read_policy r.memory in
+    let (st',_) = evaluate_prog (st with clock := r.processor) env policy in
+    (obs.name, r with <| memory := TL st'.ffi.ffi_state |>)`;
 
-val prepare_def = Define`
-  prepare ev (nm,(r,a)) = ((nm, ev, private a), r)
-`
+val _ = overload_on("destroyed",
+  ``λnm ras. MEM (Destroyed nm) (MAP (SND o SND) ras)``);
 
 val _ = overload_on("destroyed",
   ``λnm ras. MEM (Destroyed nm) (MAP (SND o SND) ras)``);
@@ -210,7 +202,7 @@ val computeSquare_def = Define`
              FILTER (λ(nm,(r,a)). ¬isMovedOut a ∧ ¬destroyed nm ev.robotActions)
                     ev.robotActions ++
              MAPi (λi r. (name t c i, (r, Passed))) ev.createdRobots in
-           MAP (runMachine o prepare ev) ls
+           MAP (runMachine ev) ls
      |>`;
 
 (* state *)
@@ -257,15 +249,11 @@ val fill_def = Define`
     (λsq. sq with robots updated_by
           MAP (if_focal s.focal_name f))`;
 
-val _ = overload_on("with_policy",``λc p.  robot_memory_fupd (K p) o robot_command_fupd (K c)``);
-val _ = overload_on("with_memory", ``λp. memory_fupd (K p)``)
-val _ = overload_on("with_command", ``λc. command_fupd (K c)``)
-
-val _ = overload_on("fill_with",``λp. fill (UNCURRY with_policy p)``);
+val _ = overload_on("with_command", ``λc. robot_memory_fupd (encode_register 0 commandsexp c)``)
 
 val steph_def = Define`
   steph command s =
-    let s' = fill (robot_command_fupd (K command)) s in
+    let s' = fill (with_command command) s in
     let events = computeEvents s'.grid in
     if FEVERY (λ (_,ev).
                EVERY (λa. a ≠ Destroyed s.focal_name ∧
