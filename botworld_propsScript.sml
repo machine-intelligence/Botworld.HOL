@@ -1,4 +1,4 @@
-open preamble match_goal
+open preamble indexedListsTheory match_goal
      botworldTheory
      botworld_dataTheory
      botworld_serialiseTheory
@@ -601,10 +601,10 @@ val wf_state_step = Q.store_thm("wf_state_step",
     fs[step_def,IN_FRANGE_FLOOKUP,FLOOKUP_FMAP_MAP2]
     \\ rw[]
     \\ pop_assum mp_tac
-    \\ simp[computeSquare_def,MEM_MAP,PULL_EXISTS,MEM_GENLIST,MEM_FILTER]
+    \\ simp[computeSquare_def,MEM_MAPi,PULL_EXISTS,MEM_GENLIST,MEM_FILTER,MEM_MAP]
     \\ reverse(rw[])
     \\ TRY pairarg_tac \\ fs[]
-    \\ rw[runMachine_def,prepare_def,UNCURRY]
+    \\ rw[]
     \\ fs[computeEvents_def,FLOOKUP_FMAP_MAP2,PULL_EXISTS]
     \\ simp[GSYM ADD1]
     \\ match_mp_tac prim_recTheory.LESS_SUC
@@ -613,12 +613,10 @@ val wf_state_step = Q.store_thm("wf_state_step",
     \\ fs[event_def]
     >- (
       asm_exists_tac
-      \\ fs[MAP2_MAP,MAP2_same]
-      \\ fs[PAIR_MAP_COMPOSE]
+      \\ fs[MAP2_MAP,MAP2_same,ZIP_MAP]
       \\ fs[MEM_MAP,UNCURRY,EXISTS_PROD]
-      \\ rw[]
-      \\ fs[localActions_def,MEM_MAP,UNCURRY]
-      \\ metis_tac[PAIR])
+      \\ fs[localActions_def,MEM_MAP,UNCURRY] \\ rw[]
+      \\ metis_tac[PAIR,FST,FST_updateInventory])
     \\ fs[MEM_FLAT,MEM_GENLIST]
     \\ rw[]
     \\ Cases_on`EL dir (neighbours s.grid k)` \\ fs[incomingFrom_def]
@@ -721,6 +719,7 @@ val wf_state_step = Q.store_thm("wf_state_step",
       \\ disch_then drule
       \\ simp[IN_DISJOINT,MEM_MAP,PULL_EXISTS]
       \\ metis_tac[NOT_MEM_neighbour_coords,MEM_EL])
+    \\ conj_tac >- ( simp[EL_ALL_DISTINCT_EL_EQ] )
     \\ rw[]
     \\ spose_not_then strip_assume_tac
     \\ fs[computeEvents_def,FLOOKUP_FMAP_MAP2]
@@ -732,13 +731,14 @@ val wf_state_step = Q.store_thm("wf_state_step",
     \\ rw[]
     \\ spose_not_then strip_assume_tac
     \\ first_x_assum drule \\ simp[]
-    \\ asm_exists_tac \\ simp[])
+    \\ pairarg_tac \\ fs[]
+    \\ asm_exists_tac \\ fs[MEM_MAPi])
   \\ fs[step_def,FLOOKUP_FMAP_MAP2]
   \\ simp[computeSquare_def,MAP_MAP_o,MAP_GENLIST,o_DEF,ETA_AX]
   \\ REWRITE_TAC[CONJ_ASSOC]
   \\ reverse conj_tac
   >- (
-    simp[IN_DISJOINT,MEM_GENLIST]
+    simp[IN_DISJOINT,MEM_GENLIST,MEM_MAPi]
     \\ spose_not_then strip_assume_tac
     \\ rw[] \\ fs[name_component_equality] )
   \\ fs[computeEvents_def,FLOOKUP_FMAP_MAP2]
@@ -845,26 +845,29 @@ val wf_state_step = Q.store_thm("wf_state_step",
     \\ disch_then drule
     \\ rw[]
     >- (
-      rw[MEM_MAP]
+      rw[MEM_MAP,MEM_MAPi]
       \\ spose_not_then strip_assume_tac
-      \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS,MEM_MAP]
-      \\ qpat_x_assum`_ = FST _`(assume_tac o SYM)
-      \\ res_tac \\ rfs[] )
+      \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS,MEM_MAP,MEM_MAPi]
+      \\ first_x_assum drule
+      \\ disch_then drule \\ simp[])
     >- (
       rw[MEM_MAP]
       \\ spose_not_then strip_assume_tac
-      \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS,MEM_MAP]
-      \\ qpat_x_assum`_ = FST _`(assume_tac o SYM)
-      \\ res_tac \\ rfs[] ))
+      \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS,MEM_MAPi,MEM_MAP]
+      \\ first_x_assum drule
+      \\ disch_then drule
+      \\ simp[]))
   \\ rw[]
   \\ drule (GEN_ALL event_name_in_grid)
   \\ disch_then drule
-  \\ qpat_x_assum`_ = FST _`(assume_tac o SYM)
+  \\ fs[MEM_MAPi]
   \\ rw[MEM_MAP]
   \\ spose_not_then strip_assume_tac \\ fs[]
   \\ fs[IN_FRANGE_FLOOKUP,MEM_MAP,PULL_EXISTS]
-  \\ qpat_x_assum`_ = FST _`(assume_tac o SYM)
-  \\ res_tac \\ rfs[]);
+  \\ first_x_assum drule
+  \\ disch_then drule
+  \\ qpat_assum`name _ _ _ = _`(assume_tac o SYM)
+  \\ fs[]);
 
 val wf_state_fill = Q.store_thm("wf_state_fill",
   `wf_state s.state ⇒ wf_state (fill f s)`,
@@ -1116,7 +1119,7 @@ val clock_preserved = Q.store_thm("clock_preserved",
   \\ every_case_tac \\ fs[]
   >- (
     imp_res_tac ALOOKUP_MEM
-    \\ fs[MEM_MAP,MEM_GENLIST]
+    \\ fs[MEM_MAP,MEM_MAPi]
     \\ rw[]
     \\ fs[prepare_def,runMachine_def]
     \\ pairarg_tac \\ fs[]
@@ -1768,7 +1771,6 @@ val ffi_from_observation_with_memory = Q.store_thm("ffi_from_observation_with_me
   \\ PairCases_on`y` \\ simp[prepare_def]
   \\ simp[observationsexp_def]
   \\ simp[eventsexp_def]
-  \\ AP_TERM_TAC
   \\ simp[MAP_MAP_o,MAP_EQ_f,FORALL_PROD,if_focal_def]
   \\ rw[]
   \\ simp[robotsexp_def]);
@@ -1934,6 +1936,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   \\ simp[fmap_eq_flookup]
   \\ simp[FLOOKUP_FMAP_MAP2]
   \\ gen_tac
+  \\ rename1`FLOOKUP events k`
   \\ Cases_on`FLOOKUP events k` \\ simp[]
   \\ simp[update_robots_def]
   \\ simp[event_update_robots_def,computeSquare_def]
@@ -2001,8 +2004,8 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
       \\ simp[Abbr`x'`,event_component_equality,MAP_EQ_f,FORALL_PROD,if_focal_def]
       \\ metis_tac[])
     \\ rfs[])
-  \\ simp[MAP_GENLIST]
-  \\ simp[GENLIST_FUN_EQ]
+  \\ match_mp_tac MAPi_CONG
+  \\ simp[]
   \\ simp[if_focal_eta,UNCURRY]
   \\ rpt strip_tac
   \\ IF_CASES_TAC

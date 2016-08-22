@@ -197,6 +197,9 @@ val prepare_def = Define`
   prepare ev (nm,(r,a)) = ((nm, ev, private a), r)
 `
 
+val _ = overload_on("destroyed",
+  ``λnm ras. MEM (Destroyed nm) (MAP (SND o SND) ras)``);
+
 val computeSquare_def = Define`
   computeSquare t (c,ev) =
     <| items :=
@@ -204,11 +207,9 @@ val computeSquare_def = Define`
          FLAT (MAP (λc. c.components ++ c.possessions) ev.fallenItems)
      ; robots :=
          let ls =
-             FILTER (λ(nm,(r,a)). ¬isMovedOut a ∧ ¬MEM (Destroyed nm) (MAP (SND o SND) ev.robotActions))
+             FILTER (λ(nm,(r,a)). ¬isMovedOut a ∧ ¬destroyed nm ev.robotActions)
                     ev.robotActions ++
-             GENLIST (λi. (<| built_step := t; built_coord := c; id := i |>,
-                           (EL i ev.createdRobots, Passed)))
-                     (LENGTH ev.createdRobots) in
+             MAPi (λi r. (name t c i, (r, Passed))) ev.createdRobots in
            MAP (runMachine o prepare ev) ls
      |>`;
 
