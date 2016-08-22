@@ -156,6 +156,7 @@ val o_f_FMAP_MAP2 = Q.store_thm("o_f_FMAP_MAP2",
 val FMAP_MAP2_SND_compose = Q.store_thm("FMAP_MAP2_SND_compose",
   `FMAP_MAP2 (f o SND) (FMAP_MAP2 (g o SND) x) = FMAP_MAP2 (f o g o SND) x`,
   rw[fmap_eq_flookup,FLOOKUP_FMAP_MAP2]
+  \\ rename1`FLOOKUP x k`
   \\ Cases_on`FLOOKUP x k` \\ simp[])
 
 val FILTER_INDICES = Q.store_thm("FILTER_INDICES",
