@@ -6,6 +6,8 @@ ifndef HOLREFLDIR
 HOLREFLDIR = $(HOME)/hol-reflection
 endif
 
+CLINE_OPTIONS = --qof
+
 INCLUDES = $(CAKEMLDIR)/semantics\
 					 $(CAKEMLDIR)/semantics/proofs\
 					 $(CAKEMLDIR)/compiler/parsing\
