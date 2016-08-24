@@ -176,15 +176,20 @@ val private_def = Define`
 val preamble_env_def = Define`
   preamble_env (ffi:'ffi ffi_state) = ARB:('ffi semanticPrimitives$state # v environment)`;
 
+val run_policy_def = Define`
+  run_policy obs k m =
+    let ffi = initial_ffi_state botworld_oracle
+      ((encode_observation obs)::m) in
+    let (st,env) = preamble_env ffi in
+    let policy = read_policy m in
+    let (st',_) = evaluate_prog (st with clock := k) env policy in
+      TL st'.ffi.ffi_state`;
+
 val runMachine_def = Define`
   runMachine ev (nm,r,a) =
     let obs = observation nm ev (private a) in
-    let ffi = initial_ffi_state botworld_oracle
-      ((encode_observation obs)::r.memory) in
-    let (st,env) = preamble_env ffi in
-    let policy = read_policy r.memory in
-    let (st',_) = evaluate_prog (st with clock := r.processor) env policy in
-    (obs.name, r with <| memory := TL st'.ffi.ffi_state |>)`;
+    let m = run_policy obs r.processor r.memory in
+    (obs.name, r with <| memory := m |>)`;
 
 val _ = overload_on("destroyed",
   ``λnm ras. MEM (Destroyed nm) (MAP (SND o SND) ras)``);
@@ -244,16 +249,14 @@ val if_focal_def = Define`
   if_focal fnm f (nm, r) = (nm, if nm = fnm then f r else r)`
 
 val fill_def = Define`
-  fill f s =
+  fill m s =
   s.state with grid updated_by $o_f
     (λsq. sq with robots updated_by
-          MAP (if_focal s.focal_name f))`;
-
-val _ = overload_on("with_command", ``λc. robot_memory_fupd (encode_register 0 commandsexp c)``)
+          MAP (if_focal s.focal_name (robot_memory_fupd (K m))))`;
 
 val steph_def = Define`
-  steph command s =
-    let s' = fill (with_command command) s in
+  steph m s =
+    let s' = fill m s in
     let events = computeEvents s'.grid in
     if FEVERY (λ (_,ev).
                EVERY (λa. a ≠ Destroyed s.focal_name ∧
