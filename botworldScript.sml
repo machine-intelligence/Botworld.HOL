@@ -249,14 +249,14 @@ val if_focal_def = Define`
   if_focal fnm f (nm, r) = (nm, if nm = fnm then f r else r)`
 
 val fill_def = Define`
-  fill m s =
+  fill f s =
   s.state with grid updated_by $o_f
     (λsq. sq with robots updated_by
-          MAP (if_focal s.focal_name (robot_memory_fupd (K m))))`;
+          MAP (if_focal s.focal_name (robot_memory_fupd f)))`;
 
 val steph_def = Define`
-  steph m s =
-    let s' = fill m s in
+  steph c s =
+    let s' = fill (write_command c) s in
     let events = computeEvents s'.grid in
     if FEVERY (λ (_,ev).
                EVERY (λa. a ≠ Destroyed s.focal_name ∧
@@ -266,7 +266,7 @@ val steph_def = Define`
       let (c,ev,a) = CHOICE
         { (c,ev,a) | ∃r. MEM (s.focal_name,(r,a)) ev.robotActions ∧
                          ¬isMovedOut a ∧ FLOOKUP events c = SOME ev } in
-      SOME ((s.focal_name, ev, private a), s with state := step s')
+      SOME (observation s.focal_name ev (private a), s with state := step s')
     else NONE
 `;
 
