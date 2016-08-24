@@ -337,24 +337,28 @@ val botworld_get_size_def = Define`
   else Oracle_fail`;
 
 val botworld_read_def = Define`
-  botworld_read n st bytes =
-    if n < LENGTH st ∧ LENGTH bytes = LENGTH (EL n st) then
-      Oracle_return st (EL n st)
+  botworld_read st bytes =
+    if LENGTH bytes = LENGTH (FLAT st) then
+      Oracle_return st (FLAT st)
     else Oracle_fail`;
 
+val UNFLAT_def = Define`
+  (UNFLAT [] _ = []) ∧
+  (UNFLAT (n::ns) ls  =
+   (TAKE n ls)::(UNFLAT ns (DROP n ls)))`;
+
 val botworld_write_def = Define`
-  botworld_write n st bytes =
-    if n < LENGTH st ∧ LENGTH bytes = LENGTH (EL n st) then
-      Oracle_return (LUPDATE bytes n st) (EL n st)
+  botworld_write st bytes =
+    if LENGTH bytes = LENGTH (FLAT st) then
+      Oracle_return (UNFLAT (MAP LENGTH st) bytes) (FLAT st)
     else Oracle_fail`;
 
 val botworld_oracle_def = Define`
   botworld_oracle n =
     if n = 0n then botworld_get_count else
-    let n = n-1 in
-      if n MOD 3 = 0 then botworld_get_size (n DIV 3) else
-      if n MOD 3 = 1 then botworld_read (n DIV 3) else
-      botworld_write (n DIV 3)`;
+    if n = 1n then botworld_read else
+    if n = 2n then botworld_write else
+    botworld_get_size (n-3)`;
 
 (* CakeML declarations of helper functions for interfacing with the Botworld FFI *)
 (* TODO: these should be replaced with CF verified functions *)
