@@ -305,8 +305,14 @@ val _ = overload_on("encode_observation",``encode_bytes observationsexp``);
 
 val encode_register_def = Define`
   encode_register n f x m =
-    if LENGTH m ≤ n ∨ LENGTH (EL n m) ≠ LENGTH (encode_bytes f x) then m
-    else LUPDATE (encode_bytes f x) n m`;
+    if LENGTH m ≤ n then m else
+    let z = LENGTH (EL n m) in
+    let bs = encode_bytes f x in
+    if z < LENGTH bs then m
+    else LUPDATE (bs ++ REPLICATE (LENGTH bs - z) (n2w(ORD #" "))) n m`;
+
+val write_command_def = Define`
+  write_command c = encode_register 0 commandsexp c`;
 
 (* botworld ffi *)
 
