@@ -198,16 +198,17 @@ val decode_bytes_def = Define`
 
 val _ = overload_on("decode_observation",``decode_bytes sexpobservation``);
 
+val decode_command_def = Define`
+  decode_command c =
+    option_CASE (decode_bytes sexpcommand c) Pass I`;
+
 val decode_register_def = Define`
   decode_register n f d m =
     if LENGTH m ≤ n then d else
       option_CASE (decode_bytes f (EL n m)) d I`;
 
-val read_command_def = Define`
-  read_command = decode_register 0 sexpcommand Pass`;
-
 val read_policy_def = Define`
-  read_policy = decode_register 1 (sexplist sexptop) []`;
+  read_policy = decode_register 0 (sexplist sexptop) []`;
 
 (* encoding to sexp *)
 
@@ -310,9 +311,6 @@ val encode_register_def = Define`
     let bs = encode_bytes f x in
     if z < LENGTH bs then m
     else LUPDATE (bs ++ REPLICATE (LENGTH bs - z) (n2w(ORD #" "))) n m`;
-
-val write_command_def = Define`
-  write_command c = encode_register 0 commandsexp c`;
 
 (* botworld ffi *)
 

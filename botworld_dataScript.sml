@@ -60,10 +60,10 @@ val _ = Datatype`
   <| frame : frame
    ; processor : num (* ticks per Botworld step *)
    ; inventory : item list
+   ; command : command
    ; memory : word8 list list
      (* convention:
-          1st register encodes the command
-          2nd register encodes the policy
+          1st register encodes the policy
           remaining registers are storage *)
    |>`;
 
@@ -72,6 +72,7 @@ val empty_robot_def = Define`
     <| frame := empty_frame;
        processor := 0;
        inventory := [];
+       command := Pass;
        memory := []
      |>`;
 
@@ -83,7 +84,7 @@ val construct_def = Define`
         LIST_REL (λp r. LENGTH (destRegisterPart p) = LENGTH r)
           rs m then
        SOME <| frame := f; processor := p; memory := m;
-               inventory := [] |>
+               command := Pass; inventory := [] |>
      else NONE
   | _ => NONE`;
 

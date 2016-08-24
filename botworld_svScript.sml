@@ -74,33 +74,36 @@ val discount_not_negative = Q.store_thm("discount_not_negative",
 
 (* suggester/verifier *)
 
+val with_policy_def = Define`
+  with_policy (c,p) = robot_memory_fupd (K p) o robot_command_fupd (K c)`;
+
 val dominates_def = Define`
-  (dominates (:α) (Trust k) (S,u) m m' ⇔
+  (dominates (:α) (Trust k) (S,u) cp cp' ⇔
      LCA k (UNIV:α set) ⇒
      ∀s. s ∈ S ⇒
-       u (hist (fill m' s)) ≤
-       u (hist (fill m s))) ∧
-  (dominates (:α) MP (S,u) m m' ⇔
+       u (hist (fill (with_policy cp') s)) ≤
+       u (hist (fill (with_policy cp) s))) ∧
+  (dominates (:α) MP (S,u) cp cp' ⇔
    ∀k. LCA k (UNIV:α set) ⇒
        ∀s. s ∈ S ⇒
-         u (hist (fill m' s)) ≤
-         u (hist (fill m s))
+         u (hist (fill (with_policy cp') s)) ≤
+         u (hist (fill (with_policy cp) s))
            + ((discount u) pow k))`;
 
 val dominates_refl = Q.store_thm("dominates_refl",
-  `utilityfn u ∧ discount_exists u ⇒ dominates a l (S,u) m m`,
+  `utilityfn u ∧ discount_exists u ⇒ dominates a l (S,u) cp cp`,
   Cases_on`a`\\Cases_on`l`\\simp[dominates_def]
   \\ simp[realTheory.REAL_LE_ADDR]
   \\ metis_tac[discount_not_negative,realTheory.POW_POS]);
 
 val dominates'_def = Define`
-  (dominates' a (Trust k) g m m' = dominates a (Trust (SUC k)) g m m') ∧
-  (dominates' (:α) MP (S,u) m m' =
+  (dominates' a (Trust k) g cp cp' = dominates a (Trust (SUC k)) g cp cp') ∧
+  (dominates' (:α) MP (S,u) cp cp' =
    ∀k. LCA (SUC k) 𝕌(:α) ⇒ ∀s. s ∈ S ⇒
-     u (hist (fill m' s)) ≤ u (hist (fill m s)) + (discount u) pow k)`;
+     u (hist (fill (with_policy cp') s)) ≤ u (hist (fill (with_policy cp) s)) + (discount u) pow k)`;
 
 val dominates'_refl = Q.store_thm("dominates'_refl",
-  `utilityfn u ∧ discount_exists u ⇒ dominates' a l (S,u) m m`,
+  `utilityfn u ∧ discount_exists u ⇒ dominates' a l (S,u) cp cp`,
   Cases_on`a`\\reverse(Cases_on`l`)\\simp[dominates'_def]
   >- metis_tac[dominates_refl]
   \\ simp[realTheory.REAL_LE_ADDR]
@@ -129,7 +132,7 @@ val mk_target_concl_def = Define`
     (FST (quote_prod
           ((I, Fun state_with_hole_ty Bool), (I, utilityfn_ty)))
      (Comb Stm (FST quote_observation obs), utm)))
-   (FST (quote_prod (quote_command, quote_prog)) m1)) (* TODO: these need to quote_memory instead *)
+   (FST (quote_prod (quote_command, quote_prog)) m1))
   (FST (quote_prod (quote_command, quote_prog)) m2)`;
 
 val check_theorem_def = Define`
