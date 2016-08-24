@@ -75,32 +75,32 @@ val discount_not_negative = Q.store_thm("discount_not_negative",
 (* suggester/verifier *)
 
 val dominates_def = Define`
-  (dominates (:α) (Trust k) (S,u) cp cp' ⇔
+  (dominates (:α) (Trust k) (S,u) m m' ⇔
      LCA k (UNIV:α set) ⇒
      ∀s. s ∈ S ⇒
-       u (hist (fill (UNCURRY with_policy cp') s)) ≤
-       u (hist (fill (UNCURRY with_policy cp) s))) ∧
-  (dominates (:α) MP (S,u) cp cp' ⇔
+       u (hist (fill m' s)) ≤
+       u (hist (fill m s))) ∧
+  (dominates (:α) MP (S,u) m m' ⇔
    ∀k. LCA k (UNIV:α set) ⇒
        ∀s. s ∈ S ⇒
-         u (hist (fill (UNCURRY with_policy cp') s)) ≤
-         u (hist (fill (UNCURRY with_policy cp) s))
+         u (hist (fill m' s)) ≤
+         u (hist (fill m s))
            + ((discount u) pow k))`;
 
 val dominates_refl = Q.store_thm("dominates_refl",
-  `utilityfn u ∧ discount_exists u ⇒ dominates a l (S,u) cp cp`,
+  `utilityfn u ∧ discount_exists u ⇒ dominates a l (S,u) m m`,
   Cases_on`a`\\Cases_on`l`\\simp[dominates_def]
   \\ simp[realTheory.REAL_LE_ADDR]
   \\ metis_tac[discount_not_negative,realTheory.POW_POS]);
 
 val dominates'_def = Define`
-  (dominates' a (Trust k) g cp cp' = dominates a (Trust (SUC k)) g cp cp') ∧
-  (dominates' (:α) MP (S,u) cp cp' =
+  (dominates' a (Trust k) g m m' = dominates a (Trust (SUC k)) g m m') ∧
+  (dominates' (:α) MP (S,u) m m' =
    ∀k. LCA (SUC k) 𝕌(:α) ⇒ ∀s. s ∈ S ⇒
-     u (hist (fill_with cp' s)) ≤ u (hist (fill_with cp s)) + (discount u) pow k)`;
+     u (hist (fill m' s)) ≤ u (hist (fill m s)) + (discount u) pow k)`;
 
 val dominates'_refl = Q.store_thm("dominates'_refl",
-  `utilityfn u ∧ discount_exists u ⇒ dominates' a l (S,u) cp cp`,
+  `utilityfn u ∧ discount_exists u ⇒ dominates' a l (S,u) m m`,
   Cases_on`a`\\reverse(Cases_on`l`)\\simp[dominates'_def]
   >- metis_tac[dominates_refl]
   \\ simp[realTheory.REAL_LE_ADDR]
@@ -121,7 +121,7 @@ val _ = overload_on("utilityfn_ty",type_to_deep``:utilityfn``);
 val _ = overload_on("dominates_tm",term_to_deep``dominates (:α)``);
 
 val mk_target_concl_def = Define`
-  mk_target_concl obs cp1 cp2 l Stm utm =
+  mk_target_concl obs m1 m2 l Stm utm =
   Comb
   (Comb
    (Comb
@@ -129,12 +129,12 @@ val mk_target_concl_def = Define`
     (FST (quote_prod
           ((I, Fun state_with_hole_ty Bool), (I, utilityfn_ty)))
      (Comb Stm (FST quote_observation obs), utm)))
-   (FST (quote_prod (quote_command, quote_prog)) cp1))
-  (FST (quote_prod (quote_command, quote_prog)) cp2)`;
+   (FST (quote_prod (quote_command, quote_prog)) m1)) (* TODO: these need to quote_memory instead *)
+  (FST (quote_prod (quote_command, quote_prog)) m2)`;
 
 val check_theorem_def = Define`
-  check_theorem thm l Stm obs utm cp1 cp2 =
-    aconv (concl thm) (mk_target_concl obs cp1 cp2 l Stm utm)`;
+  check_theorem thm l Stm obs utm m1 m2 =
+    aconv (concl thm) (mk_target_concl obs m1 m2 l Stm utm)`;
 
 (* TODO: translate mk_target_concl *)
 
