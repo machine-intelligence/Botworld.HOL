@@ -1076,6 +1076,10 @@ val get_focal_robot_sing = Q.store_thm("get_focal_robot_sing",
   \\ rw[get_focal_robot_def]
   \\ rw[get_robot_by_name_def]);
 
+val if_focal_eta  = Q.store_thm("if_focal_eta",
+  `if_focal fnm f = λ(nm,r). (nm, if nm = fnm then f r else r)`,
+  rw[FUN_EQ_THM,if_focal_def,FORALL_PROD])
+
 val get_robot_by_name_fill = Q.store_thm("get_robot_by_name_fill",
   `wf_state_with_hole s ⇒
    get_robot_by_name (fill f s) s.focal_name =
@@ -1237,10 +1241,6 @@ val clock_preserved = Q.store_thm("clock_preserved",
   \\ rw[] \\ fs[]
   \\ fs[wf_state_def,IN_FRANGE_FLOOKUP,PULL_EXISTS]
   \\ metis_tac[ALL_DISTINCT_MAP_FST,PAIR,PAIR_EQ] );
-
-val if_focal_eta  = Q.store_thm("if_focal_eta",
-  `if_focal fnm f = λ(nm,r). (nm, if nm = fnm then f r else r)`,
-  rw[FUN_EQ_THM,if_focal_def,FORALL_PROD])
 
 val fill_robots_by_name = Q.store_thm("fill_robots_by_name",
   `robots_by_name (fill f s) s.focal_name = IMAGE f (robots_by_name s.state s.focal_name)`,
@@ -2088,7 +2088,10 @@ val next_def = Define`
   (next (Trust k) = Trust (k+1))`;
 
 val canupdateh_def = Define`
-  canupdateh S c = ∀s. s ∈ S ⇒ wf_state_with_hole s ∧ IS_SOME(steph c s)`;
+  canupdateh S c ps =
+    ∀s. s ∈ S ⇒
+      wf_state_with_hole s ∧ IS_SOME(steph c s) ∧
+      ∀p. p ∈ ps ⇒ LIST_REL (λr1 r2. LENGTH r1 = LENGTH r2) (get_focal_robot s).memory p`;
 
 val updateh_def = Define`
   updateh S c o' s' ⇔ ∃s. s ∈ S ∧ steph c s = SOME (o',s')`;
@@ -2097,22 +2100,24 @@ val _ = Parse.hide"S";
 
 val lemmaA = Q.store_thm("lemmaA",
   `∀δ l S u c p1 p2.
-     canupdateh S c ∧
+     canupdateh S c {p1;p2} ∧
      utilityfn u ∧ weaklyExtensional u ∧ discount_exists u ∧
      0 ≤ δ ∧
      (∀o' s'. updateh S c o' s' ⇒
        let k = (get_focal_robot s').processor in
-       u (hist (fill_with (run_policy p1 k o') s')) + δ ≥
-       u (hist (fill_with (run_policy p2 k o') s')))
+       u (hist (fill (with_policy (run_policy o' k p1)) s')) + δ ≥
+       u (hist (fill (with_policy (run_policy o' k p2)) s')))
      ⇒
      ∀s. s ∈ S ⇒
-       u (hist (fill_with (c,p1) s)) + (discount u)*δ ≥
-       u (hist (fill_with (c,p2) s))`,
+       u (hist (fill (with_policy (c,p1)) s)) + (discount u)*δ ≥
+       u (hist (fill (with_policy (c,p2)) s))`,
   rpt gen_tac
   \\ strip_tac
   \\ gen_tac \\ strip_tac
-  \\ `∃o' s'. steph c s = SOME (o',s') ∧ wf_state_with_hole s`
-  by ( fs[canupdateh_def,IS_SOME_EXISTS,EXISTS_PROD])
+  \\ `∃o' s'. steph c s = SOME (o',s') ∧ wf_state_with_hole s ∧
+        LIST_REL (λr1 r2. LENGTH r1 = LENGTH r2) (get_focal_robot s).memory p1 ∧
+        LIST_REL (λr1 r2. LENGTH r1 = LENGTH r2) (get_focal_robot s).memory p2`
+  by ( fs[canupdateh_def,IS_SOME_EXISTS,EXISTS_PROD] )
   \\ `updateh S c o' s'` by metis_tac[updateh_def]
   \\ first_x_assum drule
   \\ BasicProvers.LET_ELIM_TAC
@@ -2126,9 +2131,9 @@ val lemmaA = Q.store_thm("lemmaA",
        let val th = GSYM (CONV_RULE SWAP_FORALL_CONV th) in
        qspec_then`p1`mp_tac th >>
        qspec_then`p2`mp_tac th end)
-  \\ Cases_on`run_policy p1 k o'`
-  \\ Cases_on`run_policy p2 k o'`
-  \\ simp[] \\ ntac 2 strip_tac
+  \\ Cases_on`run_policy o' k p1`
+  \\ Cases_on`run_policy o' k p2`
+  \\ simp[EQ_SYM_EQ] \\ ntac 2 strip_tac
   \\ fs[weaklyExtensional_def]
   \\ qmatch_assum_abbrev_tac`u1 + δ ≥ u2`
   \\ `u2 - u1 ≤ δ` by ( srw_tac[realSimps.REAL_ARITH_ss][] )
@@ -2192,12 +2197,12 @@ val get_game_clock_def = Define`
     @k. ∀s. s ∈ S ⇒ (get_focal_robot s).processor = k`;
 
 val lemmaB = Q.store_thm("lemmaB",
-  `∀a l. canupdateh S c ∧ wf_game (S,u)
+  `∀a l. canupdateh S c {p1;p2} ∧ wf_game (S,u)
    ⇒
      (∀o'.
        dominates' a l (updateh S c o',u)
-         (run_policy p1 (get_game_clock S) o')
-         (run_policy p2 (get_game_clock S) o'))
+         (run_policy o' (get_game_clock S) p1)
+         (run_policy o' (get_game_clock S) p2))
      ⇒
      dominates a (next l) (S,u) (c,p1) (c,p2)`,
   Cases
