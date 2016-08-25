@@ -132,8 +132,8 @@ val mk_target_concl_def = Define`
     (FST (quote_prod
           ((I, Fun state_with_hole_ty Bool), (I, utilityfn_ty)))
      (Comb Stm (FST quote_observation obs), utm)))
-   (FST (quote_prod (quote_command, quote_prog)) m1))
-  (FST (quote_prod (quote_command, quote_prog)) m2)`;
+   (FST (quote_prod (quote_command, quote_list (quote_list quote_word8))) m1))
+  (FST (quote_prod (quote_command, quote_list (quote_list quote_word8))) m2)`;
 
 val check_theorem_def = Define`
   check_theorem thm l Stm obs utm m1 m2 =
@@ -175,6 +175,8 @@ val sv_body_def = Define`
 
 val sv_def = Define`
   sv l Stm utm π σ =
+    (* TODO: this will always fail because the program is too big *)
+    combin$C (encode_register 0 (listsexp o MAP topsexp)) π (
     (* assumes Botworld preamble gets run by botworld *)
     (* Botworld preamble includes helper functions:
        Botworld.read_observation : unit -> observation
@@ -196,7 +198,7 @@ val sv_def = Define`
       preambles, not including the FFI-calling functions, and two variables
       "observation" and "fallback", and it returns a (command * prog * thm) option
     *)
-    π (* this will read the observation and write the fallback *) ++
+    (read_policy π) (* this will read the observation and write the fallback *) ++
     (* TODO: insert sv_preamble here *)
     [Tdec(Dlet(Pvar"observation")(App Opapp [Var(Long"Botworld""read_observation");Con NONE []]));
      Tdec(Dlet(Pvar"fallback")(App Opapp [Var(Long"Botworld""read_output");Con NONE []]));
@@ -216,6 +218,6 @@ val sv_def = Define`
                       ;Var(Short"fallback")
                       ]])
                    (App Opapp [Var(Long"Botworld""write_output");Var(Short"policy")])
-                   (Con NONE []))]))]`;
+                   (Con NONE []))]))])`;
 
 val _ = export_theory()

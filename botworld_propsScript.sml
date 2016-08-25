@@ -1,7 +1,8 @@
-open preamble indexedListsTheory match_goal
+open preamble indexedListsTheory match_goal simpleSexpTheory
      botworldTheory
      botworld_dataTheory
      botworld_serialiseTheory
+     botworld_svTheory
 local open realSimps in end
 
 val _ = new_theory"botworld_props";
@@ -1459,6 +1460,8 @@ val act_with_memory = Q.store_thm("act_with_memory",
   \\ fs[neighbours_def,update_robots_def,EL_MAP,FLOOKUP_o_f]
   \\ every_case_tac \\ fs[]);
 
+val _ = overload_on("same_shape",``λm1 m2. LIST_REL (λr1 r2. LENGTH r1 = LENGTH r2) m1 m2``);
+
 val computeEvents_update_robots_with_memory = Q.store_thm("computeEvents_update_robots_with_memory",
   `wf_state s ∧
    LIST_REL (λr1 r2. LENGTH r1 = LENGTH r2) (get_robot_by_name s nm).memory (p (get_robot_by_name s nm).memory) ∧
@@ -1932,8 +1935,6 @@ val wf_state_with_hole_wf_state = Q.store_thm("wf_state_with_hole_wf_state",
   `wf_state_with_hole s ⇒ wf_state s.state`,
   rw[wf_state_with_hole_def])
 
-open botworld_svTheory
-
 val fill_with_policy_split = Q.store_thm("fill_with_policy_split",
   `fill (with_policy (c,p)) s =
    fill (memory_fupd (K p))
@@ -2088,21 +2089,24 @@ val next_def = Define`
   (next (Trust k) = Trust (k+1))`;
 
 val canupdateh_def = Define`
-  canupdateh S c ps =
+  canupdateh S c =
     ∀s. s ∈ S ⇒
-      wf_state_with_hole s ∧ IS_SOME(steph c s) ∧
-      ∀p. p ∈ ps ⇒ LIST_REL (λr1 r2. LENGTH r1 = LENGTH r2) (get_focal_robot s).memory p`;
+      wf_state_with_hole s ∧ IS_SOME(steph c s)`;
 
 val updateh_def = Define`
   updateh S c o' s' ⇔ ∃s. s ∈ S ∧ steph c s = SOME (o',s')`;
+
+val shape_ok_def = Define`
+  shape_ok S p ⇔ ∀s. s ∈ S ⇒ same_shape (get_focal_robot s).memory p`;
 
 val _ = Parse.hide"S";
 
 val lemmaA = Q.store_thm("lemmaA",
   `∀δ l S u c p1 p2.
-     canupdateh S c {p1;p2} ∧
+     canupdateh S c ∧
      utilityfn u ∧ weaklyExtensional u ∧ discount_exists u ∧
      0 ≤ δ ∧
+     shape_ok S p1 ∧ shape_ok S p2 ∧
      (∀o' s'. updateh S c o' s' ⇒
        let k = (get_focal_robot s').processor in
        u (hist (fill (with_policy (run_policy o' k p1)) s')) + δ ≥
@@ -2117,7 +2121,7 @@ val lemmaA = Q.store_thm("lemmaA",
   \\ `∃o' s'. steph c s = SOME (o',s') ∧ wf_state_with_hole s ∧
         LIST_REL (λr1 r2. LENGTH r1 = LENGTH r2) (get_focal_robot s).memory p1 ∧
         LIST_REL (λr1 r2. LENGTH r1 = LENGTH r2) (get_focal_robot s).memory p2`
-  by ( fs[canupdateh_def,IS_SOME_EXISTS,EXISTS_PROD] )
+  by ( fs[canupdateh_def,IS_SOME_EXISTS,EXISTS_PROD,shape_ok_def] )
   \\ `updateh S c o' s'` by metis_tac[updateh_def]
   \\ first_x_assum drule
   \\ BasicProvers.LET_ELIM_TAC
@@ -2197,7 +2201,7 @@ val get_game_clock_def = Define`
     @k. ∀s. s ∈ S ⇒ (get_focal_robot s).processor = k`;
 
 val lemmaB = Q.store_thm("lemmaB",
-  `∀a l. canupdateh S c {p1;p2} ∧ wf_game (S,u)
+  `∀a l. canupdateh S c ∧ shape_ok S p1 ∧ shape_ok S p2 ∧ wf_game (S,u)
    ⇒
      (∀o'.
        dominates' a l (updateh S c o',u)
@@ -2214,6 +2218,7 @@ val lemmaB = Q.store_thm("lemmaB",
     \\ simp[Once(GSYM AND_IMP_INTRO)]
     \\ disch_then drule
     \\ disch_then drule
+    \\ disch_then(qspecl_then[`p1`,`p2`]mp_tac)
     \\ simp[]
     \\ simp[PULL_FORALL]
     \\ simp[realTheory.real_ge]
@@ -2310,7 +2315,6 @@ val evaluate_prog_prefix = Q.store_thm("evaluate_prog_prefix",
                                                                           combine_mod_result new_mods new_vals r')`,
    cheat);
 
-open simpleSexpTheory
 val sv_thm = Q.store_thm("sv_thm",
   `wf_game (S,u) ∧
    canupdateh S c ∧
