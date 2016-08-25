@@ -310,7 +310,7 @@ val encode_register_def = Define`
     let z = LENGTH (EL n m) in
     let bs = encode_bytes f x in
     if z < LENGTH bs then m
-    else LUPDATE (bs ++ REPLICATE (LENGTH bs - z) (n2w(ORD #" "))) n m`;
+    else LUPDATE (bs ++ REPLICATE (z - LENGTH bs) (n2w(ORD #" "))) n m`;
 
 (* botworld ffi *)
 
