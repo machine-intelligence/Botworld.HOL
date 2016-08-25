@@ -2315,9 +2315,17 @@ val evaluate_prog_prefix = Q.store_thm("evaluate_prog_prefix",
                                                                           combine_mod_result new_mods new_vals r')`,
    cheat);
 
+val shape_ok_sv = Q.store_thm("shape_ok_sv",
+  `shape_ok S (sv l Stm utm p σ) ⇔ shape_ok S p`,
+  rw[sv_def]
+  \\ rw[encode_register_def]
+  \\ qpat_abbrev_tac`bs = encode_bytes _ _`
+  \\ Cases_on`p` \\ fs[LUPDATE_def]
+  \\ rw[shape_ok_def,LENGTH_REPLICATE]);
+
 val sv_thm = Q.store_thm("sv_thm",
   `wf_game (S,u) ∧
-   canupdateh S c ∧
+   canupdateh S c ∧ shape_ok S p ∧
    typeof Stm' = Fun observation_ty (Fun state_with_hole_ty Bool) ∧
    typeof utm = utilityfn_ty ∧
    no_ffi σ ∧
@@ -2330,7 +2338,8 @@ val sv_thm = Q.store_thm("sv_thm",
   \\ qpat_abbrev_tac`S' = updateh _ _`
   \\ strip_tac
   \\ match_mp_tac (MP_CANON lemmaB)
-  \\ conj_tac >- simp[]
+  \\ conj_tac
+  >- ( simp[Abbr`psv`,shape_ok_sv] )
   \\ gen_tac \\ simp[]
   \\ qpat_abbrev_tac`ck = get_game_clock S`
   \\ qpat_x_assum`∀x. _`mp_tac
