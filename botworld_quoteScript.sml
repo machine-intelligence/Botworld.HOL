@@ -557,7 +557,6 @@ val (quote_action_aux_def,quote_action_def) = mk_quote NONE ``:action``;
 
 val (quote_event_aux_def,quote_event_def) = mk_quote NONE ``:event``;
 
-val _ = overload_on("quote_observation",
-    ``quote_prod (quote_name,(quote_prod (quote_event,quote_privateData)))``);
+val (quote_observation_aux_def,quote_observation_def) = mk_quote NONE ``:observation``;
 
 val _ = export_theory();
