@@ -312,6 +312,15 @@ val encode_register_def = Define`
     if z < LENGTH bs then m
     else LUPDATE (bs ++ REPLICATE (z - LENGTH bs) (n2w(ORD #" "))) n m`;
 
+val LENGTH_encode_register = Q.store_thm("LENGTH_encode_register[simp]",
+  `LENGTH (encode_register n f x m) = LENGTH m`,
+  rw[encode_register_def]);
+
+val clear_register_def = Define`
+  clear_register n (m:word8 list list) =
+    if LENGTH m ≤ n then m else
+      LUPDATE (REPLICATE (LENGTH (EL n m)) 0w) n m`;
+
 (* botworld ffi *)
 
 (* ffi state = word8 list list

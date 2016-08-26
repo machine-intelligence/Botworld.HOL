@@ -176,10 +176,14 @@ val private_def = Define`
 val preamble_env_def = Define`
   preamble_env (ffi:'ffi ffi_state) = ARB:('ffi semanticPrimitives$state # v environment)`;
 
+val ffi_from_observation_def = Define`
+  ffi_from_observation obs m =
+    initial_ffi_state botworld_oracle
+      (encode_observation obs::clear_register 0 m)`;
+
 val run_policy_def = Define`
   run_policy obs k m =
-    let ffi = initial_ffi_state botworld_oracle
-      ((encode_observation obs)::m) in
+    let ffi = ffi_from_observation obs m in
     let (st,env) = preamble_env ffi in
     let policy = read_policy m in
     let (st',_) = evaluate_prog (st with clock := k) env policy in

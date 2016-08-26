@@ -1808,9 +1808,6 @@ val botworld_call_FFI_invariant = Q.store_thm("botworld_call_FFI_invariant",
   \\ every_case_tac \\ fs[] \\ rfs[] \\ rveq \\ fs[]);
 *)
 
-val _ = temp_overload_on("ffi_from_observation",``λobs m.
-  initial_ffi_state botworld_oracle (encode_observation obs::m)``);
-
 val ffi_from_observation_with_memory = Q.store_thm("ffi_from_observation_with_memory",
   `obs1 = observation nm x v ∧ obs2 = observation nm x' v ∧
    x' = x with robotActions updated_by (MAP (if_focal nm' (memory_fupd (K p) ## I)))
@@ -1818,7 +1815,7 @@ val ffi_from_observation_with_memory = Q.store_thm("ffi_from_observation_with_me
    ffi_state_rel botworld_oracle $=
     (ffi_from_observation obs1 m)
     (ffi_from_observation obs2 m)`,
-  rw[ffi_state_rel_def,ffiTheory.initial_ffi_state_def]
+  rw[ffi_state_rel_def,ffiTheory.initial_ffi_state_def,ffi_from_observation_def]
   \\ simp[encode_bytes_def]
   \\ AP_TERM_TAC \\ AP_TERM_TAC
   \\ simp[observationsexp_def]
@@ -2345,14 +2342,45 @@ val sv_thm = Q.store_thm("sv_thm",
   \\ qpat_x_assum`∀x. _`mp_tac
   \\ qho_match_abbrev_tac`(∀o' cp' cp''. thm o' cp' cp'' ⇒ (_ o' cp' cp'')) ⇒ _`
   \\ simp[] \\ strip_tac
-  \\ `run_policy psv ck o' = run_policy p ck o' ∨
-      thm o' (run_policy psv ck o') (run_policy p ck o')`
-  by (simp[run_policy_def] >> rpt (pairarg_tac >> fs[])
-          >> `∃p'. psv = p ++ p'` by (rw[Abbr`psv`, sv_def]) >> rveq
+  \\ qmatch_goalsub_rename_tac`run_policy obs ck`
+  \\ `ffi_from_observation obs psv = ffi_from_observation obs p`
+  by (
+    rw[ffi_from_observation_def]
+    \\ AP_TERM_TAC \\ AP_TERM_TAC
+    \\ `LENGTH psv = LENGTH p`
+    by ( simp[Abbr`psv`,sv_def] )
+    \\ rw[clear_register_def]
+    >- fs[LENGTH_NIL]
+    \\ `LENGTH (HD psv) = LENGTH (HD p)`
+    by (
+      simp[Abbr`psv`,sv_def]
+      \\ qmatch_goalsub_abbrev_tac`encode_register _ _ x`
+      \\ simp[encode_register_def] \\ rw[]
+      \\ Cases_on`p` \\ fs[LUPDATE_def,LENGTH_REPLICATE] )
+    \\ simp[]
+    \\ simp[Abbr`psv`,LIST_EQ_REWRITE]
+    \\ Cases \\ simp[EL_LUPDATE]
+    \\ simp[GSYM LIST_EQ_REWRITE]
+    \\ Cases_on`p` \\ fs[]
+    \\ simp[sv_def,encode_register_def]
+    \\ rw[] \\ simp[EL_LUPDATE] )
+  \\ `run_policy obs ck psv = run_policy obs ck p ∨
+      thm obs (run_policy obs ck psv) (run_policy obs ck p)`
+  by (
+    simp[run_policy_def] >> rpt (pairarg_tac >> fs[])
+    >> `∃p'. read_policy psv = read_policy p ++ p'`
+          by (
+            rw[Abbr`psv`, sv_def]
+            \\ cheat (*
+                need an encode/decode register thm
+                then need to assume p is big enough *)
+            ) >> rveq
+          >> qmatch_assum_rename_tac`evaluate_prog _ _ (_ p) = (_,r)`
+          >> Cases_on`r`
+          >> qmatch_assum_rename_tac`evaluate_prog _ _ (_ p) = (_,ctors,res)`
           >> imp_res_tac evaluate_prog_prefix
-          >> reverse(cases_on `res'`)
-          >- fs[]
-          >- (pop_assum kall_tac >> fs[] >> pop_assum kall_tac >> every_case_tac >> fs[] >> rveq >> cheat))
+          >> cases_on `res` \\ fs[]
+          \\ cheat )
   >- (
     simp[]
     \\ match_mp_tac dominates'_refl
