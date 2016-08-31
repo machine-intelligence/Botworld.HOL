@@ -1003,7 +1003,7 @@ val wf_state_with_hole_steph = Q.store_thm("wf_state_with_hole_steph",
    steph c s = SOME (obs,s')
    ⇒
    wf_state_with_hole s'`,
-  rw[steph_def]
+  rw[steph_def,RES_FORALL_THM]
   \\ pairarg_tac \\ fs[]
   \\ fs[wf_state_with_hole_def]
   \\ rveq \\ fs[]
@@ -1028,7 +1028,7 @@ val wf_state_with_hole_steph = Q.store_thm("wf_state_with_hole_steph",
   \\ CONV_TAC(STRIP_QUANT_CONV(move_conj_left(can(match_term``MEM _ _``))))
   \\ asm_exists_tac
   \\ simp[]
-  \\ fs[FEVERY_ALL_FLOOKUP]
+  \\ fs[IN_FRANGE_FLOOKUP,PULL_EXISTS]
   \\ first_x_assum drule
   \\ simp[EVERY_MEM,MEM_MAP]
   \\ metis_tac[]);
@@ -1953,7 +1953,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   rw[]
   \\ imp_res_tac steph_focal_clock
   \\ pop_assum (assume_tac o SYM)
-  \\ fs[steph_def]
+  \\ fs[steph_def,RES_FORALL_THM]
   \\ pairarg_tac \\ fs[]
   \\ imp_res_tac (wf_state_with_hole_def |> SPEC_ALL |> EQ_IMP_RULE |> #1)
   \\ `wf_state (fill (with_command c) s)` by metis_tac[wf_state_fill]
@@ -1968,7 +1968,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   \\ first_x_assum(qspec_then`(c'',ev,a)`mp_tac)
   \\ simp[] \\ strip_tac
   \\ simp[Once fill_with_policy_split]
-  \\ qmatch_assum_abbrev_tac`FEVERY _ events`
+  \\ qmatch_asmsub_abbrev_tac`_ ∈ FRANGE events ⇒ _`
   \\ qmatch_assum_abbrev_tac`Abbrev(_ = _ s'.grid)`
   \\ simp[state_component_equality]
   \\ simp[step_def]
@@ -1978,7 +1978,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   \\ disch_then(qspecl_then[`K m`,`s.focal_name`]mp_tac)
   \\ impl_tac
   >- (
-    fs[FEVERY_ALL_FLOOKUP,EVERY_MEM]
+    fs[IN_FRANGE_FLOOKUP,PULL_EXISTS,EVERY_MEM,FEVERY_ALL_FLOOKUP]
     \\ conj_tac
     >- (
       simp[Abbr`s'`,get_robot_by_name_fill]

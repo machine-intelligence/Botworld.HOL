@@ -199,9 +199,6 @@ val runMachine_def = Define`
 val _ = overload_on("destroyed",
   ``λnm ras. MEM (Destroyed nm) (MAP (SND o SND) ras)``);
 
-val _ = overload_on("destroyed",
-  ``λnm ras. MEM (Destroyed nm) (MAP (SND o SND) ras)``);
-
 val computeSquare_def = Define`
   computeSquare t (c,ev) =
     <| items :=
@@ -261,14 +258,16 @@ val fill_def = Define`
 
 val _ = overload_on("with_command",``λc. robot_command_fupd (K c)``);
 
+val _ = overload_on("inspected",
+  ``λnm ras. ∃r. MEM (Inspected nm r) (MAP (SND o SND) ras)``);
+
 val steph_def = Define`
   steph c s =
     let s' = fill (with_command c) s in
     let events = computeEvents s'.grid in
-    if FEVERY (λ (_,ev).
-               EVERY (λa. a ≠ Destroyed s.focal_name ∧
-                          ∀r. a ≠ Inspected s.focal_name r)
-              (MAP (SND o SND) ev.robotActions)) events
+    if ∀ev::FRANGE events.
+              ¬destroyed s.focal_name ev.robotActions ∧
+              ¬inspected s.focal_name ev.robotActions
     then
       let (c,ev,a) = CHOICE
         { (c,ev,a) | ∃r. MEM (s.focal_name,(r,a)) ev.robotActions ∧
