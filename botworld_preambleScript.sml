@@ -7,6 +7,8 @@ local open std_preludeLib in end
 
 val _ = new_theory"botworld_preamble";
 
+(* The preamble is currently not finished and not used, and takes a long time to compile, hence commenting it out...
+
 val _ = ml_prog_update (open_module "Botworld");
 
 val _ = std_preludeLib.std_prelude();
@@ -251,6 +253,8 @@ val res = translate (
 (* Should we just axiomatize the relevant parts for sv? *)
 
 val _ = ml_prog_update (close_module NONE);
+
+*)
 
 val _ = Feedback.set_trace "TheoryPP.include_docs" 0;
 
