@@ -8,7 +8,8 @@ endif
 
 CLINE_OPTIONS = --qof
 
-INCLUDES = $(CAKEMLDIR)/semantics\
+INCLUDES = $(CAKEMLDIR)\
+           $(CAKEMLDIR)/semantics\
 					 $(CAKEMLDIR)/semantics/proofs\
 					 $(CAKEMLDIR)/compiler/parsing\
 					 $(CAKEMLDIR)/translator\
