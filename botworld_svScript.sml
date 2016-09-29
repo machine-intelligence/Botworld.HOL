@@ -20,9 +20,12 @@ val utilityfn_def = Define`
 val discount_def = Define`
   discount (u:utilityfn) = sup { (u (s ::: h) - u (s ::: h')) / (u h - u h') | (s,h,h') | u h ≠ u h' }`
 
+val with_policy_def = Define`
+  with_policy (c,p) = robot_memory_fupd (K p) o robot_command_fupd (K c)`;
+
 val weaklyExtensional_def = Define`
   weaklyExtensional (u:utilityfn) ⇔
-    ∀s p1 p2 h. u (fill p1 s ::: h) = u (fill p2 s ::: h)`;
+    ∀s cp1 cp2 h. u (fill (with_policy cp1) s ::: h) = u (fill (with_policy cp2) s ::: h)`;
 
 val discount_exists_def = Define`
   discount_exists (u:utilityfn) ⇔
@@ -73,9 +76,6 @@ val discount_not_negative = Q.store_thm("discount_not_negative",
   \\ simp[realTheory.REAL_SUB_LE] );
 
 (* suggester/verifier *)
-
-val with_policy_def = Define`
-  with_policy (c,p) = robot_memory_fupd (K p) o robot_command_fupd (K c)`;
 
 val dominates_def = Define`
   (dominates (:α) (Trust k) (S,u) cp cp' ⇔
