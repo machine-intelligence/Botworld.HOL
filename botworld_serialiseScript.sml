@@ -362,8 +362,9 @@ val UNFLAT_def = Define`
 
 val botworld_write_def = Define`
   botworld_write st bytes =
-    if LENGTH bytes = LENGTH (FLAT st) then
-      Oracle_return (UNFLAT (MAP LENGTH st) bytes) (FLAT st)
+    if LENGTH (FLAT (TL st)) ≤ LENGTH bytes then
+      let extra = LENGTH bytes - LENGTH (FLAT (TL st)) in
+        Oracle_return (HD st::TAKE extra bytes::(UNFLAT (MAP LENGTH st) (DROP extra bytes))) bytes
     else Oracle_fail`;
 
 val botworld_oracle_def = Define`

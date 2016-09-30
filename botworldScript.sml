@@ -179,7 +179,7 @@ val preamble_env_def = Define`
 val ffi_from_observation_def = Define`
   ffi_from_observation obs m =
     initial_ffi_state botworld_oracle
-      (encode_observation obs::clear_register 0 m)`;
+      (encode_observation obs::[]::clear_register 0 m)`;
 
 val run_policy_def = Define`
   run_policy obs k m =
@@ -188,7 +188,7 @@ val run_policy_def = Define`
     let policy = read_policy m in
     let (st',_) = evaluate_prog (st with clock := k) env policy in
     case st'.ffi.ffi_state of
-      (c::m') => (decode_command c, m')`;
+      (_::c::m') => (decode_command c, m')`;
 
 val runMachine_def = Define`
   runMachine ev (nm,r,a) =
