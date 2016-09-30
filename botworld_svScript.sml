@@ -173,10 +173,13 @@ val sv_body_def = Define`
     - definition of check_theorem
 *)
 
+val sv_preamble_decs_def = Define`
+  sv_preamble_decs = ARB:prog`; (* TODO *)
+
 val sv_def = Define`
   sv l Stm utm π σ =
-    (* TODO: this will always fail because the program is too big *)
-    combin$C (encode_register 0 (listsexp o MAP topsexp)) π (
+    (* N.B. this requires there to be enough leftover space in register 0 *)
+    encode_register 0 (listsexp o MAP topsexp) (
     (* assumes Botworld preamble gets run by botworld *)
     (* Botworld preamble includes helper functions:
        Botworld.read_observation : unit -> observation
@@ -196,14 +199,14 @@ val sv_def = Define`
     (*
       Assume σ is an expression that is closed by the definitions of the both
       preambles, not including the FFI-calling functions, and two variables
-      "observation" and "fallback", and it returns a (command * prog * thm) option
+      "observation" and "default", and it returns a (memory * thm) option
     *)
-    (read_policy π) (* this will read the observation and write the fallback *) ++
-    (* TODO: insert sv_preamble here *)
-    [Tdec(Dlet(Pvar"observation")(App Opapp [Var(Long"Botworld""read_observation");Con NONE []]));
-     Tdec(Dlet(Pvar"fallback")(App Opapp [Var(Long"Botworld""read_output");Con NONE []]));
-     Tdec(Dlet(Pvar"result")
-           (Mat σ (* n.b. σ refers to the observation and fallback variables *)
+    (read_policy π) (* this will read the observation and write the default *) ++
+    [Tdec(Dlet(Pvar"default")(App Opapp [Var(Long"Botworld""read_output");Con NONE []]));
+     Tdec(Dlet(Pvar"observation")(App Opapp [Var(Long"Botworld""read_observation");Con NONE []]))] ++
+    sv_preamble_decs ++
+    [Tdec(Dlet(Pvar"result")
+           (Mat σ (* n.b. σ refers to the observation and default variables *)
               [(Pcon(SOME(Short"NONE"))[],Con NONE [])
               ;(Pcon(SOME(Short"SOME"))[Pcon NONE [Pvar"policy";Pvar"thm"]],
                If (App Opapp
@@ -215,9 +218,10 @@ val sv_def = Define`
                       ;Var(Short"observation")
                       ;term_to_ml utm
                       ;Var(Short"policy")
-                      ;Var(Short"fallback")
+                      ;Var(Short"default")
                       ]])
                    (App Opapp [Var(Long"Botworld""write_output");Var(Short"policy")])
-                   (Con NONE []))]))])`;
+                   (Con NONE []))]))])
+     π`;
 
 val _ = export_theory()
