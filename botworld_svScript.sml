@@ -210,7 +210,7 @@ val sv_def = Define`
               [(Pcon(SOME(Short"NONE"))[],Con NONE [])
               ;(Pcon(SOME(Short"SOME"))[Pcon NONE [Pvar"policy";Pvar"thm"]],
                If (App Opapp
-                   [Var(Long"Botworld""check_theorem");
+                   [Var(Long"SV""check_theorem");
                     Con NONE
                       [Var(Short"thm")
                       ;level_to_ml l
