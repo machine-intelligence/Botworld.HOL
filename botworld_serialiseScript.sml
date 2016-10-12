@@ -207,8 +207,8 @@ val decode_register_def = Define`
     if LENGTH m ≤ n then d else
       option_CASE (decode_bytes f (EL n m)) d I`;
 
-val read_policy_def = Define`
-  read_policy = decode_register 0 (sexplist sexptop) []`;
+val read_code_def = Define`
+  read_code = decode_register 0 (sexplist sexptop) []`;
 
 (* encoding to sexp *)
 

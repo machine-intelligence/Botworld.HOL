@@ -201,7 +201,7 @@ val sv_def = Define`
       preambles, not including the FFI-calling functions, and two variables
       "observation" and "default", and it returns a (memory * thm) option
     *)
-    (read_policy π) (* this will read the observation and write the default *) ++
+    (read_code π) (* this will read the observation and write the default *) ++
     [Tdec(Dlet(Pvar"default")(App Opapp [Var(Long"Botworld""read_output");Con NONE []]));
      Tdec(Dlet(Pvar"observation")(App Opapp [Var(Long"Botworld""read_observation");Con NONE []]))] ++
     sv_preamble_decs ++

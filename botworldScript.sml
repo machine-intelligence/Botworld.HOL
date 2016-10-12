@@ -185,8 +185,8 @@ val run_policy_def = Define`
   run_policy obs k m =
     let ffi = ffi_from_observation obs m in
     let (st,env) = preamble_env ffi in
-    let policy = read_policy m in
-    let (st',_) = evaluate_prog (st with clock := k) env policy in
+    let code = read_code m in
+    let (st',_) = evaluate_prog (st with clock := k) env code in
     case st'.ffi.ffi_state of
       (_::c::m') => (decode_command c, m')`;
 
