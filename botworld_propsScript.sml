@@ -2188,7 +2188,7 @@ val lemmaA = Q.store_thm("lemmaA",
   \\ metis_tac[realTheory.REAL_LE_SUB_RADD,realTheory.REAL_ADD_SYM]);
 
 val wf_game_def = Define`
-  wf_game (S,u) ⇔
+  wf_game (u,S) ⇔
     (∀s. s ∈ S ⇒ wf_state_with_hole s) ∧
     (∃k. ∀s. s ∈ S ⇒ (get_focal_robot s).processor = k) ∧
     utilityfn u ∧ weaklyExtensional u ∧ discount_exists u`;
@@ -2198,14 +2198,14 @@ val get_game_clock_def = Define`
     @k. ∀s. s ∈ S ⇒ (get_focal_robot s).processor = k`;
 
 val lemmaB = Q.store_thm("lemmaB",
-  `∀a l. canupdateh S c ∧ shape_ok S p1 ∧ shape_ok S p2 ∧ wf_game (S,u)
+  `∀a l. canupdateh S c ∧ shape_ok S p1 ∧ shape_ok S p2 ∧ wf_game (u,S)
    ⇒
      (∀o'.
-       dominates' a l (updateh S c o',u)
+       dominates' a l (u,updateh S c o')
          (run_policy o' (get_game_clock S) p1)
          (run_policy o' (get_game_clock S) p2))
      ⇒
-     dominates a (next l) (S,u) (c,p1) (c,p2)`,
+     dominates a (next l) (u,S) (c,p1) (c,p2)`,
   Cases
   \\ reverse Cases
   >- (
@@ -2321,16 +2321,16 @@ val shape_ok_sv = Q.store_thm("shape_ok_sv",
   \\ rw[shape_ok_def,LENGTH_REPLICATE]);
 
 val sv_thm = Q.store_thm("sv_thm",
-  `wf_game (S,u) ∧
+  `wf_game (u,S) ∧
    canupdateh S c ∧ shape_ok S p ∧
    typeof Stm' = Fun observation_ty (Fun state_with_hole_ty Bool) ∧
    typeof utm = utilityfn_ty ∧
    no_ffi σ ∧
    (∀o' cp' cp''.
      (thy,[]) |- mk_target_concl o' cp' cp'' l Stm' utm ⇒
-       dominates' a l (updateh S c o',u) cp' cp'')
+       dominates' a l (u,updateh S c o') cp' cp'')
    ⇒
-   dominates a (next l) (S,u) (c, sv l Stm' utm p σ) (c,p)`,
+   dominates a (next l) (u,S) (c, sv l Stm' utm p σ) (c,p)`,
   qpat_abbrev_tac`psv = sv _ _ _ _ _`
   \\ qpat_abbrev_tac`S' = updateh _ _`
   \\ strip_tac
