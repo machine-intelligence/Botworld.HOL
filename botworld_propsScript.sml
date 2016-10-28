@@ -2313,7 +2313,7 @@ val evaluate_prog_prefix = Q.store_thm("evaluate_prog_prefix",
    cheat);
 
 val shape_ok_sv = Q.store_thm("shape_ok_sv",
-  `shape_ok S (sv l Stm utm p σ) ⇔ shape_ok S p`,
+  `shape_ok S (sv l utm Stm ctm p σ) ⇔ shape_ok S p`,
   rw[sv_def]
   \\ rw[encode_register_def]
   \\ qpat_abbrev_tac`bs = encode_bytes _ _`
@@ -2323,15 +2323,16 @@ val shape_ok_sv = Q.store_thm("shape_ok_sv",
 val sv_thm = Q.store_thm("sv_thm",
   `wf_game (u,S) ∧
    canupdateh S c ∧ shape_ok S p ∧
-   typeof Stm' = Fun observation_ty (Fun state_with_hole_ty Bool) ∧
    typeof utm = utilityfn_ty ∧
+   typeof Stm = state_with_hole_ty ∧
+   typeof ctm = command_ty ∧
    no_ffi σ ∧
    (∀o' cp' cp''.
-     (thy,[]) |- mk_target_concl o' cp' cp'' l Stm' utm ⇒
+     (thy,[]) |- mk_target_concl l utm Stm ctm o' cp' cp'' ⇒
        dominates' a l (u,updateh S c o') cp' cp'')
    ⇒
-   dominates a (next l) (u,S) (c, sv l Stm' utm p σ) (c,p)`,
-  qpat_abbrev_tac`psv = sv _ _ _ _ _`
+   dominates a (next l) (u,S) (c, sv l utm Stm ctm p σ) (c,p)`,
+  qpat_abbrev_tac`psv = sv _ _ _ _ _ _`
   \\ qpat_abbrev_tac`S' = updateh _ _`
   \\ strip_tac
   \\ match_mp_tac (MP_CANON lemmaB)

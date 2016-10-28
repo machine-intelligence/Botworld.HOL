@@ -121,23 +121,26 @@ val term_to_ml_def = Define`
 val _ = overload_on("state_with_hole_ty",type_to_deep``:state_with_hole``);
 val _ = overload_on("observation_ty",type_to_deep``:observation``);
 val _ = overload_on("utilityfn_ty",type_to_deep``:utilityfn``);
+val _ = overload_on("command_ty",type_to_deep``:command``);
 val _ = overload_on("dominates_tm",term_to_deep``dominates (:α)``);
+val _ = overload_on("updateh_tm",term_to_deep``updateh``);
 
 val mk_target_concl_def = Define`
-  mk_target_concl obs m1 m2 l Stm utm =
+  mk_target_concl l utm Stm ctm obs m1 m2 =
   Comb
   (Comb
    (Comb
     (Comb dominates_tm (FST quote_level l))
     (FST (quote_prod
-          ((I, Fun state_with_hole_ty Bool), (I, utilityfn_ty)))
-     (Comb Stm (FST quote_observation obs), utm)))
+          ((I, utilityfn_ty),
+           (I, Fun state_with_hole_ty Bool)))
+     (utm, Comb (Comb (Comb updateh_tm Stm) ctm) (FST quote_observation obs))))
    (FST (quote_prod (quote_command, quote_list (quote_list quote_word8))) m1))
   (FST (quote_prod (quote_command, quote_list (quote_list quote_word8))) m2)`;
 
 val check_theorem_def = Define`
-  check_theorem thm l Stm obs utm m1 m2 =
-    aconv (concl thm) (mk_target_concl obs m1 m2 l Stm utm)`;
+  check_theorem thm l utm Stm ctm obs m1 m2 =
+    aconv (concl thm) (mk_target_concl l utm Stm ctm obs m1 m2)`;
 
 (* TODO: translate mk_target_concl *)
 
@@ -177,7 +180,7 @@ val sv_preamble_decs_def = Define`
   sv_preamble_decs = ARB:prog`; (* TODO *)
 
 val sv_def = Define`
-  sv l Stm utm π σ =
+  sv l utm Stm ctm π σ =
     (* N.B. this requires there to be enough leftover space in register 0 *)
     encode_register 0 (listsexp o MAP topsexp) (
     (* assumes Botworld preamble gets run by botworld *)
@@ -188,7 +191,7 @@ val sv_def = Define`
     *)
     (*
        sv_preamble includes:
-       check_theorem : thm * level * term * observation * term * (command * prog) * (command * prog) -> bool
+       check_theorem
     *)
     (*
       N.B. The only functions in either preamble that call any FFI are
@@ -214,9 +217,10 @@ val sv_def = Define`
                     Con NONE
                       [Var(Short"thm")
                       ;level_to_ml l
-                      ;term_to_ml Stm
-                      ;Var(Short"observation")
                       ;term_to_ml utm
+                      ;term_to_ml Stm
+                      ;term_to_ml ctm
+                      ;Var(Short"observation")
                       ;Var(Short"policy")
                       ;Var(Short"default")
                       ]])
