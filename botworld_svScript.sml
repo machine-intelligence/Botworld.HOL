@@ -99,12 +99,39 @@ val exp_disc_fn_sums =
   |> REWRITE_RULE[GSYM exp_disc_utilityfn_def]
   |> DISCH_ALL
 
-(*
+val exp_disc_fn_cons_suc = Q.store_thm("exp_disc_fn_cons_suc",
+  `exp_disc_fn v γ (s:::h) (SUC n) = γ * exp_disc_fn v γ h n`,
+  rw[exp_disc_fn_def,realTheory.pow,realTheory.REAL_MUL_ASSOC]);
+
+val sum_1_exp_disc_fn_cons = Q.store_thm("sum_1_exp_disc_fn_cons",
+  `sum (0,1) (exp_disc_fn v γ (s:::h)) = v s`,
+  REWRITE_TAC[ONE] \\ rw[realTheory.sum,exp_disc_fn_def,realTheory.pow]);
+
 val exp_disc_utilityfn_thm = Q.store_thm("exp_disc_utilityfn_thm",
   `(∀s. 0 ≤ v s ∧ v s ≤ 1) ∧ 0 < γ ∧ γ < 1 ⇒
    exp_disc_utilityfn v γ (s:::h) =
        v s + γ * exp_disc_utilityfn v γ h`,
-*)
+  disch_then assume_tac \\
+  mp_tac (MATCH_MP  seqTheory.SER_OFFSET
+    (Q.SPEC`s:::h`(Q.GEN`h`(UNDISCH exp_disc_fn_summable)))) \\
+  disch_then(qspec_then`1`mp_tac) \\
+  simp[GSYM ADD1,exp_disc_fn_cons_suc,sum_1_exp_disc_fn_cons] \\
+  rw[exp_disc_utilityfn_def] \\
+  drule seqTheory.SER_CDIV \\
+  disch_then(qspec_then`γ`mp_tac) \\
+  simp[] \\
+  Cases_on`γ = 0` \\ fs[] \\
+  `(λn. γ * exp_disc_fn v γ h n / γ) = exp_disc_fn v γ h`
+  by (
+    rw[FUN_EQ_THM] \\
+    drule realTheory.REAL_DIV_RMUL_CANCEL \\
+    disch_then(qspecl_then[`exp_disc_fn v γ h n`,`1`]mp_tac) \\
+    simp[realTheory.REAL_MUL_COMM] ) \\
+  simp[] \\
+  disch_then (mp_tac o MATCH_MP seqTheory.SUM_UNIQ)
+  \\ disch_then (SUBST_ALL_TAC o SYM) \\
+  simp[realTheory.REAL_DIV_LMUL] \\
+  simp[realTheory.REAL_SUB_ADD2]);
 
 val with_policy_def = Define`
   with_policy (c,p) = robot_memory_fupd (K p) o robot_command_fupd (K c)`;
