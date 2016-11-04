@@ -1,5 +1,5 @@
 open HolKernel boolLib bossLib ml_translatorLib ml_progLib
-     astTheory funBigStepTheory
+     astTheory terminationTheory
      botworld_dataTheory botworld_serialiseTheory
      holSyntaxTheory holKernelTheory
 

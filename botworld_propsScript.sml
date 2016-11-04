@@ -1652,7 +1652,7 @@ val do_app_ffi_extensional = Q.store_thm("do_app_ffi_extensional",
     \\ spose_not_then strip_assume_tac
     \\ fs[] )
   \\ rw[ffi_state_rel_def,ffiTheory.ffi_state_component_equality]
-  \\ fs[evalPropsTheory.do_app_cases,semanticPrimitivesTheory.do_app_def] \\ rw[]
+  \\ fs[semanticPrimitivesPropsTheory.do_app_cases,semanticPrimitivesTheory.do_app_def] \\ rw[]
   \\ every_case_tac \\ fs[]
   \\ spose_not_then strip_assume_tac
   \\ fs[call_FFI_invariant_def,ffiTheory.ffi_state_component_equality,GSYM CONJ_ASSOC]
@@ -1710,7 +1710,7 @@ val evaluate_ffi_extensional = Q.store_thm("evaluate_ffi_extensional",
   \\ imp_res_tac do_app_ffi_extensional
   \\ fs[ffi_rel_def,
         semanticPrimitivesTheory.state_component_equality,
-        funBigStepTheory.dec_clock_def]
+        evaluateTheory.dec_clock_def]
   \\ match_tac(
        [mg.a"h"`ffi_state_rel _ R ffi_ _`,
         mg.bau`do_app (refs_,ffi_) op_ es_`
@@ -1731,8 +1731,8 @@ val evaluate_decs_ffi_extensional = Q.store_thm("evaluate_decs_ffi_extensional",
    ⇒
    res = res' ∧ ffi_rel oracle R st2 st2'`,
   strip_tac
-  \\ ho_match_mp_tac funBigStepTheory.evaluate_decs_ind
-  \\ rw[funBigStepTheory.evaluate_decs_def] \\ rw[]
+  \\ ho_match_mp_tac evaluateTheory.evaluate_decs_ind
+  \\ rw[evaluateTheory.evaluate_decs_def] \\ rw[]
   \\ imp_res_tac ffi_rel_same_defined_types \\ fs[]
   \\ every_case_tac \\ fs[] \\ rw[] \\ rfs[] \\ fs[]
   \\ TRY (
@@ -1752,8 +1752,8 @@ val evaluate_tops_ffi_extensional = Q.store_thm("evaluate_tops_ffi_extensional",
    ⇒
    res = res' ∧ ffi_rel oracle R st2 st2'`,
   strip_tac
-  \\ ho_match_mp_tac funBigStepTheory.evaluate_tops_ind
-  \\ rw[funBigStepTheory.evaluate_tops_def] \\ rw[]
+  \\ ho_match_mp_tac evaluateTheory.evaluate_tops_ind
+  \\ rw[evaluateTheory.evaluate_tops_def] \\ rw[]
   \\ imp_res_tac ffi_rel_same_defined_mods \\ fs[]
   \\ every_case_tac \\ fs[] \\ rw[] \\ rfs[] \\ fs[]
   \\ TRY (
@@ -1771,7 +1771,7 @@ val evaluate_prog_ffi_extensional = Q.store_thm("evaluate_prog_ffi_extensional",
    evaluate_prog st' env prog = (st2',res')
    ⇒
    res = res' ∧ ffi_rel oracle R st2 st2'`,
-  simp[funBigStepTheory.evaluate_prog_def]
+  simp[evaluateTheory.evaluate_prog_def]
   \\ ntac 2 strip_tac
   \\ imp_res_tac ffi_rel_same_defined_mods
   \\ imp_res_tac ffi_rel_same_defined_types

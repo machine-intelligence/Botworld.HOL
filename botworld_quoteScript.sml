@@ -457,8 +457,10 @@ val _ = special_quoters := (``:word64``,``FST quote_word64``) :: !special_quoter
 
 val (quote_lit_aux_def,quote_lit_def) = mk_quote NONE ``:lit``
 
-val _ = mk_quote_tac := (wf_rel_tac `measure pat_size` \\ gen_tac \\ Induct \\ rw[astTheory.pat_size_def]
-                                   \\ simp[] \\ res_tac \\ simp[])
+val _ = mk_quote_tac := (
+  wf_rel_tac `measure pat_size` \\ simp[]
+  \\ gen_tac \\ Induct \\ rw[astTheory.pat_size_def]
+  \\ simp[] \\ res_tac \\ simp[])
 val (quote_pat_aux_def,quote_pat_def) = mk_quote NONE ``:pat``
 val quote_pat_aux_def = save_thm("quote_pat_aux_def",quote_pat_aux_def |> REWRITE_RULE[GSYM quote_list_is_aux,ETA_AX])
 

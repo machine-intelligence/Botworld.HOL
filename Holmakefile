@@ -28,7 +28,7 @@ HOLHEAP = heap
 EXTRA_CLEANS = $(HOLHEAP) $(HOLHEAP).o
 BARE_THYS = $(CAKEMLDIR)/preamble\
 						$(CAKEMLDIR)/semantics/terminationTheory\
-						$(CAKEMLDIR)/semantics/proofs/funBigStepPropsTheory\
+						$(CAKEMLDIR)/semantics/proofs/evaluatePropsTheory\
 						$(CAKEMLDIR)/compiler/parsing/fromSexpTheory\
 						$(CAKEMLDIR)/translator/ml_translatorLib\
 						$(CAKEMLDIR)/candle/standard/monadic/holKernelTheory\
