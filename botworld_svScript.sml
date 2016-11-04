@@ -18,15 +18,20 @@ val utilityfn_def = Define`
     (∀x. 0 ≤ u x ∧ u x ≤ 1) ∧
     ∀s h h'. u h ≤ u h' ⇒ u (s ::: h) ≤ u (s ::: h')`;
 
-val discount_def = Define`
-  discount (u:utilityfn) = sup { (u (s ::: h) - u (s ::: h')) / (u h - u h') | (s,h,h') | u h ≠ u h' }`
-
 val exp_disc_fn_def = Define`
   exp_disc_fn v γ h n =
     γ pow n * v (THE (LNTH n h))`;
 
-val exp_disc_utilityfn_def = Define`
-  exp_disc_utilityfn v γ h = suminf (exp_disc_fn v γ h)`;
+val exp_disc_def = Define`
+  exp_disc (v:state->real,γ) h = suminf (exp_disc_fn v γ h)`;
+
+val _ = overload_on("values",``λ(u:(state -> real) # real). FST u``);
+val _ = overload_on("discount",``λ(u:(state -> real) # real). SND u``);
+
+val wf_exp_disc_def = Define`
+  wf_exp_disc (v,γ) ⇔
+    (∀s. 0 ≤ v s ∧ v s ≤ 1) ∧
+    0 < γ ∧ γ < 1`;
 
 (* TODO: does this already exist? *)
 val REAL_SUB_RAT1 = Q.store_thm("REAL_SUB_RAT1",
@@ -39,53 +44,74 @@ val REAL_SUB_RAT1 = Q.store_thm("REAL_SUB_RAT1",
   \\ pop_assum SUBST_ALL_TAC
   \\ simp[realTheory.REAL_DIV_RMUL_CANCEL]);
 
+val exp_disc_fn_eta = Q.store_thm("exp_disc_fn_eta",
+  `exp_disc_fn v γ h = λn. γ pow n * v (THE (LNTH n h))`,
+  simp[FUN_EQ_THM,exp_disc_fn_def]);
+
+val exp_disc_fn_non_neg = Q.store_thm("exp_disc_fn_non_neg",
+  `(∀s. 0 ≤ v s) ∧ 0 < γ ⇒
+   ∀n. 0 ≤ exp_disc_fn v γ h n`,
+  strip_tac \\
+  simp[exp_disc_fn_eta] \\
+  gen_tac \\
+  match_mp_tac realTheory.REAL_LE_MUL \\ simp[] \\
+  match_mp_tac realTheory.POW_POS \\
+  simp[realTheory.REAL_LT_IMP_LE] )
+
+val exp_disc_fn_bound_gp = Q.store_thm("exp_disc_fn_bound_gp",
+  `(∀s. 0 ≤ v s ∧ v s ≤ 1) ∧ 0 < γ ∧ γ < 1 ⇒
+    ∀n. sum (0,n) (exp_disc_fn v γ h) ≤ sum (0,n) (λn. γ pow n)`,
+  strip_tac \\
+  gen_tac \\
+  match_mp_tac realTheory.SUM_LE \\
+  rw[exp_disc_fn_eta] \\
+  ONCE_REWRITE_TAC[realTheory.REAL_MUL_COMM] \\
+  `0 < γ pow r`
+  by ( simp[realTheory.REAL_POW_LT] ) \\
+  simp[GSYM realTheory.REAL_LE_RDIV_EQ] \\
+  `γ pow r ≠ 0` by (CCONTR_TAC \\ fs[]) \\
+  simp[realTheory.REAL_DIV_REFL] )
+
+val exp_disc_fn_bound_lim = Q.store_thm("exp_disc_fn_bound_lim",
+  `(∀s. 0 ≤ v s ∧ v s ≤ 1) ∧ 0 < γ ∧ γ < 1 ⇒
+   ∀n. sum (0,n) (exp_disc_fn v γ h) < 1 / (1 - γ)`,
+  strip_tac \\
+  gen_tac \\
+  match_mp_tac realTheory.REAL_LET_TRANS \\
+  qexists_tac`sum (0,n) (λn. γ pow n)` \\
+  simp[exp_disc_fn_bound_gp]
+  \\ qspec_then`γ`mp_tac seqTheory.GP_FINITE \\
+  impl_tac >- (CCONTR_TAC \\ fs[]) \\
+  simp[] \\ disch_then kall_tac \\
+  `γ - 1 = -(1 - γ)` by simp[realTheory.REAL_NEG_SUB] \\
+  `γ pow n - 1 = -(1 - γ pow n)` by simp[realTheory.REAL_NEG_SUB] \\
+  pop_assum SUBST_ALL_TAC \\
+  pop_assum SUBST_ALL_TAC \\
+  simp[realTheory.neg_rat] \\
+  IF_CASES_TAC \\ fs[] \\
+  `1 - γ ≠ 0` by simp[] \\
+  simp[GSYM REAL_SUB_RAT1] \\
+  simp[realTheory.REAL_LT_SUB_RADD] \\
+  simp[realTheory.REAL_LT_ADDR] \\
+  match_mp_tac realTheory.REAL_LT_DIV \\
+  simp[realTheory.REAL_SUB_LT,realTheory.REAL_POW_LT] );
+
 val exp_disc_fn_summable = Q.store_thm("exp_disc_fn_summable",
   `(∀s. 0 ≤ v s ∧ v s ≤ 1) ∧ 0 < γ ∧ γ < 1 ⇒
    summable (exp_disc_fn v γ h)`,
   rw[seqTheory.summable,seqTheory.sums,GSYM seqTheory.convergent] \\
   match_mp_tac seqTheory.SEQ_ICONV \\
-  `exp_disc_fn v γ h = λn. γ pow n * v (THE (LNTH n h))`
-    by simp[FUN_EQ_THM,exp_disc_fn_def] \\
-  pop_assum SUBST_ALL_TAC \\
+  mp_tac exp_disc_fn_non_neg \\
+  impl_tac >- fs[] \\ strip_tac \\
+  SUBST_ALL_TAC exp_disc_fn_eta \\
   qho_match_abbrev_tac`bounded _ (λn. sum (0,n) f) ∧ _` \\
-  `∀n. 0 ≤ f n` by (
-    simp[Abbr`f`] \\
-    gen_tac \\
-    match_mp_tac realTheory.REAL_LE_MUL \\ simp[] \\
-    match_mp_tac realTheory.POW_POS \\
-    simp[realTheory.REAL_LT_IMP_LE] ) \\
   imp_res_tac realTheory.SUM_POS \\
   conj_tac >- (
     simp[seqTheory.SEQ_BOUNDED] \\
     qexists_tac`1 / (1 - γ)` \\
-    gen_tac \\
     simp[realTheory.abs] \\
-    match_mp_tac realTheory.REAL_LET_TRANS \\
-    qexists_tac`sum (0,n) (λn. γ pow n)` \\
-    conj_tac >- (
-      match_mp_tac realTheory.SUM_LE \\
-      rw[Abbr`f`] \\
-      ONCE_REWRITE_TAC[realTheory.REAL_MUL_COMM] \\
-      `0 < γ pow r`
-      by ( simp[realTheory.REAL_POW_LT] ) \\
-      simp[GSYM realTheory.REAL_LE_RDIV_EQ] \\
-      `γ pow r ≠ 0` by (CCONTR_TAC \\ fs[]) \\
-      simp[realTheory.REAL_DIV_REFL] )
-    \\ qspec_then`γ`mp_tac seqTheory.GP_FINITE \\
-    impl_tac >- (CCONTR_TAC \\ fs[]) \\
-    simp[] \\ disch_then kall_tac \\
-    `γ - 1 = -(1 - γ)` by simp[realTheory.REAL_NEG_SUB] \\
-    `γ pow n - 1 = -(1 - γ pow n)` by simp[realTheory.REAL_NEG_SUB] \\
-    pop_assum SUBST_ALL_TAC \\
-    pop_assum SUBST_ALL_TAC \\
-    simp[realTheory.neg_rat] \\
-    IF_CASES_TAC \\ fs[] \\
-    `1 - γ ≠ 0` by simp[] \\
-    simp[GSYM REAL_SUB_RAT1] \\
-    simp[realTheory.REAL_LT_SUB_RADD] \\
-    simp[realTheory.REAL_LT_ADDR] \\
-    match_mp_tac realTheory.REAL_LT_DIV \\
-    simp[realTheory.REAL_SUB_LT,realTheory.REAL_POW_LT] ) \\
+    simp[Abbr`f`,GSYM exp_disc_fn_eta] \\
+    simp[exp_disc_fn_bound_lim]) \\
   rw[] \\
   fs[realTheory.real_ge,GREATER_EQ] \\
   fs[LESS_EQ_EXISTS] \\
@@ -96,7 +122,7 @@ val exp_disc_fn_sums =
   exp_disc_fn_summable
   |> UNDISCH
   |> MATCH_MP seqTheory.SUMMABLE_SUM
-  |> REWRITE_RULE[GSYM exp_disc_utilityfn_def]
+  |> REWRITE_RULE[GSYM exp_disc_def]
   |> DISCH_ALL
 
 val exp_disc_fn_cons_suc = Q.store_thm("exp_disc_fn_cons_suc",
@@ -107,16 +133,19 @@ val sum_1_exp_disc_fn_cons = Q.store_thm("sum_1_exp_disc_fn_cons",
   `sum (0,1) (exp_disc_fn v γ (s:::h)) = v s`,
   REWRITE_TAC[ONE] \\ rw[realTheory.sum,exp_disc_fn_def,realTheory.pow]);
 
-val exp_disc_utilityfn_thm = Q.store_thm("exp_disc_utilityfn_thm",
-  `(∀s. 0 ≤ v s ∧ v s ≤ 1) ∧ 0 < γ ∧ γ < 1 ⇒
-   exp_disc_utilityfn v γ (s:::h) =
-       v s + γ * exp_disc_utilityfn v γ h`,
+val exp_disc_thm = Q.store_thm("exp_disc_thm",
+  `wf_exp_disc u ⇒
+   exp_disc u (s:::h) =
+       (values u) s + (discount u) * exp_disc u h`,
+  Cases_on`u` \\
+  qmatch_goalsub_rename_tac`wf_exp_disc (v,γ)` \\
+  simp[wf_exp_disc_def] \\
   disch_then assume_tac \\
   mp_tac (MATCH_MP  seqTheory.SER_OFFSET
-    (Q.SPEC`s:::h`(Q.GEN`h`(UNDISCH exp_disc_fn_summable)))) \\
+    (Q.ISPEC`(s:state):::h`(Q.GEN`h`(UNDISCH exp_disc_fn_summable)))) \\
   disch_then(qspec_then`1`mp_tac) \\
   simp[GSYM ADD1,exp_disc_fn_cons_suc,sum_1_exp_disc_fn_cons] \\
-  rw[exp_disc_utilityfn_def] \\
+  rw[exp_disc_def] \\
   drule seqTheory.SER_CDIV \\
   disch_then(qspec_then`γ`mp_tac) \\
   simp[] \\
@@ -133,12 +162,36 @@ val exp_disc_utilityfn_thm = Q.store_thm("exp_disc_utilityfn_thm",
   simp[realTheory.REAL_DIV_LMUL] \\
   simp[realTheory.REAL_SUB_ADD2]);
 
+val exp_disc_imp_utilityfn = Q.store_thm("exp_disc_imp_utilityfn",
+  `wf_exp_disc u ∧
+   (∀h. exp_disc u h ≤ 1)
+    ⇒ utilityfn (exp_disc u)`,
+  Cases_on`u` \\
+  qmatch_goalsub_rename_tac`wf_exp_disc (v,γ)` \\
+  simp[utilityfn_def,exp_disc_thm] \\
+  rw[wf_exp_disc_def,utilityfn_def]
+  >- (
+    rw[exp_disc_def] \\
+    `0 = sum (0,0) (exp_disc_fn v γ x)`
+    by ( simp[realTheory.sum] ) \\
+    pop_assum SUBST1_TAC \\
+    match_mp_tac seqTheory.SER_POS_LE \\
+    conj_tac >- (
+      match_mp_tac exp_disc_fn_summable
+      \\ simp[] ) \\
+    simp[exp_disc_fn_non_neg] )
+  \\ match_mp_tac realTheory.REAL_LE_LMUL_IMP
+  \\ simp[realTheory.REAL_LT_IMP_LE]);
+
 val with_policy_def = Define`
   with_policy (c,p) = robot_memory_fupd (K p) o robot_command_fupd (K c)`;
 
 val weaklyExtensional_def = Define`
   weaklyExtensional (u:utilityfn) ⇔
     ∀s cp1 cp2 h. u (fill (with_policy cp1) s ::: h) = u (fill (with_policy cp2) s ::: h)`;
+
+val discount_def = Define`
+  discount (u:utilityfn) = sup { (u (s ::: h) - u (s ::: h')) / (u h - u h') | (s,h,h') | u h ≠ u h' }`
 
 val discount_exists_def = Define`
   discount_exists (u:utilityfn) ⇔
