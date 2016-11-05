@@ -63,18 +63,22 @@ val exp_disc_fn_non_neg = Q.store_thm("exp_disc_fn_non_neg",
   simp[realTheory.REAL_LT_IMP_LE] )
 
 val exp_disc_fn_bound_gp = Q.store_thm("exp_disc_fn_bound_gp",
+  `0 < γ ∧ (∀s. v s ≤ 1) ⇒
+   ∀n. exp_disc_fn v γ h n ≤ γ pow n`,
+  rw[exp_disc_fn_eta] \\
+  ONCE_REWRITE_TAC[realTheory.REAL_MUL_COMM] \\
+  `0 < γ pow n` by ( simp[realTheory.REAL_POW_LT] ) \\
+  simp[GSYM realTheory.REAL_LE_RDIV_EQ] \\
+  `γ pow n ≠ 0` by (CCONTR_TAC \\ fs[]) \\
+  simp[realTheory.REAL_DIV_REFL] )
+
+val sum_exp_disc_fn_bound_gp = Q.store_thm("sum_exp_disc_fn_bound_gp",
   `(∀s. 0 ≤ v s ∧ v s ≤ 1) ∧ 0 < γ ∧ γ < 1 ⇒
     ∀n. sum (0,n) (exp_disc_fn v γ h) ≤ sum (0,n) (λn. γ pow n)`,
   strip_tac \\
   gen_tac \\
   match_mp_tac realTheory.SUM_LE \\
-  rw[exp_disc_fn_eta] \\
-  ONCE_REWRITE_TAC[realTheory.REAL_MUL_COMM] \\
-  `0 < γ pow r`
-  by ( simp[realTheory.REAL_POW_LT] ) \\
-  simp[GSYM realTheory.REAL_LE_RDIV_EQ] \\
-  `γ pow r ≠ 0` by (CCONTR_TAC \\ fs[]) \\
-  simp[realTheory.REAL_DIV_REFL] )
+  simp[exp_disc_fn_bound_gp]);
 
 val exp_disc_fn_bound_lim = Q.store_thm("exp_disc_fn_bound_lim",
   `(∀s. 0 ≤ v s ∧ v s ≤ 1) ∧ 0 < γ ∧ γ < 1 ⇒
@@ -83,7 +87,7 @@ val exp_disc_fn_bound_lim = Q.store_thm("exp_disc_fn_bound_lim",
   gen_tac \\
   match_mp_tac realTheory.REAL_LET_TRANS \\
   qexists_tac`sum (0,n) (λn. γ pow n)` \\
-  simp[exp_disc_fn_bound_gp]
+  simp[sum_exp_disc_fn_bound_gp]
   \\ qspec_then`γ`mp_tac seqTheory.GP_FINITE \\
   impl_tac >- (CCONTR_TAC \\ fs[]) \\
   simp[] \\ disch_then kall_tac \\
@@ -188,6 +192,27 @@ val exp_disc_mono = Q.store_thm("exp_disc_mono",
   \\ match_mp_tac realTheory.REAL_LE_LMUL_IMP
   \\ simp[realTheory.REAL_LT_IMP_LE]);
 
+val exp_disc_bound = Q.store_thm("exp_disc_bound",
+  `wf_exp_disc u ⇒ ∀h. exp_disc u h ≤ 1 / (1 - discount u)`,
+  Cases_on`u` \\ strip_tac \\
+  qmatch_assum_rename_tac`wf_exp_disc (v,γ)` \\
+  qspec_then`γ`mp_tac seqTheory.GP \\
+  impl_keep_tac >- (
+    fs[realTheory.abs,wf_exp_disc_def] \\ rw[]
+    \\ metis_tac[realTheory.REAL_LT_IMP_LE] )
+  \\ disch_then(mp_tac o MATCH_MP seqTheory.SUM_UNIQ)
+  \\ simp[realTheory.REAL_INV_1OVER]
+  \\ disch_then kall_tac
+  \\ simp[exp_disc_def]
+  \\ gen_tac
+  \\ match_mp_tac seqTheory.SER_LE
+  \\ conj_tac
+  >- ( fs[exp_disc_fn_bound_gp,wf_exp_disc_def] )
+  \\ conj_tac
+  >- ( fs[exp_disc_fn_summable,wf_exp_disc_def] )
+  \\ match_mp_tac seqTheory.SUM_SUMMABLE
+  \\ metis_tac[seqTheory.GP]);
+
 val with_policy_def = Define`
   with_policy (c,p) = robot_memory_fupd (K p) o robot_command_fupd (K c)`;
 
@@ -208,25 +233,33 @@ val dominates_def = Define`
        ∀s. s ∈ S ⇒
          exp_disc u (hist (fill (with_policy cp') s)) ≤
          exp_disc u (hist (fill (with_policy cp) s))
-           + ((discount u) pow k))`;
+           + discount u pow k / (1 - discount u))`;
 
 val dominates_refl = Q.store_thm("dominates_refl",
   `wf_exp_disc u ⇒ dominates a l (u,S) cp cp`,
   Cases_on`a`\\Cases_on`l`\\simp[dominates_def]
   \\ simp[realTheory.REAL_LE_ADDR]
+  \\ rw[]
+  \\ match_mp_tac realTheory.REAL_LE_DIV
+  \\ simp[realTheory.REAL_SUB_LE]
   \\ metis_tac[PAIR,wf_exp_disc_def,realTheory.REAL_LT_IMP_LE,realTheory.POW_POS]);
 
 val dominates'_def = Define`
   (dominates' a (Trust k) g cp cp' = dominates a (Trust (SUC k)) g cp cp') ∧
   (dominates' (:α) MP (u,S) cp cp' =
    ∀k. LCA (SUC k) 𝕌(:α) ⇒ ∀s. s ∈ S ⇒
-     exp_disc u (hist (fill (with_policy cp') s)) ≤ exp_disc u (hist (fill (with_policy cp) s)) + (discount u) pow k)`;
+     exp_disc u (hist (fill (with_policy cp') s)) ≤
+     exp_disc u (hist (fill (with_policy cp) s))
+       + (discount u) pow k / (1 - discount u))`;
 
 val dominates'_refl = Q.store_thm("dominates'_refl",
   `wf_exp_disc u ⇒ dominates' a l (u,S) cp cp`,
   Cases_on`a`\\reverse(Cases_on`l`)\\simp[dominates'_def]
   >- metis_tac[dominates_refl]
   \\ simp[realTheory.REAL_LE_ADDR]
+  \\ rw[]
+  \\ match_mp_tac realTheory.REAL_LE_DIV
+  \\ simp[realTheory.REAL_SUB_LE]
   \\ metis_tac[PAIR,wf_exp_disc_def,realTheory.REAL_LT_IMP_LE,realTheory.POW_POS]);
 
 val level_to_ml_def = Define`
