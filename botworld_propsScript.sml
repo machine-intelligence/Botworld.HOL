@@ -1885,17 +1885,17 @@ val _ = Parse.hide"S";
 val lemmaA = Q.store_thm("lemmaA",
   `∀δ l S u c p1 p2.
      canupdateh S c ∧
-     utilityfn u ∧ weaklyExtensional u ∧ discount_exists u ∧
+     wf_exp_disc u ∧ weaklyExtensional (values u) ∧
      0 ≤ δ ∧
      shape_ok S p1 ∧ shape_ok S p2 ∧
      (∀o' s'. updateh S c o' s' ⇒
        let k = (get_focal_robot s').processor in
-       u (hist (fill (with_policy (run_policy o' k p1)) s')) + δ ≥
-       u (hist (fill (with_policy (run_policy o' k p2)) s')))
+       exp_disc u (hist (fill (with_policy (run_policy o' k p1)) s')) + δ ≥
+       exp_disc u (hist (fill (with_policy (run_policy o' k p2)) s')))
      ⇒
      ∀s. s ∈ S ⇒
-       u (hist (fill (with_policy (c,p1)) s)) + (discount u)*δ ≥
-       u (hist (fill (with_policy (c,p2)) s))`,
+       exp_disc u (hist (fill (with_policy (c,p1)) s)) + (discount u)*δ ≥
+       exp_disc u (hist (fill (with_policy (c,p2)) s))`,
   rpt gen_tac
   \\ strip_tac
   \\ gen_tac \\ strip_tac
@@ -1925,57 +1925,22 @@ val lemmaA = Q.store_thm("lemmaA",
   \\ `∀p. hist (fill p s) = fill p s ::: hist (step (fill p s))`
   by ( simp[hist_def,LUNFOLD_THM] )
   \\ simp[]
-  \\ qmatch_abbrev_tac`u (fill cp1 s ::: h1) + _ ≥ u (fill cp2 s ::: h2)`
-  \\ `u (fill cp2 s ::: h2) - u (fill cp1 s ::: h1) =
-      u (fill cp1 s ::: h2) - u (fill cp1 s ::: h1)`
-  by metis_tac[]
-  \\ qmatch_assum_abbrev_tac`_ = rhs`
-  \\ `0 ≤ discount u` by metis_tac[discount_not_negative]
-  \\ `rhs ≤ discount u * δ`
-  by (
-    simp[Abbr`rhs`,Abbr`u2`,Abbr`u1`]
-    \\ qmatch_abbrev_tac`a - b ≤ d * _`
-    \\ qmatch_assum_abbrev_tac`e ≤ δ`
-    \\ Cases_on`0 < e`
-    >- (
-      `a - b ≤ d * e` suffices_by
-        metis_tac[realTheory.REAL_LE_LMUL_IMP,realTheory.REAL_LE_TRANS]
-      \\ simp[GSYM realTheory.REAL_LE_LDIV_EQ]
-      \\ simp[Abbr`d`,discount_def]
-      \\ match_mp_tac (MP_CANON realTheory.REAL_SUP_UBOUND)
-      \\ conj_tac
-      >- (
-        simp[UNCURRY,PULL_EXISTS,FORALL_PROD]
-        \\ fs[discount_exists_def]
-        \\ simp[EXISTS_PROD]
-        \\ metis_tac[])
-      \\ simp[UNCURRY]
-      \\ simp[EXISTS_PROD]
-      \\ simp[Abbr`a`,Abbr`b`,Abbr`e`]
-      \\ metis_tac[realTheory.REAL_LT_REFL,realTheory.REAL_SUB_0] )
-    \\ `0 ≤ d * δ` by metis_tac[realTheory.REAL_LE_MUL]
-    \\ `a - b ≤ 0` suffices_by metis_tac[realTheory.REAL_LE_TRANS]
-    \\ ONCE_REWRITE_TAC[GSYM realTheory.REAL_LE_NEG]
-    \\ REWRITE_TAC[realTheory.REAL_NEG_SUB]
-    \\ simp[realTheory.REAL_SUB_LE]
-    \\ fs[utilityfn_def,Abbr`a`,Abbr`b`]
-    \\ first_x_assum match_mp_tac
-    \\ fs[Abbr`e`,realTheory.REAL_NOT_LT]
-    \\ ONCE_REWRITE_TAC[GSYM realTheory.REAL_SUB_LE]
-    \\ ONCE_REWRITE_TAC[GSYM realTheory.REAL_LE_NEG]
-    \\ REWRITE_TAC[realTheory.REAL_NEG_SUB]
-    \\ simp[] )
-  \\ qmatch_abbrev_tac`x + y ≥ z`
-  \\ `rhs = z - x`
-  by ( simp[Abbr`z`,Abbr`x`,Abbr`rhs`] )
-  \\ simp[realTheory.real_ge]
-  \\ metis_tac[realTheory.REAL_LE_SUB_RADD,realTheory.REAL_ADD_SYM]);
+  \\ qmatch_abbrev_tac`exp_disc u (fill cp1 s ::: h1) + _ ≥ exp_disc u (fill cp2 s ::: h2)`
+  \\ simp[exp_disc_thm]
+  \\ `values u (fill cp2 s) = values u (fill cp1 s)`
+  by ( simp[Abbr`cp1`,Abbr`cp2`] )
+  \\ pop_assum SUBST_ALL_TAC
+  \\ fs[realTheory.real_ge]
+  \\ simp[GSYM realTheory.REAL_ADD_ASSOC]
+  \\ simp[GSYM realTheory.REAL_LDISTRIB]
+  \\ match_mp_tac realTheory.REAL_LE_LMUL_IMP
+  \\ metis_tac[wf_exp_disc_def,PAIR,realTheory.REAL_LT_IMP_LE]);
 
 val wf_game_def = Define`
   wf_game (u,S) ⇔
     (∀s. s ∈ S ⇒ wf_state_with_hole s) ∧
     (∃k. ∀s. s ∈ S ⇒ (get_focal_robot s).processor = k) ∧
-    utilityfn u ∧ weaklyExtensional u ∧ discount_exists u`;
+    wf_exp_disc u ∧ weaklyExtensional (values u)`;
 
 val get_game_clock_def = Define`
   get_game_clock S =
@@ -2021,12 +1986,13 @@ val lemmaB = Q.store_thm("lemmaB",
   \\ Cases
   >- (
     simp[] \\ rw[]
-    \\ fs[wf_game_def,utilityfn_def]
-    \\ qmatch_abbrev_tac`u a ≤ u b + 1`
-    \\ `u a ≤ 1` by metis_tac[]
-    \\ `1 ≤ u b + 1` suffices_by metis_tac[realTheory.REAL_LE_TRANS]
+    \\ fs[wf_game_def]
+    \\ qmatch_abbrev_tac`eu a ≤ eu b + bnd`
+    \\ `eu a ≤ bnd` by metis_tac[exp_disc_bound]
+    \\ `bnd ≤ eu b + bnd` suffices_by metis_tac[realTheory.REAL_LE_TRANS]
     \\ ONCE_REWRITE_TAC[realTheory.REAL_ADD_COMM]
-    \\ simp[realTheory.REAL_LE_ADDR] )
+    \\ simp[realTheory.REAL_LE_ADDR]
+    \\ metis_tac[exp_disc_non_neg])
   \\ rw[]
   \\ first_x_assum drule
   \\ strip_tac
@@ -2035,14 +2001,18 @@ val lemmaB = Q.store_thm("lemmaB",
   \\ disch_then drule
   \\ simp[]
   \\ simp[realTheory.pow]
-  \\ disch_then(qspec_then`discount u pow n`mp_tac)
+  \\ disch_then(qspec_then`discount u pow n / (1 - discount u)`mp_tac)
   \\ simp[GSYM AND_IMP_INTRO,RIGHT_FORALL_IMP_THM]
   \\ impl_tac
   >- (
-    match_mp_tac realTheory.POW_POS
-    \\ match_mp_tac discount_not_negative
-    \\ simp[] )
+    match_mp_tac realTheory.REAL_LE_DIV
+    \\ simp[realTheory.REAL_SUB_LE]
+    \\ metis_tac[PAIR,wf_exp_disc_def,realTheory.REAL_LT_IMP_LE,realTheory.POW_POS])
   \\ simp[PULL_FORALL,realTheory.real_ge]
+  \\ simp[realTheory.mult_ratr]
+  \\ `1 <> discount u`
+  by( metis_tac[realTheory.REAL_LT_REFL,wf_exp_disc_def,PAIR] )
+  \\ simp[]
   \\ disch_then (match_mp_tac o MP_CANON)
   \\ fs[IN_DEF]
   \\ rw[]
