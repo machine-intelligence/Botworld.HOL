@@ -13,10 +13,14 @@ val _ = Parse.hide"S";
 
 val _ = Parse.type_abbrev("utilityfn",``:history -> real``);
 
+val _ = Parse.type_abbrev("expdisc",``:(state -> real) # real``);
+
+(*
 val utilityfn_def = Define`
   utilityfn (u:utilityfn) ⇔
     (∀x. 0 ≤ u x ∧ u x ≤ 1) ∧
     ∀s h h'. u h ≤ u h' ⇒ u (s ::: h) ≤ u (s ::: h')`;
+*)
 
 val exp_disc_fn_def = Define`
   exp_disc_fn v γ h n =
@@ -25,8 +29,8 @@ val exp_disc_fn_def = Define`
 val exp_disc_def = Define`
   exp_disc (v:state->real,γ) h = suminf (exp_disc_fn v γ h)`;
 
-val _ = overload_on("values",``λ(u:(state -> real) # real). FST u``);
-val _ = overload_on("discount",``λ(u:(state -> real) # real). SND u``);
+val _ = overload_on("values",``λ(u:expdisc). FST u``);
+val _ = overload_on("discount",``λ(u:expdisc). SND u``);
 
 val wf_exp_disc_def = Define`
   wf_exp_disc (v,γ) ⇔
@@ -162,24 +166,25 @@ val exp_disc_thm = Q.store_thm("exp_disc_thm",
   simp[realTheory.REAL_DIV_LMUL] \\
   simp[realTheory.REAL_SUB_ADD2]);
 
-val exp_disc_imp_utilityfn = Q.store_thm("exp_disc_imp_utilityfn",
-  `wf_exp_disc u ∧
-   (∀h. exp_disc u h ≤ 1)
-    ⇒ utilityfn (exp_disc u)`,
+val exp_disc_non_neg = Q.store_thm("exp_disc_non_neg",
+  `wf_exp_disc u ⇒ ∀h. 0 ≤ exp_disc u h`,
+  Cases_on`u` \\ rw[exp_disc_def] \\
+  qmatch_assum_rename_tac`wf_exp_disc (v,γ)` \\
+  `0 = sum (0,0) (exp_disc_fn v γ h)` by ( simp[realTheory.sum] ) \\
+  pop_assum SUBST1_TAC \\
+  match_mp_tac seqTheory.SER_POS_LE \\
+  conj_tac >- (
+    match_mp_tac exp_disc_fn_summable
+    \\ fs[wf_exp_disc_def] ) \\
+  fs[wf_exp_disc_def,exp_disc_fn_non_neg] )
+
+val exp_disc_mono = Q.store_thm("exp_disc_mono",
+  `wf_exp_disc u ⇒
+    ∀s h h'. exp_disc u h ≤ exp_disc u h' ⇒ exp_disc u (s ::: h) ≤ exp_disc u (s ::: h')`,
   Cases_on`u` \\
   qmatch_goalsub_rename_tac`wf_exp_disc (v,γ)` \\
-  simp[utilityfn_def,exp_disc_thm] \\
-  rw[wf_exp_disc_def,utilityfn_def]
-  >- (
-    rw[exp_disc_def] \\
-    `0 = sum (0,0) (exp_disc_fn v γ x)`
-    by ( simp[realTheory.sum] ) \\
-    pop_assum SUBST1_TAC \\
-    match_mp_tac seqTheory.SER_POS_LE \\
-    conj_tac >- (
-      match_mp_tac exp_disc_fn_summable
-      \\ simp[] ) \\
-    simp[exp_disc_fn_non_neg] )
+  simp[exp_disc_thm] \\
+  rw[wf_exp_disc_def]
   \\ match_mp_tac realTheory.REAL_LE_LMUL_IMP
   \\ simp[realTheory.REAL_LT_IMP_LE]);
 
@@ -187,59 +192,8 @@ val with_policy_def = Define`
   with_policy (c,p) = robot_memory_fupd (K p) o robot_command_fupd (K c)`;
 
 val weaklyExtensional_def = Define`
-  weaklyExtensional (u:utilityfn) ⇔
-    ∀s cp1 cp2 h. u (fill (with_policy cp1) s ::: h) = u (fill (with_policy cp2) s ::: h)`;
-
-val discount_def = Define`
-  discount (u:utilityfn) = sup { (u (s ::: h) - u (s ::: h')) / (u h - u h') | (s,h,h') | u h ≠ u h' }`
-
-val discount_exists_def = Define`
-  discount_exists (u:utilityfn) ⇔
-    (∃h1 h2. u h1 ≠ u h2) ∧
-    (∃z. ∀s h1 h2. u h1 ≠ u h2 ⇒ (u (s:::h2) − u (s:::h1)) / (u h2 − u h1) < z)`;
-
-val discount_not_negative = Q.store_thm("discount_not_negative",
-  `utilityfn u ∧ discount_exists u ⇒ 0 ≤ discount u`,
-  rw[utilityfn_def,discount_def,discount_exists_def]
-  \\ qmatch_goalsub_abbrev_tac`sup P`
-  \\ `∃x. P x` by ( simp[Abbr`P`,UNCURRY] \\ simp[EXISTS_PROD] \\ metis_tac[])
-  \\ `∃z. ∀x. P x ⇒ x < z`
-  by (
-    simp[Abbr`P`,UNCURRY] \\ simp[EXISTS_PROD]
-    \\ simp[PULL_EXISTS] \\ metis_tac[] )
-  \\ `∃x. P x ∧ 0 ≤ x` suffices_by metis_tac[realTheory.REAL_SUP_UBOUND,realTheory.REAL_LE_TRANS]
-  \\ simp[Abbr`P`,UNCURRY,EXISTS_PROD]
-  \\ simp[PULL_EXISTS]
-  \\ asm_exists_tac \\ simp[]
-  \\ Cases_on`u h2 ≤ u h1`
-  >- (
-    last_x_assum drule
-    \\ disch_then(qspec_then`s`strip_assume_tac)
-    \\ qexists_tac`s`
-    \\ match_mp_tac realTheory.REAL_LE_DIV
-    \\ simp[realTheory.REAL_SUB_LE] )
-  \\ pop_assum mp_tac
-  \\ simp[realTheory.REAL_NOT_LE,realTheory.REAL_LT_LE]
-  \\ strip_tac
-  \\ last_x_assum drule
-  \\ disch_then(qspec_then`s`strip_assume_tac)
-  \\ qexists_tac`s`
-  \\ ONCE_REWRITE_TAC [GSYM realTheory.REAL_NEG_LE0]
-  \\ ONCE_REWRITE_TAC [realTheory.neg_rat]
-  \\ IF_CASES_TAC >- metis_tac[realTheory.REAL_SUB_0]
-  \\ simp[realTheory.REAL_NEG_SUB]
-  \\ qmatch_abbrev_tac`a / b ≤ 0`
-  \\ `0 ≤ a / -b`
-  suffices_by (
-    REWRITE_TAC[realTheory.neg_rat]
-    \\ IF_CASES_TAC >- metis_tac[realTheory.REAL_SUB_0]
-    \\ ONCE_REWRITE_TAC[GSYM realTheory.REAL_NEG_LE0]
-    \\ REWRITE_TAC[realTheory.neg_rat]
-    \\ IF_CASES_TAC >- metis_tac[realTheory.REAL_SUB_0]
-    \\ simp[] )
-  \\ simp[realTheory.REAL_NEG_SUB,Abbr`a`,Abbr`b`]
-  \\ match_mp_tac realTheory.REAL_LE_DIV
-  \\ simp[realTheory.REAL_SUB_LE] );
+  weaklyExtensional (v:state -> real) ⇔
+    ∀cp1 cp2 s. v (fill (with_policy cp1) s) = v (fill (with_policy cp2) s)`;
 
 (* suggester/verifier *)
 
@@ -247,33 +201,33 @@ val dominates_def = Define`
   (dominates (:α) (Trust k) (u,S) cp cp' ⇔
      LCA k (UNIV:α set) ⇒
      ∀s. s ∈ S ⇒
-       u (hist (fill (with_policy cp') s)) ≤
-       u (hist (fill (with_policy cp) s))) ∧
+       exp_disc u (hist (fill (with_policy cp') s)) ≤
+       exp_disc u (hist (fill (with_policy cp) s))) ∧
   (dominates (:α) MP (u,S) cp cp' ⇔
    ∀k. LCA k (UNIV:α set) ⇒
        ∀s. s ∈ S ⇒
-         u (hist (fill (with_policy cp') s)) ≤
-         u (hist (fill (with_policy cp) s))
+         exp_disc u (hist (fill (with_policy cp') s)) ≤
+         exp_disc u (hist (fill (with_policy cp) s))
            + ((discount u) pow k))`;
 
 val dominates_refl = Q.store_thm("dominates_refl",
-  `utilityfn u ∧ discount_exists u ⇒ dominates a l (u,S) cp cp`,
+  `wf_exp_disc u ⇒ dominates a l (u,S) cp cp`,
   Cases_on`a`\\Cases_on`l`\\simp[dominates_def]
   \\ simp[realTheory.REAL_LE_ADDR]
-  \\ metis_tac[discount_not_negative,realTheory.POW_POS]);
+  \\ metis_tac[PAIR,wf_exp_disc_def,realTheory.REAL_LT_IMP_LE,realTheory.POW_POS]);
 
 val dominates'_def = Define`
   (dominates' a (Trust k) g cp cp' = dominates a (Trust (SUC k)) g cp cp') ∧
   (dominates' (:α) MP (u,S) cp cp' =
    ∀k. LCA (SUC k) 𝕌(:α) ⇒ ∀s. s ∈ S ⇒
-     u (hist (fill (with_policy cp') s)) ≤ u (hist (fill (with_policy cp) s)) + (discount u) pow k)`;
+     exp_disc u (hist (fill (with_policy cp') s)) ≤ exp_disc u (hist (fill (with_policy cp) s)) + (discount u) pow k)`;
 
 val dominates'_refl = Q.store_thm("dominates'_refl",
-  `utilityfn u ∧ discount_exists u ⇒ dominates' a l (u,S) cp cp`,
+  `wf_exp_disc u ⇒ dominates' a l (u,S) cp cp`,
   Cases_on`a`\\reverse(Cases_on`l`)\\simp[dominates'_def]
   >- metis_tac[dominates_refl]
   \\ simp[realTheory.REAL_LE_ADDR]
-  \\ metis_tac[discount_not_negative,realTheory.POW_POS]);
+  \\ metis_tac[PAIR,wf_exp_disc_def,realTheory.REAL_LT_IMP_LE,realTheory.POW_POS]);
 
 val level_to_ml_def = Define`
   level_to_ml (l:level) = (ARB:exp) (* TODO *)`;
@@ -286,7 +240,7 @@ val term_to_ml_def = Define`
 
 val _ = overload_on("state_with_hole_ty",type_to_deep``:state_with_hole``);
 val _ = overload_on("observation_ty",type_to_deep``:observation``);
-val _ = overload_on("utilityfn_ty",type_to_deep``:utilityfn``);
+val _ = overload_on("expdisc_ty",type_to_deep``:expdisc``);
 val _ = overload_on("command_ty",type_to_deep``:command``);
 val _ = overload_on("dominates_tm",term_to_deep``dominates (:α)``);
 val _ = overload_on("updateh_tm",term_to_deep``updateh``);
@@ -298,7 +252,7 @@ val mk_target_concl_def = Define`
    (Comb
     (Comb dominates_tm (FST quote_level l))
     (FST (quote_prod
-          ((I, utilityfn_ty),
+          ((I, expdisc_ty),
            (I, Fun state_with_hole_ty Bool)))
      (utm, Comb (Comb (Comb updateh_tm Stm) ctm) (FST quote_observation obs))))
    (FST (quote_prod (quote_command, quote_list (quote_list quote_word8))) m1))
