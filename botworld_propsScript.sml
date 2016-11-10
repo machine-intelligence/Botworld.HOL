@@ -898,9 +898,9 @@ val focal_event_sing = Q.store_thm("focal_event_sing",
    MEM nm (MAP FST sq.robots)
    ⇒
     ∃x.
-     {(c,ev,a) | ∃r. MEM (nm,r,a) ev.robotActions ∧
+     {(ev,a) | ∃r. MEM (nm,r,a) ev.robotActions ∧
                    ¬isMovedOut a ∧
-                   FLOOKUP (computeEvents s.grid) c = SOME ev }
+                   ev ∈ FRANGE (computeEvents s.grid) }
      = {x}`,
   rw[computeEvents_def,IN_FRANGE_FLOOKUP,FLOOKUP_FMAP_MAP2,EXTENSION,PULL_EXISTS]
   \\ `MEM nm (MAP FST (event sq (neighbours s.grid k)).robotActions)`
@@ -914,7 +914,7 @@ val focal_event_sing = Q.store_thm("focal_event_sing",
   \\ qmatch_assum_rename_tac`MEM nra ev.robotActions`
   \\ Cases_on`isMovedIn (SND(SND nra))`
   >- (
-    qexists_tac`(k,ev,SND(SND nra))`
+    qexists_tac`(ev,SND(SND nra))`
     \\ rw[EQ_IMP_THM,Abbr`ev`]
     \\ PairCases_on`nra` \\ fs[]
     \\ rveq
@@ -933,7 +933,7 @@ val focal_event_sing = Q.store_thm("focal_event_sing",
       \\ strip_tac \\ fs[]
       \\ first_x_assum(qspec_then`MovedOut(opposite dir)`mp_tac)
       \\ simp[] )
-    \\ asm_exists_tac \\ simp[]
+    \\ first_assum(part_match_exists_tac (el 2 o strip_conj) o concl) \\ simp[]
     \\ Cases_on`nra2` \\ fs[])
   \\ Cases_on`isMovedOut (SND(SND nra))`
   >- (
@@ -943,11 +943,12 @@ val focal_event_sing = Q.store_thm("focal_event_sing",
     \\ drule (GEN_ALL event_MovedOut_MovedIn)
     \\ disch_then drule
     \\ rw[]
-    \\ qexists_tac`(EL n (neighbour_coords k), ev', MovedIn(opposite n))`
+    \\ qexists_tac`(ev', MovedIn(opposite n))`
     \\ rw[EQ_IMP_THM]
     >- (
       fs[computeEvents_def,FLOOKUP_FMAP_MAP2,Abbr`ev`]
       \\ rveq \\ fs[] \\ rveq
+      \\ qmatch_assum_rename_tac`FLOOKUP _ c = SOME _`
       \\ `c = EL n (neighbour_coords k) ∧ (r,a) = (r0,MovedIn (opposite n))`
       by (
         drule (GEN_ALL same_name_same_action)
@@ -968,7 +969,7 @@ val focal_event_sing = Q.store_thm("focal_event_sing",
     \\ fs[computeEvents_def,FLOOKUP_FMAP_MAP2]
     \\ rw[]
     \\ metis_tac[] )
-  \\ qexists_tac`(k,ev,SND(SND nra))`
+  \\ qexists_tac`(ev,SND(SND nra))`
   \\ rw[EQ_IMP_THM]
   >- (
     fs[computeEvents_def,FLOOKUP_FMAP_MAP2,Abbr`ev`]
@@ -1016,12 +1017,13 @@ val wf_state_with_hole_steph = Q.store_thm("wf_state_with_hole_steph",
   \\ disch_then drule
   \\ disch_then(qx_choose_then`ceva`strip_assume_tac)
   \\ fs[] \\ rveq
-  \\ qexists_tac`computeSquare s.state.time_step (c',ev)`
   \\ simp[step_def,IN_FRANGE_FLOOKUP,FLOOKUP_FMAP_MAP2]
   \\ fs[EXTENSION]
-  \\ first_x_assum(qspec_then`(c',ev,a)`mp_tac)
-  \\ simp[] \\ strip_tac
-  \\ conj_tac >- ( asm_exists_tac \\ simp[fill_def] )
+  \\ first_x_assum(qspec_then`(ev,a)`mp_tac)
+  \\ simp[IN_FRANGE_FLOOKUP] \\ strip_tac
+  \\ simp[PULL_EXISTS]
+  \\ asm_exists_tac
+  \\ conj_tac >- ( simp[fill_def] )
   \\ simp[computeSquare_def]
   \\ disj1_tac
   \\ simp[MEM_MAP,MAP_MAP_o,MEM_FILTER,PULL_EXISTS]
@@ -1749,7 +1751,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
   \\ disch_then(qx_choose_then`ceva`strip_assume_tac)
   \\ fs[] \\ rveq
   \\ fs[EXTENSION]
-  \\ first_x_assum(qspec_then`(c'',ev,a)`mp_tac)
+  \\ first_x_assum(qspec_then`(ev,a)`mp_tac)
   \\ simp[] \\ strip_tac
   \\ simp[Once fill_with_policy_split]
   \\ qmatch_asmsub_abbrev_tac`_ ∈ FRANGE events ⇒ _`
@@ -1802,7 +1804,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
     \\ simp[runMachine_def,UNCURRY,robot_component_equality]
     \\ drule (GEN_ALL same_name_same_action) \\ simp[]
     \\ disch_then drule
-    \\ qpat_x_assum `_ = SOME ev` assume_tac
+    \\ qpat_x_assum `ev ∈ FRANGE _` (strip_assume_tac o SIMP_RULE(srw_ss())[IN_FRANGE_FLOOKUP])
     \\ disch_then drule
     \\ disch_then drule
     \\ disch_then drule
@@ -1820,7 +1822,7 @@ val steph_fill_step = Q.store_thm("steph_fill_step",
       \\ CONV_TAC(LAND_CONV(STRIP_QUANT_CONV(LAND_CONV(
            move_conj_left(can(match_term``FLOOKUP events _ = _``))))))
       \\ disch_then drule
-      \\ disch_then(qspec_then`k`mp_tac o CONV_RULE (RESORT_FORALL_CONV List.rev))
+      \\ disch_then(qspec_then`k'`mp_tac o CONV_RULE (RESORT_FORALL_CONV List.rev))
       \\ fs[MEM_MAP,PULL_EXISTS]
       \\ CONV_TAC(LAND_CONV(STRIP_QUANT_CONV(LAND_CONV(
            move_conj_left(listSyntax.is_mem)))))

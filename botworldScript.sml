@@ -269,9 +269,9 @@ val steph_def = Define`
               ¬destroyed s.focal_name ev.robotActions ∧
               ¬inspected s.focal_name ev.robotActions
     then
-      let (c,ev,a) = CHOICE
-        { (c,ev,a) | ∃r. MEM (s.focal_name,(r,a)) ev.robotActions ∧
-                         ¬isMovedOut a ∧ FLOOKUP events c = SOME ev } in
+      let (ev,a) = CHOICE
+        { (ev,a) | ∃r. MEM (s.focal_name,(r,a)) ev.robotActions ∧
+                       ¬isMovedOut a ∧ ev ∈ FRANGE events } in
       SOME (observation s.focal_name ev (private a), s with state := step s')
     else NONE
 `;
