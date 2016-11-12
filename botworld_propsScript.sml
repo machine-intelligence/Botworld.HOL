@@ -659,7 +659,7 @@ val wf_state_step = Q.store_thm("wf_state_step",
           \\ simp[]
           \\ spose_not_then strip_assume_tac
           \\ last_x_assum drule
-          \\ rator_x_assum`FLOOKUP`kall_tac
+          \\ qhdtm_x_assum`FLOOKUP`kall_tac
           \\ disch_then drule
           \\ disch_then drule
           \\ simp[IN_DISJOINT]
@@ -749,7 +749,7 @@ val wf_state_step = Q.store_thm("wf_state_step",
     rw[]
     \\ drule (GEN_ALL event_name_in_grid)
     \\ disch_then drule
-    \\ rator_x_assum`FLOOKUP`mp_tac
+    \\ qhdtm_x_assum`FLOOKUP`mp_tac
     \\ drule (GEN_ALL event_name_in_grid)
     \\ disch_then drule
     \\ rw[]
@@ -1158,7 +1158,7 @@ val clock_preserved = Q.store_thm("clock_preserved",
   \\ last_x_assum(qspec_then`r`strip_assume_tac) \\ fs[]
   \\ last_x_assum(qspec_then`r'`strip_assume_tac) \\ fs[]
   \\ fs[IN_FRANGE_FLOOKUP]
-  \\ rator_x_assum`wf_state`kall_tac
+  \\ qhdtm_x_assum`wf_state`kall_tac
   \\ fs[step_def,FLOOKUP_FMAP_MAP2]
   \\ rw[]
   \\ fs[computeSquare_def,ALOOKUP_APPEND]
@@ -1182,7 +1182,7 @@ val clock_preserved = Q.store_thm("clock_preserved",
   \\ pairarg_tac \\ fs[] \\ rw[]
   \\ fs[runMachine_def]
   \\ rpt(pairarg_tac \\ fs[]) \\ rw[]
-  \\ rator_x_assum`ALOOKUP`kall_tac
+  \\ qhdtm_x_assum`ALOOKUP`kall_tac
   \\ drule (GEN_ALL event_name_in_grid)
   \\ disch_then drule
   \\ rw[] >- (
