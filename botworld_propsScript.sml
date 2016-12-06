@@ -3,7 +3,7 @@ open preamble indexedListsTheory match_goal simpleSexpTheory
      botworld_dataTheory
      botworld_serialiseTheory
      botworld_svTheory
-local open realSimps in end
+local open realSimps ffiExtTheory in end
 
 val _ = new_theory"botworld_props";
 
@@ -2076,6 +2076,29 @@ val shape_ok_sv = Q.store_thm("shape_ok_sv",
   \\ Cases_on`p` \\ fs[LUPDATE_def]
   \\ rw[shape_ok_def,LENGTH_REPLICATE]);
 
+val sv_output_cases = Q.store_thm("sv_output_cases",
+  `psv = sv l utm Stm ctm p σ ⇒
+   run_policy obs ck psv = run_policy obs ck p ∨
+   (thy,[]) |- mk_target_concl l utm Stm ctm obs (run_policy obs ck psv) (run_policy obs ck p)`,
+  rw[run_policy_def]
+  \\ cheat);
+    (*
+    simp[run_policy_def] >> rpt (pairarg_tac >> fs[])
+    >> `∃p'. read_policy psv = read_policy p ++ p'`
+          by (
+            rw[Abbr`psv`, sv_def]
+            \\ cheat (*
+                need an encode/decode register thm
+                then need to assume p is big enough *)
+            ) >> rveq
+          >> qmatch_assum_rename_tac`evaluate_prog _ _ (_ p) = (_,r)`
+          >> Cases_on`r`
+          >> qmatch_assum_rename_tac`evaluate_prog _ _ (_ p) = (_,ctors,res)`
+          >> imp_res_tac evaluate_prog_prefix
+          >> cases_on `res` \\ fs[]
+          \\ cheat )
+*)
+
 val sv_thm = Q.store_thm("sv_thm",
   `wf_game (u,S) ∧
    canupdateh S c ∧ shape_ok S p ∧
@@ -2123,21 +2146,7 @@ val sv_thm = Q.store_thm("sv_thm",
     \\ rw[] \\ simp[EL_LUPDATE] )
   \\ `run_policy obs ck psv = run_policy obs ck p ∨
       thm obs (run_policy obs ck psv) (run_policy obs ck p)`
-  by (
-    simp[run_policy_def] >> rpt (pairarg_tac >> fs[])
-    >> `∃p'. read_policy psv = read_policy p ++ p'`
-          by (
-            rw[Abbr`psv`, sv_def]
-            \\ cheat (*
-                need an encode/decode register thm
-                then need to assume p is big enough *)
-            ) >> rveq
-          >> qmatch_assum_rename_tac`evaluate_prog _ _ (_ p) = (_,r)`
-          >> Cases_on`r`
-          >> qmatch_assum_rename_tac`evaluate_prog _ _ (_ p) = (_,ctors,res)`
-          >> imp_res_tac evaluate_prog_prefix
-          >> cases_on `res` \\ fs[]
-          \\ cheat )
+  by metis_tac[sv_output_cases]
   >- (
     simp[]
     \\ match_mp_tac dominates'_refl
