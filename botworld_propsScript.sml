@@ -2079,7 +2079,7 @@ val shape_ok_sv = Q.store_thm("shape_ok_sv",
 val sv_thm = Q.store_thm("sv_thm",
   `wf_game (u,S) ∧
    canupdateh S c ∧ shape_ok S p ∧
-   typeof utm = utilityfn_ty ∧
+   typeof utm = expdisc_ty ∧
    typeof Stm = state_with_hole_ty ∧
    typeof ctm = command_ty ∧
    no_ffi σ ∧
