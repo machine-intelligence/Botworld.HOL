@@ -27,6 +27,7 @@ val _ = temp_overload_on ("fail", ``NONE``)
 val _ = temp_overload_on ("lift", ``OPTION_MAP``)
 val _ = temp_overload_on ("guard", ``λb m. monad_unitbind (assert b) m``)
 val _ = temp_overload_on ("sexpnum", ``odestSXNUM``)
+val _ = temp_add_monadsyntax()
 
 (* decoding from sexp *)
 
