@@ -370,10 +370,10 @@ val botworld_write_def = Define`
 
 val botworld_oracle_def = Define`
   botworld_oracle n =
-    if n = 0n then botworld_get_count else
-    if n = 1n then botworld_read else
-    if n = 2n then botworld_write else
-    botworld_get_size (n-3)`;
+    if n = "get_count" then botworld_get_count else
+    if n = "read" then botworld_read else
+    if n = "write" then botworld_write else
+    botworld_get_size (num_from_dec_string n)`;
 
 (* CakeML declarations of helper functions for interfacing with the Botworld FFI *)
 (* TODO: these should be replaced with CF verified functions *)

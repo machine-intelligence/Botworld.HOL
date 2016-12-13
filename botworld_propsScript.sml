@@ -2029,7 +2029,7 @@ val lemmaB = Q.store_thm("lemmaB",
   \\ fs[] );
 
 val no_ffi_op_def = Define`
-  (no_ffi_op (FFI n) ⇔ (n ≠ 2)) ∧
+  (no_ffi_op (FFI n) ⇔ (n ≠ "write")) ∧
   (no_ffi_op _ ⇔ T)`;
 val _ = export_rewrites["no_ffi_op_def"];
 
