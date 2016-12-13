@@ -2077,7 +2077,12 @@ val shape_ok_sv = Q.store_thm("shape_ok_sv",
   \\ rw[shape_ok_def,LENGTH_REPLICATE]);
 
 val sv_output_cases = Q.store_thm("sv_output_cases",
-  `psv = sv l utm Stm ctm p σ ∧ no_ffi σ ⇒
+  `psv = sv l utm Stm ctm p σ ∧
+   typeof utm = expdisc_ty ∧
+   typeof Stm = state_with_hole_ty ∧
+   typeof ctm = command_ty ∧
+   no_ffi σ
+  ⇒
    run_policy obs ck psv = run_policy obs ck p ∨
    (thy,[]) |- mk_target_concl l utm Stm ctm obs (run_policy obs ck psv) (run_policy obs ck p)`,
   rw[run_policy_def]
