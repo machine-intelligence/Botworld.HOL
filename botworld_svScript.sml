@@ -276,10 +276,9 @@ val _ = overload_on("observation_ty",type_to_deep``:observation``);
 val _ = overload_on("expdisc_ty",type_to_deep``:expdisc``);
 val _ = overload_on("command_ty",type_to_deep``:command``);
 val _ = overload_on("dominates_tm",term_to_deep``dominates (:α)``);
-val _ = overload_on("updateh_tm",term_to_deep``updateh``);
 
 val mk_target_concl_def = Define`
-  mk_target_concl l utm Stm ctm obs m1 m2 =
+  mk_target_concl l utm nextStm obs m1 m2 =
   Comb
   (Comb
    (Comb
@@ -287,13 +286,13 @@ val mk_target_concl_def = Define`
     (FST (quote_prod
           ((I, expdisc_ty),
            (I, Fun state_with_hole_ty Bool)))
-     (utm, Comb (Comb (Comb updateh_tm Stm) ctm) (FST quote_observation obs))))
+     (utm, Comb nextStm (FST quote_observation obs))))
    (FST (quote_prod (quote_command, quote_list (quote_list quote_word8))) m1))
   (FST (quote_prod (quote_command, quote_list (quote_list quote_word8))) m2)`;
 
 val check_theorem_def = Define`
-  check_theorem thm l utm Stm ctm obs m1 m2 =
-    aconv (concl thm) (mk_target_concl l utm Stm ctm obs m1 m2)`;
+  check_theorem thm l utm nextStm obs m1 m2 =
+    aconv (concl thm) (mk_target_concl l utm nextStm obs m1 m2)`;
 
 (* TODO: translate mk_target_concl *)
 
@@ -333,7 +332,7 @@ val sv_preamble_decs_def = Define`
   sv_preamble_decs = ARB:prog`; (* TODO *)
 
 val sv_def = Define`
-  sv l utm Stm ctm π σ =
+  sv l utm nextStm π σ =
     (* N.B. this requires there to be enough leftover space in register 0 *)
     encode_register 0 (listsexp o MAP topsexp) (
     (* assumes Botworld preamble gets run by botworld *)
@@ -371,8 +370,7 @@ val sv_def = Define`
                       [Var(Short"thm")
                       ;level_to_ml l
                       ;term_to_ml utm
-                      ;term_to_ml Stm
-                      ;term_to_ml ctm
+                      ;term_to_ml nextStm
                       ;Var(Short"observation")
                       ;Var(Short"policy")
                       ;Var(Short"default")

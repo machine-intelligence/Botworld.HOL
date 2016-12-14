@@ -2069,7 +2069,7 @@ val evaluate_prog_prefix = Q.store_thm("evaluate_prog_prefix",
    cheat);
 
 val shape_ok_sv = Q.store_thm("shape_ok_sv",
-  `shape_ok S (sv l utm Stm ctm p σ) ⇔ shape_ok S p`,
+  `shape_ok S (sv l utm nextStm p σ) ⇔ shape_ok S p`,
   rw[sv_def]
   \\ rw[encode_register_def]
   \\ qpat_abbrev_tac`bs = encode_bytes _ _`
@@ -2077,14 +2077,13 @@ val shape_ok_sv = Q.store_thm("shape_ok_sv",
   \\ rw[shape_ok_def,LENGTH_REPLICATE]);
 
 val sv_output_cases = Q.store_thm("sv_output_cases",
-  `psv = sv l utm Stm ctm p σ ∧
+  `psv = sv l utm nextStm p σ ∧
    typeof utm = expdisc_ty ∧
-   typeof Stm = state_with_hole_ty ∧
-   typeof ctm = command_ty ∧
+   typeof nextStm = (Fun observation_ty (Fun state_with_hole_ty Bool)) ∧
    no_ffi σ
   ⇒
    run_policy obs ck psv = run_policy obs ck p ∨
-   (thy,[]) |- mk_target_concl l utm Stm ctm obs (run_policy obs ck psv) (run_policy obs ck p)`,
+   (thy,[]) |- mk_target_concl l utm nextStm obs (run_policy obs ck psv) (run_policy obs ck p)`,
   rw[run_policy_def]
   \\ cheat);
     (*
@@ -2104,19 +2103,21 @@ val sv_output_cases = Q.store_thm("sv_output_cases",
           \\ cheat )
 *)
 
+val _ = overload_on("updateh_tm",reflectionLib.term_to_deep``updateh``);
+
 val sv_thm = Q.store_thm("sv_thm",
   `wf_game (u,S) ∧
    canupdateh S c ∧ shape_ok S p ∧
    typeof utm = expdisc_ty ∧
-   typeof Stm = state_with_hole_ty ∧
+   typeof Stm = (Fun state_with_hole_ty Bool) ∧
    typeof ctm = command_ty ∧
    no_ffi σ ∧
    (∀o' cp' cp''.
-     (thy,[]) |- mk_target_concl l utm Stm ctm o' cp' cp'' ⇒
+     (thy,[]) |- mk_target_concl l utm (Comb (Comb updateh_tm Stm) ctm) o' cp' cp'' ⇒
        dominates' a l (u,updateh S c o') cp' cp'')
    ⇒
-   dominates a (next l) (u,S) (c, sv l utm Stm ctm p σ) (c,p)`,
-  qpat_abbrev_tac`psv = sv _ _ _ _ _ _`
+   dominates a (next l) (u,S) (c, sv l utm (Comb (Comb updateh_tm Stm) ctm) p σ) (c,p)`,
+  qpat_abbrev_tac`psv = sv _ _ _ _ _`
   \\ qpat_abbrev_tac`S' = updateh _ _`
   \\ strip_tac
   \\ match_mp_tac (MP_CANON lemmaB)
@@ -2151,7 +2152,10 @@ val sv_thm = Q.store_thm("sv_thm",
     \\ rw[] \\ simp[EL_LUPDATE] )
   \\ `run_policy obs ck psv = run_policy obs ck p ∨
       thm obs (run_policy obs ck psv) (run_policy obs ck p)`
-  by metis_tac[sv_output_cases]
+  by (
+    simp[Abbr`thm`]
+    \\ match_mp_tac sv_output_cases
+    \\ simp[] )
   >- (
     simp[]
     \\ match_mp_tac dominates'_refl
